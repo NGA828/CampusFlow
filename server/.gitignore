@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Local configuration (copy `.env.example` to `.env`); secrets never get committed.
+.env
+.env.*
+
+# Embedded database file used by the pglite driver — recreated by `npm run db:reset`
+storage/
+
+# Logs and coverage
+*.log
+coverage/
