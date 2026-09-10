@@ -1,26 +1,177 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * CampusFlow design language.
+ *
+ * A wayfinding-inspired palette: deep ink for structure, an electric indigo for actions,
+ * a signal amber reserved for routes and wayfinding, and a mint/coral pair for state.
+ * Every surface, radius and shadow used by the app is declared here so screens stay
+ * consistent and the design tokens are documented in one place.
+ */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, monospace;
+
+  /* Ink — structure, text, dark surfaces */
+  --color-ink-50: #f6f7fb;
+  --color-ink-100: #eceefa;
+  --color-ink-200: #d7dbeb;
+  --color-ink-300: #b3bad3;
+  --color-ink-400: #8590b0;
+  --color-ink-500: #5c6788;
+  --color-ink-600: #424c6b;
+  --color-ink-700: #2c3450;
+  --color-ink-800: #1b2138;
+  --color-ink-900: #101527;
+  --color-ink-950: #080b17;
+
+  /* Brand — actions, active navigation, focus */
+  --color-brand-50: #eef1ff;
+  --color-brand-100: #dfe4ff;
+  --color-brand-200: #c3ccff;
+  --color-brand-300: #9ea9ff;
+  --color-brand-400: #7a83fb;
+  --color-brand-500: #5b5ff2;
+  --color-brand-600: #4340e0;
+  --color-brand-700: #3730bb;
+  --color-brand-800: #2d2a95;
+  --color-brand-900: #282874;
+
+  /* Signal — routes, wayfinding, "in progress" */
+  --color-signal-50: #fff8ea;
+  --color-signal-100: #ffedc7;
+  --color-signal-200: #ffd889;
+  --color-signal-300: #ffc155;
+  --color-signal-400: #f9a92c;
+  --color-signal-500: #e3890c;
+  --color-signal-600: #b96707;
+  --color-signal-700: #934c0b;
+
+  /* State */
+  --color-mint-50: #e9faf6;
+  --color-mint-100: #cdf3ea;
+  --color-mint-200: #9ce6d6;
+  --color-mint-300: #63d3bd;
+  --color-mint-400: #2fb8a0;
+  --color-mint-500: #129a84;
+  --color-mint-600: #0b7a69;
+  --color-mint-700: #0b6155;
+
+  --color-coral-50: #fff0f1;
+  --color-coral-100: #ffdde0;
+  --color-coral-200: #ffc2c8;
+  --color-coral-300: #fb929c;
+  --color-coral-400: #f26371;
+  --color-coral-500: #dd3746;
+  --color-coral-600: #b92233;
+
+  --color-sky-slate: #eef1f8;
+
+  --radius-card: 16px;
+  --radius-control: 11px;
+  --shadow-card: 0 1px 2px rgb(16 21 39 / 0.05), 0 8px 24px -12px rgb(16 21 39 / 0.14);
+  --shadow-pop: 0 12px 40px -12px rgb(16 21 39 / 0.28);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  body {
+    background-color: var(--color-ink-50);
+    color: var(--color-ink-800);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.015em;
+    font-weight: 650;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-brand-100);
+  }
+
+  /* Tabular numbers everywhere a count, position or ticket is shown. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .surface {
+    background: white;
+    border: 1px solid var(--color-ink-100);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  .surface-flat {
+    background: white;
+    border: 1px solid var(--color-ink-100);
+    border-radius: var(--radius-card);
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-200) transparent;
+  }
+
+  .animate-in {
+    animation: cf-fade-in 0.24s ease-out both;
+  }
+
+  .animate-rise {
+    animation: cf-rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .route-dash {
+    stroke-dasharray: 10 8;
+    animation: cf-dash 1.4s linear infinite;
+  }
+}
+
+@keyframes cf-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cf-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cf-dash {
+  to {
+    stroke-dashoffset: -36;
+  }
+}
+
+/* MapLibre canvas: keep it inside the rounded frame and free of default chrome. */
+.maplibregl-canvas {
+  outline: none !important;
+}
+.maplibregl-ctrl-attrib {
+  display: none !important;
 }

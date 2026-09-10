@@ -1,56 +1,54 @@
-# Welcome to your Expo app 👋
+# CampusFlow mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The CampusFlow mobile client — Expo SDK 57 + expo-router, talking to the same REST API as the web
+app (`server/`). It is not a wrapper around the website: every screen calls the API through
+`src/lib/api.ts`, so role rules, queue transactions and navigation logic are identical on both
+clients.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run it
 
 ```bash
-npm run reset-project
+cd mobile
+npm install
+
+# Point the app at the API. Use your machine's LAN address — a phone cannot reach 127.0.0.1.
+EXPO_PUBLIC_API_URL=http://192.168.1.20:3000/api/v1 npm run start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Then open the QR code with **Expo Go** (Android/iOS) or press `a` / `i` for an emulator. The API
+must be running (`npm --prefix ../server run dev`) and reachable from the device. The web target is
+also available with `npm run web` for a quick look at the layout.
 
-### Other setup steps
+Demo accounts (seeded by `npm --prefix ../server run db:seed`): `student@campusflow.dev`,
+`staff@campusflow.dev`, `admin@campusflow.dev` — password `CampusFlow2026!`.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Screens
 
-## Learn more
+| Route | What it does |
+| --- | --- |
+| `(auth)/login`, `(auth)/register` | Session handling; the token is kept in `expo-secure-store` and validated against `GET /auth/me` on launch |
+| `(tabs)/index` | Dashboard: next class with countdown, today's sessions, active queue/office tickets, notices, building alerts |
+| `(tabs)/timetable` | Week selector and per-day sessions derived from enrolments, with navigate and room-detail actions |
+| `(tabs)/map` | Buildings and room search straight from the campus API |
+| `(tabs)/queue` | Live room queues: join (with an optional GPS fix for the geofence), position, ETA, check-in, cancel |
+| `(tabs)/more` | Offices, scanner, assistant, notifications and profile |
+| `scan` | `expo-camera` QR scanning with manual code/payload fallback and the API's rejection reasons |
+| `offices`, `office/[code]` | Office status, service windows, ticket request, check-in and cancel |
+| `room/[code]` | Availability computed from the timetable, free slots, amenities, join queue |
+| `navigate/[code]` | Route steps from the walking graph, live tracking via `expo-location`, off-route warning with the grace countdown |
+| `notifications` | Notification centre with unread state and mark-as-read |
+| `assistant` | Campus assistant chat showing the backend tool calls behind each answer |
+| `profile` | Profile edits, session/device details, push registration status |
 
-To learn more about developing your project with Expo, look at the following resources:
+## Push notifications
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+`src/lib/notifications.ts` requests permission and registers the Expo push token with
+`POST /me/devices` (best-effort: Expo Go and simulators cannot always mint a token). In-app and
+websocket delivery work regardless, and the notification centre always reads `GET /me/notifications`.
 
-## Join the community
+## Checks
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npx tsc --noEmit          # types
+npx expo export --platform web   # bundles every route (fast smoke test without a device)
+```

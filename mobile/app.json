@@ -1,16 +1,25 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "CampusFlow",
+    "slug": "campusflow",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
-    "userInterfaceStyle": "automatic",
+    "scheme": "campusflow",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.campusflow.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "CampusFlow uses the camera to scan the QR anchors that fix your indoor position and confirm queue check-ins.",
+        "NSLocationWhenInUseUsageDescription": "CampusFlow uses your location to validate queue geofences, follow your walking route and check you in at service desks."
+      }
     },
     "android": {
+      "package": "dev.campusflow.app",
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "POST_NOTIFICATIONS"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -28,13 +37,29 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#4340e0",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow CampusFlow to use the camera to scan campus QR anchors."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow CampusFlow to use your location for queue geofences and live navigation."
+        }
+      ],
+      "expo-notifications"
     ],
+    "extra": {
+      "apiUrl": "http://127.0.0.1:3000/api/v1"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
