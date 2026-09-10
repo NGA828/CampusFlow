@@ -1,0 +1,19 @@
+{
+  "name": "campusflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CampusFlow — Intelligent Campus Management, Navigation and Student Services Platform",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "setup": "npm --prefix server install && npm --prefix frontend install && npm --prefix mobile install && npm run db:reset",
+    "db:migrate": "npm --prefix server run db:migrate",
+    "db:seed": "npm --prefix server run db:seed",
+    "db:reset": "npm --prefix server run db:reset",
+    "test": "npm --prefix server run test",
+    "typecheck": "npm --prefix server run typecheck && npm --prefix frontend run typecheck",
+    "lint": "npm --prefix frontend run lint"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

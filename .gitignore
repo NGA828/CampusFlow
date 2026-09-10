@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+.next/
+out/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# Environment — real configuration stays local; `.env.example` files are tracked.
+.env
+.env.*
+!.env.example
+
+# Local database / uploaded artifacts (the API recreates these from migrations + seed)
+server/storage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test / coverage output
+coverage/
+.nyc_output/
+.pytest_cache/
+__pycache__/
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
