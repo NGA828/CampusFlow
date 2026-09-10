@@ -1,26 +1,195 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================
+   CAMPUSFLOW DESIGN SYSTEM — tokens
+   A single source of truth consumed by Tailwind utilities.
+   ============================================================ */
+
+@theme {
+  /* --- Brand: "flow blue" (primary actions, identity) --- */
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe7fe;
+  --color-brand-200: #bfd4fe;
+  --color-brand-300: #93b8fd;
+  --color-brand-400: #6092fa;
+  --color-brand-500: #3b6df6;
+  --color-brand-600: #254beb; /* primary */
+  --color-brand-700: #1d38d8;
+  --color-brand-800: #1e30af;
+  --color-brand-900: #1e2e8a;
+  --color-brand-950: #171f54;
+
+  /* --- Ink: neutral UI gray (text, surfaces, borders) --- */
+  --color-ink-25: #fcfcfd;
+  --color-ink-50: #f7f8fa;
+  --color-ink-100: #f0f1f4;
+  --color-ink-200: #e3e5ea;
+  --color-ink-300: #cbd0d9;
+  --color-ink-400: #9aa1ad;
+  --color-ink-500: #6f7785;
+  --color-ink-600: #565e6b;
+  --color-ink-700: #424957;
+  --color-ink-800: #2b303c;
+  --color-ink-900: #191c24;
+  --color-ink-950: #0e1016;
+
+  /* --- Accent: "assistant violet" (AI surfaces) --- */
+  --color-accent-50: #f5f2ff;
+  --color-accent-100: #ece5ff;
+  --color-accent-200: #dccfff;
+  --color-accent-300: #c2a9ff;
+  --color-accent-400: #a47aff;
+  --color-accent-500: #8a4cf7;
+  --color-accent-600: #7c2aed;
+  --color-accent-700: #6a1fc7;
+  --color-accent-800: #591ba3;
+  --color-accent-900: #4a1883;
+
+  /* --- Semantic (semantic names alias Tailwind defaults) --- */
+  --color-success-50: #ecfdf3;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-warning-50: #fffbeb;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-danger-50: #fef2f2;
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+  --color-info-50: #eff6ff;
+  --color-info-500: #3b82f6;
+  --color-info-600: #2563eb;
+  --color-info-700: #1d4ed8;
+
+  /* --- Typography --- */
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono",
+    Menlo, Consolas, monospace;
+
+  /* --- Radius --- */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-full: 9999px;
+
+  /* --- Elevation --- */
+  --shadow-soft: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 4px 12px rgb(16 24 40 / 0.06);
+  --shadow-lifted: 0 2px 4px rgb(16 24 40 / 0.06),
+    0 12px 24px -8px rgb(16 24 40 / 0.14);
+  --shadow-glow: 0 0 0 4px rgb(37 75 235 / 0.14);
+
+  /* --- Motion --- */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* ============================================================
+   Base
+   ============================================================ */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-ink-50);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background-color: var(--color-brand-100);
+  color: var(--color-brand-900);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Tabular figures for queue positions, times, metrics */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin, unobtrusive scrollbars on desktop panels */
+@media (pointer: fine) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-300) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-ink-300);
+    border-radius: 9999px;
+  }
+}
+
+/* ============================================================
+   Shared animation utilities
+   ============================================================ */
+
+@keyframes cf-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cf-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cf-pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.animate-fade-up {
+  animation: cf-fade-up 0.4s var(--ease-out-soft) both;
+}
+
+.animate-fade-in {
+  animation: cf-fade-in 0.3s ease-out both;
+}
+
+.animate-pulse-soft {
+  animation: cf-pulse-soft 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-in,
+  .animate-pulse-soft {
+    animation: none;
+  }
 }
