@@ -70,7 +70,7 @@ export default function RoomDetailScreen() {
               <Stat label="Occupancy" value={availability.occupancy ? `${availability.occupancy.enrolled}/${availability.occupancy.capacity}` : '—'} />
             </View>
             <View style={styles.actions}>
-              <Button label="Navigate here" onPress={() => router.push(`/navigate/${encodeURIComponent(room_.code)}`)} style={{ flex: 1 }} />
+              <Button label="Navigate here" onPress={() => router.push(`/navigate/${encodeURIComponent(room_.code)}` as any)} style={{ flex: 1 }} />
               {room_.requires_admission ? <Button label="Join queue" variant="secondary" loading={busy} onPress={() => void joinQueue()} style={{ flex: 1 }} /> : null}
             </View>
           </Card>

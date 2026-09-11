@@ -44,11 +44,11 @@ export default function MapScreen() {
         </View>
 
         <View style={styles.actions}>
-          <Pressable style={styles.action} onPress={() => router.push('/scan')}>
+          <Pressable style={styles.action} onPress={() => router.push('/scan' as any)}>
             <Ionicons name="qr-code-outline" size={18} color={colors.brand700} />
             <Small style={{ color: colors.brand700, fontWeight: '700' }}>Scan anchor</Small>
           </Pressable>
-          <Pressable style={styles.action} onPress={() => router.push('/room/A-103')}>
+          <Pressable style={styles.action} onPress={() => router.push('/room/A-103' as any)}>
             <Ionicons name="navigate-outline" size={18} color={colors.ink600} />
             <Small style={{ color: colors.ink600, fontWeight: '700' }}>Try a route</Small>
           </Pressable>
@@ -102,7 +102,7 @@ export default function MapScreen() {
             </Card>
           ) : null}
           {rooms.data?.items.map((room) => (
-            <Pressable key={room.id} onPress={() => router.push(`/room/${encodeURIComponent(room.code)}`)} style={styles.roomRow}>
+            <Pressable key={room.id} onPress={() => router.push(`/room/${encodeURIComponent(room.code)}` as any)} style={styles.roomRow}>
               <View style={{ flex: 1 }}>
                 <Small style={{ color: colors.ink800, fontWeight: '700' }}>{room.code}</Small>
                 <Small>

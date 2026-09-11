@@ -31,7 +31,7 @@ export default function MoreScreen() {
       <View style={styles.padded}>
         <Card>
           {LINKS.map((link) => (
-            <ListRow key={link.href} onPress={() => router.push(link.href)}>
+            <ListRow key={link.href} onPress={() => router.push(link.href as any)}>
               <View style={styles.rowLeft}>
                 <Ionicons name={link.icon} size={19} color={colors.brand700} />
                 <View style={{ flex: 1 }}>

@@ -141,7 +141,7 @@ export default function QueueScreen() {
                 loading={busyId === active.ticket.id}
                 style={{ flex: 1 }}
               />
-              <Button label="Navigate" variant="secondary" onPress={() => router.push(`/navigate/${encodeURIComponent(active.queue.room_code ?? '')}`)} style={{ flex: 1 }} />
+              <Button label="Navigate" variant="secondary" onPress={() => router.push(`/navigate/${encodeURIComponent(active.queue.room_code ?? '')}` as any)} style={{ flex: 1 }} />
             </View>
             {active.can_cancel ? (
               <Button label="Cancel ticket" variant="ghost" onPress={() => void cancel()} style={{ marginTop: spacing.sm }} />

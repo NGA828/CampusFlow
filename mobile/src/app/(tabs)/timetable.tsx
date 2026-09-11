@@ -100,12 +100,12 @@ export default function TimetableScreen() {
 
             {entry.room_code ? (
               <View style={styles.actions}>
-                <Pressable onPress={() => router.push(`/navigate/${encodeURIComponent(entry.room_code ?? '')}`)} style={styles.action}>
+                <Pressable onPress={() => router.push(`/navigate/${encodeURIComponent(entry.room_code ?? '')}` as any)} style={styles.action}>
                   <Ionicons name="navigate-outline" size={16} color={colors.brand700} />
                   <Small style={{ color: colors.brand700, fontWeight: '600' }}>Navigate</Small>
                 </Pressable>
                 {entry.room_id ? (
-                  <Pressable onPress={() => router.push(`/room/${encodeURIComponent(entry.room_code ?? '')}`)} style={styles.action}>
+                  <Pressable onPress={() => router.push(`/room/${encodeURIComponent(entry.room_code ?? '')}` as any)} style={styles.action}>
                     <Ionicons name="information-circle-outline" size={16} color={colors.ink600} />
                     <Small style={{ color: colors.ink600, fontWeight: '600' }}>Room details</Small>
                   </Pressable>

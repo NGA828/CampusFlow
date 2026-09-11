@@ -89,7 +89,7 @@ export default function RegisterScreen() {
 
           <View style={styles.links}>
             <Small>Already registered? </Small>
-            <Link href="/login">
+            <Link href={"/login" as any}>
               <Text style={styles.link}>Sign in</Text>
             </Link>
           </View>

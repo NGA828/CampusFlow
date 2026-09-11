@@ -42,7 +42,7 @@ export default function OfficesScreen() {
                 Expected {formatClock(myTicket.expected_window.starts_at)}–{formatClock(myTicket.expected_window.ends_at)}
               </Small>
             ) : null}
-            <Button label="Open my ticket" variant="secondary" onPress={() => router.push(`/office/${myTicket.office.code}`)} style={{ marginTop: spacing.md }} />
+            <Button label="Open my ticket" variant="secondary" onPress={() => router.push(`/office/${myTicket.office.code}` as any)} style={{ marginTop: spacing.md }} />
           </Card>
         </View>
       ) : null}
@@ -81,7 +81,7 @@ export default function OfficesScreen() {
               </Small>
             </View>
 
-            <Button label="Request a ticket" onPress={() => router.push(`/office/${summary.office.code}`)} style={{ marginTop: spacing.md }} />
+            <Button label="Request a ticket" onPress={() => router.push(`/office/${summary.office.code}` as any)} style={{ marginTop: spacing.md }} />
           </Card>
         ))}
 

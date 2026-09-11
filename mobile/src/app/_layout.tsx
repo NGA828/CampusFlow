@@ -22,9 +22,9 @@ function RootNavigator() {
 
   useEffect(() => {
     if (!ready) return;
-    const inAuthGroup = segments[0] === '(auth)';
-    if (!user && !inAuthGroup) router.replace('/login');
-    else if (user && inAuthGroup) router.replace('/');
+    const inAuthGroup = (segments[0] as string) === '(auth)';
+    if (!user && !inAuthGroup) router.replace('/login' as any);
+    else if (user && inAuthGroup) router.replace('/' as any);
   }, [ready, user, segments, router]);
 
   useEffect(() => {

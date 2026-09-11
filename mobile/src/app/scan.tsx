@@ -88,7 +88,7 @@ export default function ScanScreen() {
               ) : null}
             </View>
             <View style={styles.actions}>
-              <Button label="Campus map" variant="secondary" onPress={() => router.push('/map')} style={{ flex: 1 }} />
+              <Button label="Campus map" variant="secondary" onPress={() => router.push('/map' as any)} style={{ flex: 1 }} />
               <Button label="Scan again" onPress={() => { setPosition(null); setScanning(true); setError(null); }} style={{ flex: 1 }} />
             </View>
           </Card>

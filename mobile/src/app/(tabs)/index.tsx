@@ -29,7 +29,7 @@ export default function HomeScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Notifications"
-          onPress={() => router.push('/notifications')}
+          onPress={() => router.push('/notifications' as any)}
           style={styles.bell}
         >
           <Ionicons name="notifications-outline" size={20} color={colors.ink700} />
@@ -65,10 +65,10 @@ export default function HomeScreen() {
                     label="Navigate"
                     variant="secondary"
                     style={{ flex: 1 }}
-                    onPress={() => router.push(`/navigate/${encodeURIComponent(data.next_class?.room_code ?? '')}`)}
+                    onPress={() => router.push(`/navigate/${encodeURIComponent(data.next_class?.room_code ?? '')}` as any)}
                   />
                 ) : null}
-                <Button label="Timetable" variant="ghost" style={{ flex: 1 }} onPress={() => router.push('/timetable')} />
+                <Button label="Timetable" variant="ghost" style={{ flex: 1 }} onPress={() => router.push('/timetable' as any)} />
               </View>
             </Card>
           ) : (
@@ -98,7 +98,7 @@ export default function HomeScreen() {
                 <KeyValue label="Check-in closes" value={countdown(data.queue_ticket.seconds_until_deadline)} />
                 <KeyValue label="Expected service" value={formatClock(data.queue_ticket.expected_service_at)} />
               </View>
-              <Button label="Open queue" variant="secondary" style={{ marginTop: spacing.md }} onPress={() => router.push('/queue')} />
+              <Button label="Open queue" variant="secondary" style={{ marginTop: spacing.md }} onPress={() => router.push('/queue' as any)} />
             </Card>
           ) : null}
 
@@ -114,7 +114,7 @@ export default function HomeScreen() {
                   Expected {formatClock(data.office_ticket.expected_window.starts_at)}–{formatClock(data.office_ticket.expected_window.ends_at)}
                 </Small>
               ) : null}
-              <Button label="Open tickets" variant="secondary" style={{ marginTop: spacing.md }} onPress={() => router.push('/offices')} />
+              <Button label="Open tickets" variant="secondary" style={{ marginTop: spacing.md }} onPress={() => router.push('/offices' as any)} />
             </Card>
           ) : null}
 
@@ -144,7 +144,7 @@ export default function HomeScreen() {
                   {entry.is_now ? <Badge tone="mint">now</Badge> : entry.is_next ? <Badge tone="brand">next</Badge> : null}
                 </View>
               ))}
-              <Link href="/timetable">
+              <Link href={"/timetable" as any}>
                 <Body style={{ color: colors.brand600, fontWeight: '600', marginTop: spacing.md }}>Open the full week →</Body>
               </Link>
             </Card>

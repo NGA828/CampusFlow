@@ -82,7 +82,7 @@ export default function LoginScreen() {
 
           <View style={styles.links}>
             <Small>New here? </Small>
-            <Link href="/register">
+            <Link href={"/register" as any}>
               <Text style={styles.link}>Create an account</Text>
             </Link>
           </View>

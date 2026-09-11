@@ -73,7 +73,7 @@ export default function NavigateScreen() {
       setTracking(true);
       subscription.current = await Location.watchPositionAsync(
         { accuracy: Location.Accuracy.Balanced, timeInterval: 4000, distanceInterval: 5 },
-        (location) => {
+        (location: Location.LocationObject) => {
           const now = Date.now();
           if (now - lastPost.current < 3500) return;
           lastPost.current = now;
