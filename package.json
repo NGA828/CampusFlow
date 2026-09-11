@@ -5,12 +5,12 @@
   "description": "CampusFlow — Intelligent Campus Management, Navigation and Student Services Platform",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "setup": "npm --prefix server install && npm --prefix frontend install && npm --prefix mobile install && npm run db:reset",
-    "db:migrate": "npm --prefix server run db:migrate",
-    "db:seed": "npm --prefix server run db:seed",
-    "db:reset": "npm --prefix server run db:reset",
-    "test": "npm --prefix server run test",
-    "typecheck": "npm --prefix server run typecheck && npm --prefix frontend run typecheck",
+    "setup": "composer install --working-dir=backend && npm --prefix frontend install && npm --prefix mobile install && php backend/artisan migrate --seed",
+    "db:migrate": "php backend/artisan migrate",
+    "db:seed": "php backend/artisan db:seed",
+    "db:reset": "php backend/artisan migrate:fresh --seed",
+    "test": "php backend/artisan test",
+    "typecheck": "npm --prefix frontend run typecheck && npm --prefix mobile exec tsc -- --noEmit",
     "lint": "npm --prefix frontend run lint"
   },
   "engines": {

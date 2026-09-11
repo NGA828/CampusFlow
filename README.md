@@ -1,14 +1,14 @@
 # CampusFlow — Navigate. Learn. Connect.
 
 An intelligent campus management, navigation and student-services platform: a **Next.js web app**,
-an **Expo mobile app** and a **Node/Fastify REST API** sharing one set of contracts, backed by a
-relational database with a real spatial model.
+an **Expo mobile app** and a **Laravel REST API** sharing one set of contracts, backed by
+PostgreSQL/PostGIS.
 
 ```
 frontend/   Next.js 16 (App Router, React 19, Tailwind v4) — student, staff and admin consoles
 mobile/     Expo SDK 57 (expo-router) — scanner, queues, timetable, live navigation
-server/     Fastify + TypeScript API — auth/RBAC, campus, positioning, navigation, queues,
-            offices, engagement, notifications, AI assistant, analytics
+backend/    Laravel API — auth/RBAC, campus, positioning, navigation, queues, offices,
+            engagement, notifications and administration
 scripts/    dev launcher
 docs/       Architecture, API and design-research documentation
 ```
@@ -16,8 +16,8 @@ docs/       Architecture, API and design-research documentation
 ## Quick start
 
 ```bash
-npm run setup        # installs server, frontend and mobile, migrates + seeds the database
-npm run dev          # API on :3000, web app on :3100
+npm run setup        # installs Laravel, frontend and mobile, migrates + seeds the database
+npm run dev          # Laravel API on :8000, web app on :3100
 ```
 
 Open <http://localhost:3100>. Seeded accounts (password `CampusFlow2026!`):
@@ -29,13 +29,14 @@ Open <http://localhost:3100>. Seeded accounts (password `CampusFlow2026!`):
 | Admin | `admin@campusflow.dev` |
 
 Database helpers: `npm run db:migrate`, `npm run db:seed`, `npm run db:reset`. Checks:
-`npm run typecheck`, `npm test` (API), `node server/scripts/smoke.py` (end-to-end request sweep).
+`npm run typecheck`, `npm test` (Laravel API), and the Laravel feature tests provide the
+end-to-end API coverage.
 
 ### Mobile app
 
 ```bash
 cd mobile && npm install
-EXPO_PUBLIC_API_URL=http://<your-lan-ip>:3000/api/v1 npm run start   # scan the QR with Expo Go
+EXPO_PUBLIC_API_URL=http://<your-lan-ip>:8000/api/v1 npm run start   # scan the QR with Expo Go
 ```
 
 A phone cannot reach `127.0.0.1`, so point `EXPO_PUBLIC_API_URL` at your machine's LAN address.
@@ -68,4 +69,4 @@ See [`mobile/README.md`](mobile/README.md) for the screen list and push-notifica
 
 Additional documents (architecture, API, database, navigation, queue system, administrative
 office, AI assistant, testing, deployment) are listed in `AGENTS.md`/`PROMPT.md`; they are written
-from the same source of truth as the code in `server/src` and `frontend/`.
+from the same source of truth as the code in `backend/` and `frontend/`.

@@ -2,14 +2,11 @@
 /**
  * CampusFlow development launcher.
  *
- * Starts both halves of the modular monolith:
- *   • API   — Fastify on PORT (default 3000); migrations run automatically on boot
- *   • Web   — Next.js dev server on WEB_DEV_PORT (default 3100)
+ * Starts the Laravel API and Next.js web client used by the project.
  *
- * The API also reverse-proxies every non-API request to the Next server, so the browser
- * only ever talks to one origin (http://localhost:3000). That keeps cookies, CORS and the
- * realtime socket on /api/ws simple, and it means the sandbox preview only needs the API
- * port exposed.
+ * The Laravel API runs on port 8000 and the Next.js development server runs on port 3100.
+ * Web requests use Next's rewrite to reach Laravel, while mobile clients call Laravel
+ * directly using EXPO_PUBLIC_API_URL.
  */
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -17,7 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const apiPort = process.env.PORT ?? '3000';
+const apiPort = process.env.API_PORT ?? '8000';
 const webPort = process.env.WEB_DEV_PORT ?? '3100';
 
 const COLORS = { api: '\u001b[36m', web: '\u001b[35m', reset: '\u001b[0m' };
@@ -70,15 +67,15 @@ function shutdown(code = 0) {
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
-const serverDir = join(root, 'server');
+const backendDir = join(root, 'backend');
 const frontendDir = join(root, 'frontend');
 
-if (!existsSync(join(serverDir, 'node_modules'))) {
-  console.error('[campusflow] server dependencies are missing — run: npm --prefix server install');
+if (!existsSync(join(backendDir, 'vendor', 'autoload.php'))) {
+  console.error('[campusflow] Laravel dependencies are missing — run: composer install --working-dir=backend');
   process.exit(1);
 }
 
-start('api', 'npm', ['run', 'dev'], serverDir, { PORT: apiPort, WEB_DEV_PORT: webPort });
+start('api', 'php', ['artisan', 'serve', '--host=0.0.0.0', `--port=${apiPort}`], backendDir);
 
 if (existsSync(join(frontendDir, 'node_modules'))) {
   start('web', 'npm', ['run', 'dev', '--', '--port', webPort, '--hostname', '0.0.0.0'], frontendDir, {
@@ -90,6 +87,6 @@ if (existsSync(join(frontendDir, 'node_modules'))) {
 }
 
 process.stdout.write(
-  `\nCampusFlow dev\n  web  http://localhost:${apiPort} (proxied to Next on :${webPort})\n` +
+  `\nCampusFlow dev\n  web  http://localhost:${webPort}\n` +
     `  api  http://localhost:${apiPort}/api/v1\n\n`,
 );

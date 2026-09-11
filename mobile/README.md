@@ -1,7 +1,7 @@
 # CampusFlow mobile
 
 The CampusFlow mobile client — Expo SDK 57 + expo-router, talking to the same REST API as the web
-app (`server/`). It is not a wrapper around the website: every screen calls the API through
+app (`backend/`). It is not a wrapper around the website: every screen calls the API through
 `src/lib/api.ts`, so role rules, queue transactions and navigation logic are identical on both
 clients.
 
@@ -12,14 +12,14 @@ cd mobile
 npm install
 
 # Point the app at the API. Use your machine's LAN address — a phone cannot reach 127.0.0.1.
-EXPO_PUBLIC_API_URL=http://192.168.1.20:3000/api/v1 npm run start
+EXPO_PUBLIC_API_URL=http://192.168.1.20:8000/api/v1 npm run start
 ```
 
 Then open the QR code with **Expo Go** (Android/iOS) or press `a` / `i` for an emulator. The API
-must be running (`npm --prefix ../server run dev`) and reachable from the device. The web target is
+must be running (`php ../backend/artisan serve --host=0.0.0.0 --port=8000`) and reachable from the device. The web target is
 also available with `npm run web` for a quick look at the layout.
 
-Demo accounts (seeded by `npm --prefix ../server run db:seed`): `student@campusflow.dev`,
+Demo accounts (seeded by `php ../backend/artisan db:seed`): `student@campusflow.dev`,
 `staff@campusflow.dev`, `admin@campusflow.dev` — password `CampusFlow2026!`.
 
 ## Screens

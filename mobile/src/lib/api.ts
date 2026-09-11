@@ -7,6 +7,7 @@
  */
 import axios, { AxiosError, type AxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 import type {
   AiReply,
@@ -37,14 +38,35 @@ const TOKEN_KEY = 'campusflow.token';
 
 let memoryToken: string | null = null;
 
+function webStorage(): Storage | null {
+  if (Platform.OS !== 'web' || typeof localStorage === 'undefined') return null;
+  return localStorage;
+}
+
 export async function loadToken(): Promise<string | null> {
   if (memoryToken) return memoryToken;
+  const browserStorage = webStorage();
+  if (browserStorage) {
+    memoryToken = browserStorage.getItem(TOKEN_KEY);
+    return memoryToken;
+  }
+  if (!(await SecureStore.isAvailableAsync())) return null;
   memoryToken = await SecureStore.getItemAsync(TOKEN_KEY);
   return memoryToken;
 }
 
 export async function saveToken(token: string | null): Promise<void> {
   memoryToken = token;
+  const browserStorage = webStorage();
+  if (browserStorage) {
+    if (token) browserStorage.setItem(TOKEN_KEY, token);
+    else browserStorage.removeItem(TOKEN_KEY);
+    return;
+  }
+  if (!(await SecureStore.isAvailableAsync())) {
+    if (token) throw new Error('Secure token storage is unavailable on this device.');
+    return;
+  }
   if (token) await SecureStore.setItemAsync(TOKEN_KEY, token);
   else await SecureStore.deleteItemAsync(TOKEN_KEY);
 }
