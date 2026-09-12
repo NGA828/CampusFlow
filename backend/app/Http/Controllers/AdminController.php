@@ -14,6 +14,7 @@ use App\Models\Office;
 use App\Models\OfficeServiceWindow;
 use App\Models\OfficeStaff;
 use App\Models\OfficeTicket;
+use App\Models\NavigationSession;
 use App\Models\QrNode;
 use App\Models\QueueTicket;
 use App\Models\Room;
@@ -66,23 +67,72 @@ class AdminController extends Controller
 
     /* ─────────────────────────────────────── dashboard */
 
-    public function dashboard(): JsonResponse
+    public function dashboard(Request $request): JsonResponse
     {
+        if (!$this->requireAdmin($request)) return $this->forbidden();
+
+        $now = now();
         $totalUsers          = User::count();
         $totalStudents       = User::where('role', 'student')->count();
         $totalStaff          = User::where('role', 'staff')->count();
-        $activeRoomTickets   = QueueTicket::whereIn('status', ['waiting', 'called'])->count();
+        $activeRoomTickets   = QueueTicket::whereIn('status', ['waiting', 'called', 'checked_in'])->count();
         $activeOfficeTickets = OfficeTicket::whereIn('status', ['waiting', 'called', 'in_service'])->count();
         $todayAdmitted       = QueueTicket::where('status', 'admitted')->whereDate('admitted_at', now()->today())->count();
         $todayOfficeCompleted= OfficeTicket::where('status', 'completed')->whereDate('completed_at', now()->today())->count();
         $buildingsCount      = Building::count();
         $roomsCount          = Room::count();
+        $queues = RoomQueue::with('room')
+            ->get()
+            ->map(fn ($queue) => [
+                'queue_id' => $queue->id,
+                'room_code' => $queue->room?->code,
+                'room_name' => $queue->room?->name,
+                'building_code' => $queue->room?->floor?->building?->code,
+                'waiting' => QueueTicket::where('queue_id', $queue->id)->where('status', 'waiting')->count(),
+                'occupying' => QueueTicket::where('queue_id', $queue->id)->whereIn('status', ['called', 'checked_in'])->count(),
+                'admission_capacity' => $queue->capacity,
+                'is_active' => $queue->is_open,
+            ])->values();
+        $issued7d = QueueTicket::where('created_at', '>=', $now->copy()->subDays(7))->count();
+        $officeIssued7d = OfficeTicket::where('created_at', '>=', $now->copy()->subDays(7))->count();
+        $navigation7d = NavigationSession::where('created_at', '>=', $now->copy()->subDays(7));
+        $recentAudit = DB::table('audit_logs')->orderByDesc('created_at')->limit(8)->get()->map(fn ($log) => [
+            'id' => $log->id,
+            'action' => $log->action,
+            'entity_type' => $log->entity_type,
+            'entity_id' => $log->entity_id,
+            'actor_name' => null,
+            'created_at' => $log->created_at,
+        ])->values();
 
         return $this->ok([
-            'users'  => ['total' => $totalUsers, 'students' => $totalStudents, 'staff' => $totalStaff],
-            'queues' => ['active_room_tickets' => $activeRoomTickets, 'active_office_tickets' => $activeOfficeTickets,
-                         'today_room_admitted' => $todayAdmitted, 'today_office_served' => $todayOfficeCompleted],
-            'campus' => ['buildings' => $buildingsCount, 'rooms' => $roomsCount],
+            'kpis' => [
+                'generated_at' => $now->toIso8601String(),
+                'students' => $totalStudents,
+                'staff' => $totalStaff,
+                'waiting_now' => $activeRoomTickets,
+                'issued_today' => QueueTicket::whereDate('created_at', $now->toDateString())->count(),
+                'office_waiting_now' => $activeOfficeTickets,
+                'office_completed_today' => $todayOfficeCompleted,
+                'navigation_sessions_today' => NavigationSession::whereDate('created_at', $now->toDateString())->count(),
+                'average_wait_minutes' => null,
+                'no_show_rate_7d' => null,
+                'rooms' => $roomsCount,
+                'buildings' => $buildingsCount,
+            ],
+            'overview' => [
+                'generated_at' => $now->toIso8601String(),
+                'users' => ['students' => $totalStudents, 'staff' => $totalStaff, 'admins' => User::where('role', 'admin')->count(), 'total' => $totalUsers, 'active_7d' => User::where('updated_at', '>=', $now->copy()->subDays(7))->count()],
+                'campus' => ['buildings' => $buildingsCount, 'floors' => Floor::count(), 'rooms' => $roomsCount, 'total_capacity' => Room::sum('capacity'), 'qr_nodes' => QrNode::count(), 'navigation_nodes' => NavigationNode::count(), 'navigation_edges' => NavigationEdge::count()],
+                'queues' => ['configured' => RoomQueue::count(), 'active' => RoomQueue::where('is_open', true)->count(), 'waiting_now' => $activeRoomTickets, 'issued_today' => QueueTicket::whereDate('created_at', $now->toDateString())->count(), 'issued_7d' => $issued7d, 'called_today' => QueueTicket::whereDate('called_at', $now->toDateString())->count(), 'average_wait_minutes' => null, 'average_service_minutes' => null, 'no_show_rate_7d' => null, 'busiest_rooms' => [], 'hourly_volume' => []],
+                'offices' => ['configured' => Office::count(), 'open_now' => Office::where('is_open', true)->count(), 'issued_today' => OfficeTicket::whereDate('created_at', $now->toDateString())->count(), 'completed_today' => $todayOfficeCompleted, 'waiting_now' => $activeOfficeTickets, 'average_service_minutes' => null, 'average_wait_minutes' => null, 'no_show_rate_7d' => null, 'busiest' => []],
+                'navigation' => ['sessions_today' => NavigationSession::whereDate('created_at', $now->toDateString())->count(), 'sessions_7d' => $navigation7d->count(), 'completion_rate_7d' => null, 'off_route_events_7d' => 0, 'recalculations_7d' => 0, 'average_distance_m' => null, 'popular_destinations' => []],
+                'engagement' => ['events_upcoming' => CampusEvent::where('starts_at', '>=', $now)->count(), 'announcements_active' => Announcement::whereNotNull('published_at')->count(), 'notifications_7d' => DB::table('notifications')->where('created_at', '>=', $now->copy()->subDays(7))->count()],
+                'utilisation' => [],
+            ],
+            'live_queues' => $queues,
+            'recent_audit' => $recentAudit,
+            'buildings' => Building::orderBy('code')->get()->map(fn ($building) => ['id' => $building->id, 'code' => $building->code, 'name' => $building->name, 'status' => $building->status, 'is_public' => $building->is_public])->values(),
         ]);
     }
 

@@ -1,8 +1,8 @@
 /**
  * API contracts for the web and mobile clients.
  *
- * Field names mirror the Fastify serialisers in `server/src/routes/*` exactly — the
- * screens never guess. Anything optional is genuinely optional in the API.
+ * Field names are the web-client contract for the authoritative Laravel API. Anything
+ * optional is genuinely optional in the API.
  */
 
 export type Role = 'visitor' | 'student' | 'staff' | 'admin';

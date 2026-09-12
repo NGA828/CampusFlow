@@ -20,7 +20,7 @@ npm run setup        # installs Laravel, frontend and mobile, migrates + seeds t
 npm run dev          # Laravel API on :8000, web app on :3100
 ```
 
-Open <http://localhost:3100>. Seeded accounts (password `CampusFlow2026!`):
+Open <http://localhost:3100>. Seeded accounts (password `password123`):
 
 | Role | Email |
 | --- | --- |
@@ -36,7 +36,7 @@ end-to-end API coverage.
 
 ```bash
 cd mobile && npm install
-EXPO_PUBLIC_API_URL=http://<your-lan-ip>:8000/api/v1 npm run start   # scan the QR with Expo Go
+EXPO_PUBLIC_API_URL=http://<your-lan-ip>:8001/api/v1 npm run start   # scan the QR with Expo Go
 ```
 
 A phone cannot reach `127.0.0.1`, so point `EXPO_PUBLIC_API_URL` at your machine's LAN address.

@@ -44,6 +44,20 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const handlersRef = useRef<Map<string, Set<Handler>>>(new Map());
   const prefixHandlersRef = useRef<Map<string, Set<Handler>>>(new Map());
   const reconnectRef = useRef<number>(0);
+  const authenticatedRef = useRef(false);
+
+  const send = useCallback((message: Record<string, unknown>) => {
+    const socket = socketRef.current;
+    if (socket?.readyState !== WebSocket.OPEN) return false;
+
+    try {
+      socket.send(JSON.stringify(message));
+      return true;
+    } catch {
+      // A connection can close between its state check and send in some browsers.
+      return false;
+    }
+  }, []);
 
   const dispatch = useCallback((event: RealtimeEvent) => {
     handlersRef.current.get(event.channel)?.forEach((handler) => handler(event));
@@ -62,16 +76,18 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     let closedByUs = false;
     let socket: WebSocket | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     const connect = () => {
       const url = socketUrl();
       if (!url) return;
       socket = new WebSocket(url);
       socketRef.current = socket;
+      authenticatedRef.current = false;
 
       socket.onopen = () => {
         reconnectRef.current = 0;
-        socket?.send(JSON.stringify({ type: 'auth', token: getToken() }));
+        send({ type: 'auth', token: getToken() });
       };
 
       socket.onmessage = (message) => {
@@ -82,8 +98,12 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           return;
         }
         if (payload.type === 'authenticated') {
+          authenticatedRef.current = true;
           setConnected(true);
           setChannels(payload.channels ?? []);
+          // Components can mount before the handshake completes. Subscribe only after the
+          // server has associated this socket with the authenticated principal.
+          for (const channel of handlersRef.current.keys()) send({ type: 'subscribe', channel });
           return;
         }
         if (payload.type === 'welcome') return;
@@ -98,12 +118,14 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       };
 
       socket.onclose = (event) => {
+        if (socketRef.current === socket) socketRef.current = null;
+        authenticatedRef.current = false;
         setConnected(false);
         setChannels([]);
         if (closedByUs || event.code === 4401) return;
         reconnectRef.current += 1;
         const delay = Math.min(15_000, 1000 * 2 ** reconnectRef.current);
-        setTimeout(connect, delay);
+        reconnectTimer = setTimeout(connect, delay);
       };
 
       socket.onerror = () => {
@@ -120,22 +142,24 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     return () => {
       closedByUs = true;
       if (heartbeat) clearInterval(heartbeat);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       socket?.close();
-      socketRef.current = null;
+      if (socketRef.current === socket) socketRef.current = null;
+      authenticatedRef.current = false;
       setConnected(false);
     };
-  }, [dispatch]);
+  }, [dispatch, send]);
 
   const subscribe = useCallback<RealtimeContextValue['subscribe']>((channel, handler) => {
     const set = handlersRef.current.get(channel) ?? new Set<Handler>();
     set.add(handler);
     handlersRef.current.set(channel, set);
-    socketRef.current?.send(JSON.stringify({ type: 'subscribe', channel }));
+    if (authenticatedRef.current) send({ type: 'subscribe', channel });
     return () => {
       set.delete(handler);
       if (set.size === 0) handlersRef.current.delete(channel);
     };
-  }, []);
+  }, [send]);
 
   const subscribePrefix = useCallback<RealtimeContextValue['subscribePrefix']>((prefix, handler) => {
     const set = prefixHandlersRef.current.get(prefix) ?? new Set<Handler>();

@@ -19,6 +19,25 @@ interface RoutePreviewProps {
  * on the floor plan of the leg's floor — no third-party tiles are involved.
  */
 export function RoutePreview({ route, walking }: RoutePreviewProps) {
+  if (
+    !Array.isArray(route.nodes) ||
+    !Array.isArray(route.legs) ||
+    !Array.isArray(route.steps) ||
+    !Array.isArray(route.transitions) ||
+    !route.origin ||
+    !route.destination
+  ) {
+    return (
+      <Card>
+        <ErrorState message="This route is incomplete. Please plan the route again after the navigation service is updated." />
+      </Card>
+    );
+  }
+
+  return <RoutePreviewContent route={route} walking={walking} />;
+}
+
+function RoutePreviewContent({ route, walking }: RoutePreviewProps) {
   const [mode, setMode] = useState<'campus' | 'indoor'>('indoor');
 
   const buildings = useAsync(() => campusApi.buildings(), []);

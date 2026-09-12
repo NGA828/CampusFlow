@@ -23,6 +23,7 @@ export default function EventsPage() {
     [category, when],
   );
   const [localRegistrations, setLocalRegistrations] = useState<Record<string, boolean>>({});
+  const eventItems = Array.isArray(events.data?.items) ? events.data.items : [];
 
   const registered = useMemo(() => {
     const base = new Set(events.data?.registered_event_ids ?? []);
@@ -89,14 +90,14 @@ export default function EventsPage() {
           <CardSkeleton rows={4} />
           <CardSkeleton rows={4} />
         </div>
-      ) : (events.data?.items.length ?? 0) === 0 ? (
+      ) : eventItems.length === 0 ? (
         <EmptyState
           title={when === 'upcoming' ? 'No upcoming events' : 'No past events'}
           description="Check back soon — departments publish new events every week."
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {events.data?.items.map((event) => {
+          {eventItems.map((event) => {
             const isRegistered = localRegistrations[event.id] ?? event.registered ?? registered.has(event.id);
             const full = event.capacity !== null && (event.registrations ?? 0) >= event.capacity && !isRegistered;
             return (

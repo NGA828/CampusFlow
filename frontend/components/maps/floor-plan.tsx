@@ -24,6 +24,7 @@ const ROOM_FILL: Record<Room['room_type'], string> = {
 };
 
 const BUSY_FILL = '#f6c9ce';
+const EMPTY_LIST: [] = [];
 
 interface FloorPlanProps {
   plan: FloorPlanPayload;
@@ -61,8 +62,12 @@ export function FloorPlan({
 
   const width = Number(plan.floor.plan_width) || 40;
   const height = Number(plan.floor.plan_height) || 30;
+  const rooms = Array.isArray(plan.rooms) ? plan.rooms : EMPTY_LIST;
+  const navigationNodes = Array.isArray(plan.navigation_nodes) ? plan.navigation_nodes : EMPTY_LIST;
+  const navigationEdges = Array.isArray(plan.navigation_edges) ? plan.navigation_edges : EMPTY_LIST;
+  const qrNodes = Array.isArray(plan.qr_nodes) ? plan.qr_nodes : EMPTY_LIST;
 
-  const nodeById = useMemo(() => new Map(plan.navigation_nodes.map((node) => [node.id, node])), [plan.navigation_nodes]);
+  const nodeById = useMemo(() => new Map(navigationNodes.map((node) => [node.id, node])), [navigationNodes]);
 
   const routePaths = useMemo(() => {
     if (!route) return [] as string[];
@@ -83,7 +88,7 @@ export function FloorPlan({
     const bounds = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - bounds.left) / bounds.width) * width - drag.offsetX;
     const y = ((event.clientY - bounds.top) / bounds.height) * height - drag.offsetY;
-    const room = plan.rooms.find((candidate) => candidate.id === drag.roomId);
+    const room = rooms.find((candidate) => candidate.id === drag.roomId);
     if (!room) return;
     onMoveRoom(room, {
       x: Math.max(0, Math.min(width - Number(room.plan_w), Math.round(x * 10) / 10)),
@@ -107,7 +112,7 @@ export function FloorPlan({
         {/* Corridor band: the graph spine sits in the middle of most floors. */}
         <rect x={0} y={height / 2 - 3} width={width} height={6} fill="#f0f2f9" />
 
-        {plan.rooms.map((room) => {
+        {rooms.map((room) => {
           const x = Number(room.plan_x);
           const y = Number(room.plan_y);
           const w = Number(room.plan_w);
@@ -169,7 +174,7 @@ export function FloorPlan({
         })}
 
         {showGraph
-          ? plan.navigation_edges.map((edge) => {
+          ? navigationEdges.map((edge) => {
               const from = nodeById.get(edge.from_node_id);
               const to = nodeById.get(edge.to_node_id);
               if (!from || !to || from.plan_x === null || to.plan_x === null || from.plan_y === null || to.plan_y === null) return null;
@@ -192,7 +197,7 @@ export function FloorPlan({
           : null}
 
         {showGraph
-          ? plan.navigation_nodes
+          ? navigationNodes
               .filter((node) => node.floor_id === plan.floor.id && node.plan_x !== null && node.plan_y !== null)
               .map((node) => (
                 <g key={node.id} onClick={() => onSelectNode?.(node)} className={onSelectNode ? 'cursor-pointer' : undefined}>
@@ -208,7 +213,7 @@ export function FloorPlan({
           : null}
 
         {showQr
-          ? plan.qr_nodes.map((node) => (
+          ? qrNodes.map((node) => (
               <g key={node.id}>
                 <rect
                   x={Number(node.plan_x) - 0.9}

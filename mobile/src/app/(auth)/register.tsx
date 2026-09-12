@@ -9,7 +9,7 @@ import { colors, font, radius, spacing } from '@/lib/theme';
 
 export default function RegisterScreen() {
   const { signUp } = useAuth();
-  const [form, setForm] = useState({ name: '', email: '', password: '', registration_no: '', department: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '', registration_no: '', department: '' });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -23,6 +23,7 @@ export default function RegisterScreen() {
         name: form.name.trim(),
         email: form.email,
         password: form.password,
+        password_confirmation: form.password_confirmation,
         registration_no: form.registration_no.trim() || undefined,
         department: form.department.trim() || undefined,
       });
@@ -76,6 +77,16 @@ export default function RegisterScreen() {
             style={styles.input}
             accessibilityLabel="Password"
           />
+          <H3 style={{ marginTop: spacing.lg }}>Confirm password</H3>
+          <TextInput
+            value={form.password_confirmation}
+            onChangeText={update('password_confirmation')}
+            placeholder="Re-enter your password"
+            placeholderTextColor={colors.ink400}
+            secureTextEntry
+            style={styles.input}
+            accessibilityLabel="Confirm password"
+          />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -83,7 +94,12 @@ export default function RegisterScreen() {
             label="Create account"
             loading={loading}
             onPress={() => void submit()}
-            disabled={form.name.trim().length < 2 || !form.email.includes('@') || form.password.length < 8}
+            disabled={
+              form.name.trim().length < 2 ||
+              !form.email.includes('@') ||
+              form.password.length < 8 ||
+              form.password !== form.password_confirmation
+            }
             style={{ marginTop: spacing.lg }}
           />
 

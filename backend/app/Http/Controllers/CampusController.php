@@ -7,6 +7,7 @@ use App\Models\Floor;
 use App\Models\Room;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /**
  * Campus spatial endpoints:
@@ -134,8 +135,10 @@ class CampusController extends Controller
     public function room(string $id): JsonResponse
     {
         $room = Room::with(['floor.building', 'queue'])
-            ->where('id', $id)
-            ->orWhere('code', strtoupper($id))
+            ->where(function ($query) use ($id) {
+                $query->where('code', strtoupper($id));
+                if (Str::isUuid($id)) $query->orWhere('id', $id);
+            })
             ->firstOrFail();
 
         $availability = [];

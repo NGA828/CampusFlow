@@ -14,7 +14,14 @@ interface AuthValue {
   user: User | null;
   ready: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (body: { name: string; email: string; password: string; registration_no?: string; department?: string }) => Promise<void>;
+  signUp: (body: {
+    name: string;
+    email: string;
+    password: string;
+    password_confirmation: string;
+    registration_no?: string;
+    department?: string;
+  }) => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -50,7 +57,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(session.user);
   }, []);
 
-  const signUp = useCallback(async (body: { name: string; email: string; password: string; registration_no?: string; department?: string }) => {
+  const signUp = useCallback(async (body: {
+    name: string;
+    email: string;
+    password: string;
+    password_confirmation: string;
+    registration_no?: string;
+    department?: string;
+  }) => {
     const session: SessionInfo = await authApi.register({ ...body, email: body.email.trim().toLowerCase() });
     await saveToken(session.token);
     setUser(session.user);

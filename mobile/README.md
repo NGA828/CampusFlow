@@ -12,15 +12,15 @@ cd mobile
 npm install
 
 # Point the app at the API. Use your machine's LAN address — a phone cannot reach 127.0.0.1.
-EXPO_PUBLIC_API_URL=http://192.168.1.20:8000/api/v1 npm run start
+EXPO_PUBLIC_API_URL=http://192.168.1.20:8001/api/v1 npm run start
 ```
 
 Then open the QR code with **Expo Go** (Android/iOS) or press `a` / `i` for an emulator. The API
-must be running (`php ../backend/artisan serve --host=0.0.0.0 --port=8000`) and reachable from the device. The web target is
+must be running (`php ../backend/artisan serve --host=0.0.0.0 --port=8001`) and reachable from the device. The web target is
 also available with `npm run web` for a quick look at the layout.
 
-Demo accounts (seeded by `php ../backend/artisan db:seed`): `student@campusflow.dev`,
-`staff@campusflow.dev`, `admin@campusflow.dev` — password `CampusFlow2026!`.
+Demo accounts (seeded by `php ../backend/artisan db:seed`): `student@campusflow.edu`,
+`staff@campusflow.edu`, `admin@campusflow.edu` — password `password123`.
 
 ## Screens
 

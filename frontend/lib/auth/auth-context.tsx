@@ -18,7 +18,15 @@ interface AuthContextValue {
   assignments: StaffAssignment[];
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
-  register: (input: { name: string; email: string; password: string; role?: 'student' | 'staff'; registration_no?: string; department?: string }) => Promise<User>;
+  register: (input: {
+    name: string;
+    email: string;
+    password: string;
+    password_confirmation: string;
+    role?: 'student' | 'staff';
+    registration_no?: string;
+    department?: string;
+  }) => Promise<User>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   isStaff: boolean;

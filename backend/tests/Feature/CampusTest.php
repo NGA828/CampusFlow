@@ -48,4 +48,13 @@ class CampusTest extends TestCase
 
         $this->assertNotEmpty($response->json('data'));
     }
+
+    public function test_can_get_a_room_by_code_without_querying_the_uuid_column(): void
+    {
+        $room = Room::firstOrFail();
+
+        $this->getJson('/api/v1/rooms/' . $room->code)
+            ->assertOk()
+            ->assertJsonPath('data.code', $room->code);
+    }
 }

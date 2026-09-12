@@ -250,4 +250,44 @@ class OfficeController extends Controller
             'data'    => $tickets->map(fn($t) => $t->toApiArray()),
         ]);
     }
+
+    public function showTicket(Request $request, string $id): JsonResponse
+    {
+        $ticket = OfficeTicket::with('office')->findOrFail($id);
+        $this->ensureTicketAccess($request, $ticket);
+        return response()->json(['success' => true, 'data' => $this->ticketPayload($ticket)]);
+    }
+
+    public function checkInTicket(Request $request, string $id): JsonResponse
+    {
+        $ticket = OfficeTicket::findOrFail($id);
+        abort_unless($ticket->user_id === $request->user()->id, 403, 'Forbidden');
+        abort_unless(in_array($ticket->status, ['called', 'approaching'], true), 422, 'Only a called ticket can be checked in');
+        $ticket->update(['status' => 'in_service', 'service_started_at' => now()]);
+        OfficeEvent::create(['ticket_id' => $ticket->id, 'type' => 'checked_in', 'metadata' => [], 'created_at' => now()]);
+        return response()->json(['success' => true, 'data' => $this->ticketPayload($ticket->fresh('office'))]);
+    }
+
+    public function approachingTicket(Request $request, string $id): JsonResponse
+    {
+        $ticket = OfficeTicket::findOrFail($id);
+        abort_unless($ticket->user_id === $request->user()->id, 403, 'Forbidden');
+        abort_unless($ticket->status === 'waiting', 422, 'Only a waiting ticket can be marked as approaching');
+        $ticket->update(['status' => 'approaching']);
+        OfficeEvent::create(['ticket_id' => $ticket->id, 'type' => 'approaching', 'metadata' => [], 'created_at' => now()]);
+        return response()->json(['success' => true, 'data' => ['ticket' => $this->ticketPayload($ticket->fresh('office'))]]);
+    }
+
+    private function ensureTicketAccess(Request $request, OfficeTicket $ticket): void
+    {
+        abort_unless($ticket->user_id === $request->user()->id || in_array($request->user()->role, ['staff', 'admin'], true), 403, 'Forbidden');
+    }
+
+    private function ticketPayload(OfficeTicket $ticket): array
+    {
+        $ticket->loadMissing('office');
+        $ahead = OfficeTicket::where('office_id', $ticket->office_id)->whereIn('status', ['waiting', 'approaching', 'called', 'in_service'])->where('created_at', '<', $ticket->created_at)->count();
+        $eta = $ahead * $ticket->office->avg_service_minutes * 60;
+        return ['ticket' => array_merge($ticket->toApiArray(), ['position' => $ahead + 1, 'issued_at' => $ticket->created_at?->toIso8601String(), 'eta_seconds' => $eta, 'expected_service_at' => now()->addSeconds($eta)->toIso8601String()]), 'office' => $ticket->office->toApiArray(), 'people_ahead' => $ahead, 'counts' => ['waiting' => OfficeTicket::where('office_id', $ticket->office_id)->whereIn('status', ['waiting', 'approaching', 'called'])->count(), 'in_service' => OfficeTicket::where('office_id', $ticket->office_id)->where('status', 'in_service')->count()], 'eta_seconds' => $eta, 'expected_window' => null, 'seconds_until_deadline' => null, 'can_check_in' => in_array($ticket->status, ['called', 'approaching'], true), 'can_cancel' => ! $ticket->isTerminal(), 'status_label' => str($ticket->status)->replace('_', ' ')->title()->toString()];
+    }
 }

@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const apiPort = process.env.API_PORT ?? '8000';
+const apiPort = process.env.API_PORT ?? '8001';
 const webPort = process.env.WEB_DEV_PORT ?? '3100';
 
 const COLORS = { api: '\u001b[36m', web: '\u001b[35m', reset: '\u001b[0m' };

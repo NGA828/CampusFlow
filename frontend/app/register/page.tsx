@@ -13,7 +13,7 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const toast = useToast();
   const [role, setRole] = useState<'student' | 'staff'>('student');
-  const [form, setForm] = useState({ name: '', email: '', password: '', registration_no: '', department: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '', registration_no: '', department: '' });
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
@@ -30,6 +30,7 @@ export default function RegisterPage() {
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
+        password_confirmation: form.password_confirmation,
         role,
         registration_no: form.registration_no.trim() || undefined,
         department: form.department.trim() || undefined,
@@ -86,6 +87,16 @@ export default function RegisterPage() {
             error={fieldErrors.password?.[0]}
           >
             <Input id="password" type="password" required value={form.password} onChange={update('password')} autoComplete="new-password" />
+          </Field>
+          <Field label="Confirm password" htmlFor="password_confirmation" error={fieldErrors.password_confirmation?.[0]}>
+            <Input
+              id="password_confirmation"
+              type="password"
+              required
+              value={form.password_confirmation}
+              onChange={update('password_confirmation')}
+              autoComplete="new-password"
+            />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={role === 'student' ? 'Registration number' : 'Staff number'} htmlFor="registration_no" error={fieldErrors.registration_no?.[0]}>

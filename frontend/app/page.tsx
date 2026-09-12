@@ -322,7 +322,7 @@ export default async function LandingPage() {
                 <p className="text-[12px] font-semibold tracking-wide text-white/50 uppercase">Run it locally</p>
                 <pre className="mt-2 overflow-x-auto text-[12.5px] leading-relaxed text-white/75">
                   <code>{`cd mobile && npm install
-EXPO_PUBLIC_API_URL=http://<your-lan-ip>:3000/api/v1 npm run start
+EXPO_PUBLIC_API_URL=http://<your-lan-ip>:8000/api/v1 npm run start
 # then scan the QR code with the Expo Go app`}</code>
                 </pre>
               </div>

@@ -30,7 +30,7 @@ export default function QueuePage() {
     if (!ticketId) return;
     queueApi
       .ticket(ticketId)
-      .then((payload) => setTicket(payload.ticket))
+      .then(setTicket)
       .catch(() => {});
   });
 
@@ -42,9 +42,8 @@ export default function QueuePage() {
     try {
       // Joining is idempotent server-side; the API client adds an idempotency key.
       const response = await queueApi.join(queue.id, {});
-      const payload = await queueApi.ticket(response.ticket.id);
-      setTicket(payload.ticket);
-      toast.success(`Ticket ${response.ticket.ticket_number}`, `Position ${response.ticket.position} for ${queue.room_name}.`);
+      setTicket(response.ticket);
+      toast.success(`Ticket ${response.ticket.ticket.ticket_number}`, `Position ${response.ticket.ticket.position} for ${queue.room_name}.`);
       queues.reload();
     } catch (caught) {
       const message = caught instanceof ApiError ? (caught.firstError ?? caught.message) : 'Could not join that queue.';
@@ -62,15 +61,15 @@ export default function QueuePage() {
     try {
       if (kind === 'check-in') {
         const payload = await queueApi.checkIn(ticket.ticket.id, {});
-        setTicket(payload.ticket);
+        setTicket(payload);
         toast.success('Checked in', 'Wait near the room until staff admit you.');
       } else if (kind === 'navigating') {
         const payload = await queueApi.navigating(ticket.ticket.id);
-        setTicket(payload.ticket);
+        setTicket(payload);
         toast.info('The room is expecting you', 'Head over now.');
       } else {
         const payload = await queueApi.cancel(ticket.ticket.id);
-        setTicket(payload.ticket);
+        setTicket(payload);
         toast.info('Ticket cancelled');
       }
       queues.reload();

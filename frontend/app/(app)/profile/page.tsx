@@ -34,6 +34,8 @@ export default function ProfilePage() {
     );
   }
 
+  const permissions = Array.isArray(user.permissions) ? user.permissions : [];
+
   const saveProfile = async () => {
     setSavingProfile(true);
     setProfileError(null);
@@ -169,9 +171,9 @@ export default function ProfilePage() {
           </Card>
 
           <Card>
-            <SectionHeading title="Permissions" description={`${user.permissions.length} granted`} />
+            <SectionHeading title="Permissions" description={`${permissions.length} granted`} />
             <div className="flex flex-wrap gap-1.5">
-              {user.permissions.slice(0, 24).map((permission) => (
+              {permissions.slice(0, 24).map((permission) => (
                 <Badge key={permission} tone="neutral">
                   {permission}
                 </Badge>

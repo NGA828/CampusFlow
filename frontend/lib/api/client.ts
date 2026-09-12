@@ -1,15 +1,14 @@
 /**
  * The single HTTP client used by the web app (and mirrored in the mobile app).
  *
- * - All requests go to `NEXT_PUBLIC_API_URL` (relative `/api/v1` by default, proxied by
- *   `server.mjs`), so no screen ever hard-codes a host.
+ * - All requests go to `NEXT_PUBLIC_API_URL`, with Laravel as the only supported API.
  * - The API envelope `{ success, data, message }` / `{ success, message, errors }` is
  *   unwrapped here: callers receive `data` or a typed `ApiError`.
  * - Duplicate-submitting mutations accept an idempotency key so a double tap can never
  *   create two tickets.
  */
 
-export const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
+export const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8001/api/v1').replace(/\/$/, '');
 
 export class ApiError extends Error {
   readonly status: number;
@@ -67,10 +66,9 @@ export interface RequestOptions {
 
 /**
  * Server components run inside our own Node process, so a relative base cannot be fetched.
- * The internal origin mirrors what `server.mjs` proxies `/api` to, which keeps the public
- * landing page (and any future server-rendered screen) on the single API client.
+ * The internal origin targets Laravel for server-rendered requests.
  */
-const INTERNAL_API_ORIGIN = (process.env.API_INTERNAL_URL ?? process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
+const INTERNAL_API_ORIGIN = (process.env.API_INTERNAL_URL ?? process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8001').replace(/\/$/, '');
 
 function resolveBase(): string {
   if (typeof window !== 'undefined') return API_BASE;

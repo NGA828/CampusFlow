@@ -32,7 +32,7 @@ import type {
   User,
 } from './types';
 
-export const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
+export const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'http://127.0.0.1:8001/api/v1').replace(/\/$/, '');
 
 const TOKEN_KEY = 'campusflow.token';
 
@@ -139,7 +139,15 @@ export const api = {
 
 export const authApi = {
   login: (body: { email: string; password: string }) => api.post<SessionInfo>('/auth/login', body),
-  register: (body: { name: string; email: string; password: string; registration_no?: string; department?: string; role?: 'student' | 'staff' }) =>
+  register: (body: {
+    name: string;
+    email: string;
+    password: string;
+    password_confirmation: string;
+    registration_no?: string;
+    department?: string;
+    role?: 'student' | 'staff';
+  }) =>
     api.post<SessionInfo>('/auth/register', body),
   logout: () => api.post<{ revoked: boolean }>('/auth/logout'),
   me: () => api.get<{ user: User }>('/auth/me'),

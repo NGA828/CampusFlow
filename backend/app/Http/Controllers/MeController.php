@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CampusEvent;
+use App\Models\Announcement;
 use App\Models\Enrollment;
 use App\Models\Office;
 use App\Models\OfficeTicket;
@@ -97,6 +98,23 @@ class MeController extends Controller
             ->whereNull('read_at')
             ->count();
 
+        $notifications = UserNotification::where('user_id', $user->id)
+            ->orderByDesc('created_at')
+            ->limit(3)
+            ->get()
+            ->map(fn($notification) => $notification->toApiArray())
+            ->values();
+
+        $announcements = Announcement::whereNotNull('published_at')
+            ->where(function ($query) use ($now) {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>=', $now);
+            })
+            ->orderByDesc('published_at')
+            ->limit(3)
+            ->get()
+            ->map(fn($announcement) => $announcement->toApiArray())
+            ->values();
+
         /* ---------- upcoming events (next 7 days) ---------- */
         $events = CampusEvent::where('starts_at', '>=', $now)
             ->where('starts_at', '<=', $now->copy()->addDays(7))
@@ -126,6 +144,7 @@ class MeController extends Controller
                     'id'   => $user->id,
                     'name' => $user->name,
                     'role' => $user->role,
+                    'department' => $user->department,
                 ],
                 'today'           => [
                     'date'    => $now->toDateString(),
@@ -134,9 +153,11 @@ class MeController extends Controller
                 'next_class'      => $nextClassData,
                 'queue_ticket'    => $queueTicket ? $queueTicket->toApiArray() : null,
                 'office_ticket'   => $officeTicket ? $officeTicket->toApiArray() : null,
-                'unread_count'    => $unread,
-                'upcoming_events' => $events,
-                'building_alerts' => [],   // placeholder — extend when alert model is added
+                'notifications' => $notifications,
+                'unread_notifications' => $unread,
+                'announcements' => $announcements,
+                'events' => $events,
+                'building_alerts' => [],
             ],
         ]);
     }
@@ -283,7 +304,7 @@ class MeController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => ['ticket' => $ticket ? $ticket->toApiArray() : null],
+            'data'    => ['ticket' => $ticket ? $this->queueTicketView($ticket) : null],
         ]);
     }
 
@@ -300,7 +321,7 @@ class MeController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => ['ticket' => $ticket ? $ticket->toApiArray() : null],
+            'data'    => ['ticket' => $ticket ? $this->officeTicketView($ticket) : null],
         ]);
     }
 
@@ -447,5 +468,50 @@ class MeController extends Controller
             'success' => true,
             'data'    => ['registered' => true],
         ]);
+    }
+
+    private function queueTicketView(QueueTicket $ticket): array
+    {
+        $ticket->loadMissing('queue.room.floor.building');
+        $ahead = QueueTicket::where('queue_id', $ticket->queue_id)
+            ->whereIn('status', ['waiting', 'called', 'navigating', 'checked_in', 'admitted'])
+            ->where('position', '<', $ticket->position)
+            ->count();
+        $queue = $ticket->queue;
+        $room = $queue->room;
+        return [
+            'ticket' => array_merge($ticket->toApiArray(), ['ticket_number' => 'Q-' . str_pad((string) $ticket->position, 3, '0', STR_PAD_LEFT), 'issued_at' => $ticket->created_at?->toIso8601String(), 'eta_seconds' => $ahead * 300]),
+            'queue' => array_merge($queue->toApiArray(), ['is_active' => $queue->is_open, 'admission_capacity' => $queue->capacity, 'avg_service_seconds' => 300, 'requires_proximity_to_join' => false, 'check_in_window_seconds' => $queue->call_window_minutes * 60, 'grace_period_seconds' => $queue->call_window_minutes * 60, 'room_code' => $room?->code, 'room_name' => $room?->name, 'building_code' => $room?->floor?->building?->code, 'building_name' => $room?->floor?->building?->name, 'floor_name' => $room?->floor?->name]),
+            'people_ahead' => $ahead,
+            'counts' => ['waiting' => QueueTicket::where('queue_id', $ticket->queue_id)->where('status', 'waiting')->count(), 'in_service' => QueueTicket::where('queue_id', $ticket->queue_id)->whereIn('status', ['called', 'checked_in', 'admitted'])->count()],
+            'eta_seconds' => $ahead * 300,
+            'expected_service_at' => now()->addSeconds($ahead * 300)->toIso8601String(),
+            'check_in_deadline' => null,
+            'seconds_until_deadline' => null,
+            'can_check_in' => in_array($ticket->status, ['called', 'navigating'], true),
+            'can_cancel' => ! $ticket->isTerminal(),
+        ];
+    }
+
+    private function officeTicketView(OfficeTicket $ticket): array
+    {
+        $ticket->loadMissing('office');
+        $ahead = OfficeTicket::where('office_id', $ticket->office_id)
+            ->whereIn('status', ['waiting', 'called', 'approaching', 'in_service'])
+            ->where('created_at', '<', $ticket->created_at)
+            ->count();
+        $eta = $ahead * $ticket->office->avg_service_minutes * 60;
+        return [
+            'ticket' => array_merge($ticket->toApiArray(), ['position' => $ahead + 1, 'issued_at' => $ticket->created_at?->toIso8601String(), 'eta_seconds' => $eta, 'expected_service_at' => now()->addSeconds($eta)->toIso8601String()]),
+            'office' => $ticket->office->toApiArray(),
+            'people_ahead' => $ahead,
+            'counts' => ['waiting' => OfficeTicket::where('office_id', $ticket->office_id)->whereIn('status', ['waiting', 'called', 'approaching'])->count(), 'in_service' => OfficeTicket::where('office_id', $ticket->office_id)->where('status', 'in_service')->count()],
+            'eta_seconds' => $eta,
+            'expected_window' => null,
+            'seconds_until_deadline' => null,
+            'can_check_in' => in_array($ticket->status, ['called', 'approaching'], true),
+            'can_cancel' => ! $ticket->isTerminal(),
+            'status_label' => str($ticket->status)->replace('_', ' ')->title()->toString(),
+        ];
     }
 }

@@ -28,7 +28,7 @@ class AuthTest extends TestCase
                 'success',
                 'data' => [
                     'token',
-                    'user' => ['id', 'name', 'email', 'role'],
+                    'user' => ['id', 'name', 'email', 'role', 'role_code', 'permissions'],
                 ],
             ]);
     }
@@ -48,7 +48,7 @@ class AuthTest extends TestCase
                 'success',
                 'data' => [
                     'token',
-                    'user' => ['id', 'name', 'email', 'role'],
+                    'user' => ['id', 'name', 'email', 'role', 'role_code', 'permissions'],
                 ],
             ]);
 

@@ -30,7 +30,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // 1. Users
-        $admin = User::firstOrCreate(
+        $admin = User::updateOrCreate(
             ['email' => 'admin@campusflow.edu'],
             [
                 'name' => 'System Administrator',
@@ -42,7 +42,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $staff = User::firstOrCreate(
+        $staff = User::updateOrCreate(
             ['email' => 'staff@campusflow.edu'],
             [
                 'name' => 'Dr. Jane Smith',
@@ -56,7 +56,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $student = User::firstOrCreate(
+        $student = User::updateOrCreate(
             ['email' => 'student@campusflow.edu'],
             [
                 'name' => 'Alex Rivera',
@@ -71,7 +71,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $visitor = User::firstOrCreate(
+        $visitor = User::updateOrCreate(
             ['email' => 'visitor@campusflow.edu'],
             [
                 'name' => 'Guest Visitor',

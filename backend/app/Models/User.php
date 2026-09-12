@@ -93,12 +93,15 @@ class User extends Authenticatable
             'name'            => $this->name,
             'email'           => $this->email,
             'role'            => $this->role,
+            'role_code'       => $this->role,
+            'status'          => $this->status ?? 'active',
             'registration_no' => $this->registration_no,
             'department'      => $this->department,
             'phone'           => $this->phone,
             'avatar_url'      => $this->avatar_url,
             'email_verified'  => $this->email_verified_at !== null,
             'assignments'     => $this->assignments,
+            'permissions'     => [],
             'created_at'      => $this->created_at?->toIso8601String(),
         ];
     }

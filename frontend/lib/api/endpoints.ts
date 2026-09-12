@@ -2,7 +2,7 @@
  * Typed API surface. Every screen imports from here — no component talks to `fetch`
  * directly, and no URL is written twice.
  */
-import { api, newIdempotencyKey, request } from './client';
+import { api, ApiError, newIdempotencyKey, request } from './client';
 import type {
   AdminDashboard,
   NavigationActive,
@@ -70,10 +70,26 @@ export interface ListQuery {
   [key: string]: string | number | boolean | undefined;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function arrayOrEmpty<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 /* ----------------------------------------------------------------------- auth */
 
 export const authApi = {
-  register: (body: { name: string; email: string; password: string; role?: 'student' | 'staff'; registration_no?: string; department?: string }) =>
+  register: (body: {
+    name: string;
+    email: string;
+    password: string;
+    password_confirmation: string;
+    role?: 'student' | 'staff';
+    registration_no?: string;
+    department?: string;
+  }) =>
     api.post<SessionInfo>('/auth/register', body, { auth: false }),
   login: (body: { email: string; password: string }) =>
     request<SessionInfo>('/auth/login', { method: 'POST', body, auth: false }),
@@ -107,11 +123,30 @@ export const meApi = {
 
 /* --------------------------------------------------------------------- campus */
 
+function normalizeFloorPlan(value: unknown): FloorPlanPayload {
+  if (!isRecord(value) || !isRecord(value.floor) || !isRecord(value.building)) {
+    throw new ApiError(502, 'The campus service returned an incomplete floor plan.', 'INVALID_FLOOR_PLAN');
+  }
+
+  return {
+    ...value,
+    floor: value.floor as unknown as FloorPlanPayload['floor'],
+    building: value.building as unknown as FloorPlanPayload['building'],
+    rooms: arrayOrEmpty<Room>(value.rooms),
+    qr_nodes: arrayOrEmpty<QrNode>(value.qr_nodes),
+    navigation_nodes: arrayOrEmpty<NavigationNode>(value.navigation_nodes),
+    navigation_edges: arrayOrEmpty<NavigationEdge>(value.navigation_edges),
+    geofences: arrayOrEmpty<Geofence>(value.geofences),
+    busy: isRecord(value.busy) ? (value.busy as FloorPlanPayload['busy']) : {},
+  };
+}
+
 export const campusApi = {
   buildings: () => api.get<{ buildings: Building[] }>('/buildings'),
   building: (idOrCode: string) => api.get<{ building: Building; floors: Floor[]; rooms: Room[] }>(`/buildings/${idOrCode}`),
   floors: (buildingId: string) => api.get<{ floors: Floor[] }>(`/buildings/${buildingId}/floors`),
-  floorPlan: (floorId: string, date?: string) => api.get<FloorPlanPayload>(`/floors/${floorId}/plan`, { query: { date } }),
+  floorPlan: async (floorId: string, date?: string) =>
+    normalizeFloorPlan(await api.get<unknown>(`/floors/${floorId}/plan`, { query: { date } })),
   floorAvailability: (floorId: string, date?: string) =>
     api.get<{ date: string; busy: Record<string, unknown>; free_now: string[] }>(`/floors/${floorId}/availability`, { query: { date } }),
   rooms: (query: ListQuery = {}) => api.get<Paginated<Room>>('/rooms', { query }),
@@ -147,16 +182,56 @@ export const positioningApi = {
 
 /* ----------------------------------------------------------------- navigation */
 
+function isRenderableRoute(value: unknown): value is Route {
+  if (!value || typeof value !== 'object') return false;
+
+  const route = value as Partial<Route>;
+  return (
+    Array.isArray(route.nodes) &&
+    Array.isArray(route.steps) &&
+    Array.isArray(route.legs) &&
+    Array.isArray(route.transitions) &&
+    typeof route.origin?.label === 'string' &&
+    typeof route.destination?.label === 'string'
+  );
+}
+
+function requireRenderableRoute(value: unknown): Route {
+  if (isRenderableRoute(value)) return value;
+
+  throw new ApiError(
+    502,
+    'The navigation service returned an incomplete route. Please try again after the route service is updated.',
+    'INVALID_ROUTE_RESPONSE',
+  );
+}
+
+function requireNavigationStart(value: unknown): NavigationStart {
+  if (!value || typeof value !== 'object') {
+    throw new ApiError(502, 'The navigation service returned an incomplete session.', 'INVALID_NAVIGATION_SESSION');
+  }
+
+  const session = value as Partial<NavigationStart>;
+  if (typeof session.session_id !== 'string' || typeof session.started_at !== 'string') {
+    throw new ApiError(502, 'The navigation service returned an incomplete session.', 'INVALID_NAVIGATION_SESSION');
+  }
+
+  return { ...session, route: requireRenderableRoute(session.route) } as NavigationStart;
+}
+
 export const navigationApi = {
-  route: (body: {
+  route: async (body: {
     to_room_id?: string;
     to_room_code?: string;
     to_node_id?: string;
     from_node_id?: string;
     accessible?: boolean;
-  }) => api.post<{ route: Route; destination_label: string }>('/navigation/route', body),
-  startSession: (body: { to_room_id?: string; to_room_code?: string; to_node_id?: string; from_node_id?: string; accessible?: boolean }) =>
-    api.post<NavigationStart>('/navigation/sessions', body),
+  }) => {
+    const response = await api.post<{ route: unknown; destination_label: string }>('/navigation/route', body);
+    return { ...response, route: requireRenderableRoute(response.route) };
+  },
+  startSession: async (body: { to_room_id?: string; to_room_code?: string; to_node_id?: string; from_node_id?: string; accessible?: boolean }) =>
+    requireNavigationStart(await api.post<unknown>('/navigation/sessions', body)),
   activeSession: () => api.get<NavigationActive>('/navigation/sessions/active'),
   updatePosition: (
     sessionId: string,
@@ -175,17 +250,17 @@ export const queueApi = {
   detail: (id: string) => api.get<QueueSnapshot>(`/queues/${id}`),
   roomQueue: (roomId: string) => api.get<QueueSnapshot>(`/rooms/${roomId}/queue`),
   join: (queueId: string, body: { qr_code?: string; fix?: { lat?: number; lng?: number; plan_x?: number; plan_y?: number; floor_id?: string; source?: string } } = {}) =>
-    api.post<{ ticket: QueueTicket; queue: Record<string, unknown>; counts: Record<string, number>; proximity: Record<string, unknown> | null }>(
+    api.post<{ ticket: QueueTicketView }>(
       `/queues/${queueId}/tickets`,
       body,
       { idempotencyKey: newIdempotencyKey('join') },
     ),
-  ticket: (id: string) => api.get<{ ticket: QueueTicketView }>(`/queue-tickets/${id}`),
+  ticket: (id: string) => api.get<QueueTicketView>(`/queue-tickets/${id}`),
   history: (id: string) => api.get<{ events: { type: string; created_at: string; metadata: Record<string, unknown> | null }[] }>(`/queue-tickets/${id}/history`),
-  cancel: (id: string) => api.post<{ ticket: QueueTicketView }>(`/queue-tickets/${id}/cancel`),
+  cancel: (id: string) => api.post<QueueTicketView>(`/queue-tickets/${id}/cancel`),
   checkIn: (id: string, body: { qr_code?: string; fix?: Record<string, unknown> } = {}) =>
-    api.post<{ ticket: QueueTicketView }>(`/queue-tickets/${id}/check-in`, body),
-  navigating: (id: string) => api.post<{ ticket: QueueTicketView }>(`/queue-tickets/${id}/navigating`),
+    api.post<QueueTicketView>(`/queue-tickets/${id}/check-in`, body),
+  navigating: (id: string) => api.post<QueueTicketView>(`/queue-tickets/${id}/navigating`),
   proximityCheck: (id: string, body: { fix?: Record<string, unknown>; qr_code?: string }) =>
     api.post<{ within: boolean; distance_m: number; radius_m: number; method: string }>(`/queues/${id}/proximity-check`, body),
 };
@@ -207,8 +282,28 @@ export const officeApi = {
 
 /* ---------------------------------------------------------------- engagement */
 
+function normalizeEvents(value: unknown, query: ListQuery): EventsPayload {
+  const payload = isRecord(value) ? value : null;
+  const items = arrayOrEmpty<CampusEvent>(Array.isArray(value) ? value : payload?.items);
+  if (!Array.isArray(value) && (!payload || !Array.isArray(payload.items))) {
+    throw new ApiError(502, 'The events service returned an invalid event list.', 'INVALID_EVENTS_RESPONSE');
+  }
+
+  const meta = isRecord(payload?.meta) ? payload.meta : null;
+  const page = typeof meta?.page === 'number' ? meta.page : typeof query.page === 'number' ? query.page : 1;
+  const perPage = typeof meta?.per_page === 'number' ? meta.per_page : typeof query.per_page === 'number' ? query.per_page : items.length;
+  const total = typeof meta?.total === 'number' ? meta.total : items.length;
+  const totalPages = typeof meta?.total_pages === 'number' ? meta.total_pages : Math.max(1, Math.ceil(total / Math.max(perPage, 1)));
+
+  return {
+    items,
+    meta: { page, per_page: perPage, total, total_pages: totalPages },
+    registered_event_ids: arrayOrEmpty<string>(payload?.registered_event_ids),
+  };
+}
+
 export const engagementApi = {
-  events: (query: ListQuery = {}) => api.get<EventsPayload>('/events', { query }),
+  events: async (query: ListQuery = {}) => normalizeEvents(await api.get<unknown>('/events', { query }), query),
   event: (id: string) => api.get<{ event: CampusEvent; attendees?: number }>(`/events/${id}`),
   register: (id: string) => api.post<{ registration: { id: string; event_id: string; user_id: string } }>(`/events/${id}/register`, {}),
   unregister: (id: string) => api.delete<void>(`/events/${id}/register`),

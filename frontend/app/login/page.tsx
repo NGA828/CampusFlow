@@ -9,9 +9,9 @@ import { useToast } from '../../components/ui/toast';
 import { ApiError } from '../../lib/api/client';
 
 const DEMO_ACCOUNTS = [
-  { role: 'Student', email: 'student@campusflow.dev', hint: 'Sofia Alvarez · Computer Science' },
-  { role: 'Staff', email: 'staff@campusflow.dev', hint: 'Priya Raman · Student Services' },
-  { role: 'Administrator', email: 'admin@campusflow.dev', hint: 'Amara Osei · Facilities & IT' },
+  { role: 'Student', email: 'student@campusflow.edu', hint: 'Alex Rivera · Computer Science' },
+  { role: 'Staff', email: 'staff@campusflow.edu', hint: 'Dr. Jane Smith · Computer Science' },
+  { role: 'Administrator', email: 'admin@campusflow.edu', hint: 'System Administrator · IT Operations' },
 ];
 
 export default function LoginPage() {
@@ -83,7 +83,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@campusflow.dev"
+                placeholder="you@campusflow.edu"
               />
             </Field>
             <Field label="Password" htmlFor="password" error={error}>
@@ -114,7 +114,7 @@ export default function LoginPage() {
 
           <div className="mt-8 rounded-[var(--radius-card)] border border-ink-100 bg-white p-4">
             <p className="text-[12.5px] font-medium text-ink-700">Demo accounts</p>
-            <p className="mt-0.5 text-[12px] text-ink-500">Password for all seeded accounts: <span className="font-mono">CampusFlow2026!</span></p>
+            <p className="mt-0.5 text-[12px] text-ink-500">Password for all seeded accounts: <span className="font-mono">password123</span></p>
             <div className="mt-3 space-y-1.5">
               {DEMO_ACCOUNTS.map((account) => (
                 <button
@@ -122,7 +122,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => {
                     setEmail(account.email);
-                    setPassword('CampusFlow2026!');
+                    setPassword('password123');
                     setError(null);
                   }}
                   className="flex w-full items-center justify-between rounded-[10px] border border-ink-100 px-3 py-2 text-left transition-colors hover:border-brand-200 hover:bg-brand-50/50"

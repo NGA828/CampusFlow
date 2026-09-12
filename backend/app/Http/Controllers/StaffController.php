@@ -43,7 +43,7 @@ class StaffController extends Controller
 
         $user = $request->user();
 
-        $activeRoomTickets   = QueueTicket::whereIn('status', ['waiting', 'called'])->count();
+        $activeRoomTickets   = QueueTicket::whereIn('status', ['waiting', 'called', 'checked_in'])->count();
         $activeOfficeTickets = OfficeTicket::whereIn('status', ['waiting', 'called', 'in_service'])->count();
         $todayAdmitted       = QueueTicket::where('status', 'admitted')
             ->whereDate('admitted_at', now()->today())->count();
@@ -51,33 +51,146 @@ class StaffController extends Controller
             ->whereDate('completed_at', now()->today())->count();
 
         // Queues the staff member may manage (simplified: all open queues)
-        $queues = RoomQueue::with(['room'])
+        $queues = RoomQueue::with(['room.floor.building'])
             ->where('is_open', true)
             ->get()
-            ->map(fn($q) => array_merge($q->toApiArray(), [
-                'room_code' => $q->room?->code,
-                'room_name' => $q->room?->name,
-                'waiting'   => QueueTicket::where('queue_id', $q->id)->where('status', 'waiting')->count(),
-            ]));
+            ->map(function ($q) {
+                $active = QueueTicket::with('user')
+                    ->where('queue_id', $q->id)
+                    ->whereNotIn('status', ['completed', 'cancelled', 'no_show'])
+                    ->orderBy('position')
+                    ->get();
+                $current = $active->first(fn($ticket) => in_array($ticket->status, ['called', 'checked_in'], true));
+                $room = $q->room;
+                $line = $current ? [
+                    'id' => $current->id,
+                    'ticket_number' => 'Q-' . str_pad((string) $current->position, 3, '0', STR_PAD_LEFT),
+                    'position' => $current->position,
+                    'status' => $current->status,
+                    'student_name' => $current->user?->name ?? 'Student',
+                    'issued_at' => $current->created_at?->toIso8601String(),
+                    'called_at' => $current->called_at?->toIso8601String(),
+                    'check_in_deadline' => null,
+                    'checked_in_at' => $current->checked_in_at?->toIso8601String(),
+                    'eta_seconds' => null,
+                    'wait_seconds' => max(0, now()->diffInSeconds($current->created_at)),
+                    'checked_in' => $current->status === 'checked_in',
+                ] : null;
+                return [
+                    'queue_id' => $q->id,
+                    'room_id' => $room?->id,
+                    'room_code' => $room?->code,
+                    'room_name' => $room?->name,
+                    'building_code' => $room?->floor?->building?->code,
+                    'floor_name' => $room?->floor?->name,
+                    'is_active' => $q->is_open,
+                    'admission_capacity' => $q->capacity,
+                    'avg_service_seconds' => 300,
+                    'max_size' => $q->max_capacity,
+                    'proximity_radius_m' => $q->proximity_radius_m,
+                    'requires_proximity_to_join' => $q->proximity_radius_m > 0,
+                    'waiting' => $active->where('status', 'waiting')->count(),
+                    'occupying' => $active->whereIn('status', ['called', 'checked_in'])->count(),
+                    'checked_in' => $active->where('status', 'checked_in')->count(),
+                    'current' => $line,
+                ];
+            })->values();
 
         // Offices the staff member is assigned to
         $officeIds = OfficeStaff::where('user_id', $user->id)->pluck('office_id');
-        $offices   = Office::whereIn('id', $officeIds)->where('status', 'active')->get()
-            ->map(fn($o) => array_merge($o->toApiArray(), [
-                'waiting' => OfficeTicket::where('office_id', $o->id)->where('status', 'waiting')->count(),
-            ]));
+        $offices   = Office::with('room.floor.building')->whereIn('id', $officeIds)->where('status', 'active')->get()
+            ->map(function ($o) {
+                $active = OfficeTicket::with('user')->where('office_id', $o->id)
+                    ->whereNotIn('status', ['completed', 'cancelled', 'no_show'])
+                    ->orderBy('created_at')
+                    ->get();
+                $room = $o->room;
+                $current = $active->first(fn($ticket) => $ticket->status === 'in_service');
+                return [
+                    'office_id' => $o->id,
+                    'name' => $o->name,
+                    'code' => $o->code,
+                    'ticket_prefix' => str($o->code)->upper()->toString(),
+                    'concurrent_capacity' => 1,
+                    'service_duration_minutes' => $o->avg_service_minutes,
+                    'check_in_radius_m' => 50,
+                    'is_active' => $o->is_open,
+                    'building_code' => $room?->floor?->building?->code,
+                    'floor_name' => $room?->floor?->name,
+                    'room_code' => $room?->code,
+                    'waiting' => $active->where('status', 'waiting')->count(),
+                    'in_service' => $active->where('status', 'in_service')->count(),
+                    'completed_today' => OfficeTicket::where('office_id', $o->id)->where('status', 'completed')->whereDate('completed_at', today())->count(),
+                    'current' => $current ? [
+                        'id' => $current->id,
+                        'ticket_number' => $current->ticket_number,
+                        'position' => 1,
+                        'status' => $current->status,
+                        'student_name' => $current->user?->name ?? 'Student',
+                        'subject' => $current->subject,
+                        'requested_at' => $current->created_at?->toIso8601String(),
+                        'called_at' => $current->called_at?->toIso8601String(),
+                        'check_in_deadline' => null,
+                        'checked_in_at' => null,
+                        'service_started_at' => $current->service_started_at?->toIso8601String(),
+                        'wait_seconds' => max(0, now()->diffInSeconds($current->created_at)),
+                        'checked_in' => true,
+                        'service_minutes' => $o->avg_service_minutes,
+                    ] : null,
+                ];
+            })->values();
+
+        $pendingQueueActions = QueueTicket::with(['user', 'queue.room'])
+            ->whereIn('status', ['called', 'checked_in'])
+            ->orderBy('position')
+            ->get()
+            ->map(fn($ticket) => [
+                'id' => $ticket->id,
+                'ticket_number' => 'Q-' . str_pad((string) $ticket->position, 3, '0', STR_PAD_LEFT),
+                'status' => $ticket->status,
+                'position' => $ticket->position,
+                'check_in_deadline' => null,
+                'student_name' => $ticket->user?->name ?? 'Student',
+                'room_code' => $ticket->queue?->room?->code,
+                'room_name' => $ticket->queue?->room?->name,
+                'queue_id' => $ticket->queue_id,
+            ])->values();
+
+        $pendingOfficeActions = OfficeTicket::with('user')
+            ->whereIn('status', ['called', 'checked_in'])
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn($ticket) => [
+                'id' => $ticket->id,
+                'ticket_number' => $ticket->ticket_number,
+                'status' => $ticket->status,
+                'position' => 0,
+                'check_in_deadline' => null,
+                'subject' => $ticket->subject,
+                'student_name' => $ticket->user?->name ?? 'Student',
+                'office_name' => $ticket->office?->name,
+            ])->values();
 
         return response()->json([
             'success' => true,
             'data'    => [
-                'stats'   => [
-                    'active_room_tickets'   => $activeRoomTickets,
-                    'active_office_tickets' => $activeOfficeTickets,
-                    'today_admitted'        => $todayAdmitted,
-                    'today_served'          => $todayServed,
-                ],
-                'queues'  => $queues,
+                'scopes' => ['queues' => $queues->count(), 'offices' => $offices->count()],
+                'queues' => $queues,
                 'offices' => $offices,
+                'pending_queue_actions' => $pendingQueueActions,
+                'pending_office_actions' => $pendingOfficeActions,
+                'teaching_today' => [],
+                'kpis' => [
+                    'served_today' => $todayAdmitted + $todayServed,
+                    'waiting_now' => $activeRoomTickets + $activeOfficeTickets,
+                    'offices_open' => $offices->where('is_active', true)->count(),
+                ],
+                'campus_time' => [
+                    'date' => now()->toDateString(),
+                    'dayOfWeek' => now()->dayOfWeek,
+                    'time' => now()->format('H:i:s'),
+                    'minutes' => now()->hour * 60 + now()->minute,
+                ],
             ],
         ]);
     }
