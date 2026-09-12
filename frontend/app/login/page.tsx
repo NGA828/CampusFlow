@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../../lib/auth/auth-context';
-import { Button, Field, Input } from '../../components/ui/kit';
-import { useToast } from '../../components/ui/toast';
-import { ApiError } from '../../lib/api/client';
+import { useAuth } from '@/lib/auth/auth-context';
+import { Button, Field, Input } from '@/components/ui/kit';
+import { useToast } from '@/components/ui/toast';
+import { ApiError } from '@/lib/api/client';
 
 const DEMO_ACCOUNTS = [
   { role: 'Student', email: 'student@campusflow.edu', hint: 'Alex Rivera · Computer Science' },
@@ -30,7 +30,7 @@ export default function LoginPage() {
     try {
       const user = await login(email.trim(), password);
       toast.success(`Welcome back, ${user.name.split(' ')[0]}`);
-      router.replace(user.role_code === 'admin' ? '/admin' : user.role_code === 'staff' ? '/staff' : '/dashboard');
+      router.replace(user.role_code === 'admin' ? '/admin/dashboard' : user.role_code === 'staff' ? '/staff/dashboard' : '/student/dashboard');
     } catch (caught) {
       const message = caught instanceof ApiError ? (caught.firstError ?? caught.message) : 'Sign in failed. Please try again.';
       setError(message);

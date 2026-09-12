@@ -20,7 +20,7 @@ class CampusTest extends TestCase
 
     public function test_can_list_buildings(): void
     {
-        $response = $this->getJson('/api/v1/buildings');
+        $response = $this->getJson('/api/v1/public/buildings');
 
         $response->assertStatus(200)
             ->assertJsonPath('success', true);
@@ -32,7 +32,7 @@ class CampusTest extends TestCase
     {
         $building = Building::first();
 
-        $response = $this->getJson('/api/v1/buildings/' . $building->id);
+        $response = $this->getJson('/api/v1/public/buildings/' . $building->id);
 
         $response->assertStatus(200)
             ->assertJsonPath('success', true)
@@ -41,7 +41,7 @@ class CampusTest extends TestCase
 
     public function test_can_list_rooms(): void
     {
-        $response = $this->getJson('/api/v1/rooms');
+        $response = $this->getJson('/api/v1/public/rooms');
 
         $response->assertStatus(200)
             ->assertJsonPath('success', true);
@@ -53,7 +53,7 @@ class CampusTest extends TestCase
     {
         $room = Room::firstOrFail();
 
-        $this->getJson('/api/v1/rooms/' . $room->code)
+        $this->getJson('/api/v1/public/rooms/' . $room->code)
             ->assertOk()
             ->assertJsonPath('data.code', $room->code);
     }

@@ -64,7 +64,7 @@ class AuthTest extends TestCase
         $token = $user->createToken('auth-token')->plainTextToken;
 
         $response = $this->withHeader('Authorization', 'Bearer ' . $token)
-            ->getJson('/api/v1/auth/me');
+            ->getJson('/api/v1/me');
 
         $response->assertStatus(200)
             ->assertJsonPath('data.user.id', $user->id)

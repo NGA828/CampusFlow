@@ -1,13 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useAsync, dayName } from '../../../../lib/hooks';
-import { staffApi } from '../../../../lib/api/endpoints';
-import { ApiError } from '../../../../lib/api/client';
-import { Badge, Button, Card, CardSkeleton, ConfirmDialog, EmptyState, ErrorState, Field, Input, Modal, Select, Tabs, Textarea } from '../../../../components/ui/kit';
-import { PageHeader } from '../../../../components/layout/app-shell';
-import { useToast } from '../../../../components/ui/toast';
-import type { StaffTimetableRow } from '../../../../lib/api/types';
+import { useAsync, dayName } from '@/lib/hooks';
+import { staffApi } from '@/lib/api/endpoints';
+import { ApiError } from '@/lib/api/client';
+import { Badge, Button, Card, CardSkeleton, ConfirmDialog, EmptyState, ErrorState, Field, Input, Modal, Select, Tabs, Textarea } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
+import { useToast } from '@/components/ui/toast';
+import type { StaffTimetableRow } from '@/lib/api/types';
 
 const SESSION_TYPES = ['lecture', 'lab', 'tutorial', 'seminar', 'exam'] as const;
 

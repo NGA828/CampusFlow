@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\Access\ClientContext;
+use App\Support\Access\Roles;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,13 +40,19 @@ class AuthController extends Controller
             'name'            => ['required', 'string', 'max:255'],
             'email'           => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password'        => ['required', 'confirmed', PasswordRule::min(8)],
-            'role'            => ['sometimes', 'string', 'in:student,staff'],
             'registration_no' => ['sometimes', 'nullable', 'string', 'max:50', 'unique:users'],
             'department'      => ['sometimes', 'nullable', 'string', 'max:120'],
         ]);
 
-        // Default role is student; admin accounts are created only by admins.
-        $role = $validated['role'] ?? 'student';
+        /*
+         * Public self-service creates a **student** and nothing else.
+         *
+         * Accepting `role` from the request body — even limited to student|staff — lets anyone
+         * mint a staff account and therefore reach the operations console from the registration
+         * form. Staff and administrator accounts are provisioned by an administrator in
+         * Admin Web → Users, where the actor of the escalation is authenticated and audited.
+         */
+        $role = Roles::STUDENT;
 
         $user = User::create([
             'name'            => $validated['name'],
@@ -55,14 +63,11 @@ class AuthController extends Controller
             'department'      => $validated['department'] ?? null,
         ]);
 
-        $token = $user->createToken('web')->plainTextToken;
+        $token = $user->createToken($this->context($request)->platform)->plainTextToken;
 
         return response()->json([
             'success' => true,
-            'data'    => [
-                'user'  => $user->toApiArray(),
-                'token' => $token,
-            ],
+            'data'    => $this->sessionPayload($user, $this->context($request), $token),
             'message' => 'Account created successfully.',
         ], 201);
     }
@@ -84,18 +89,23 @@ class AuthController extends Controller
             ]);
         }
 
+        // An inactive or suspended principal must not obtain a token at all: role guards run per
+        // request, but issuing a session to a disabled account is already the wrong answer.
+        if (! $user->isActive()) {
+            throw ValidationException::withMessages([
+                'email' => ['This account is ' . ($user->status ?? 'inactive') . '. Contact an administrator.'],
+            ]);
+        }
+
         // Revoke all previous tokens to enforce single-session; adjust if
         // multi-device is required later.
         $user->tokens()->delete();
 
-        $token = $user->createToken('web')->plainTextToken;
+        $token = $user->createToken($this->context($request)->platform)->plainTextToken;
 
         return response()->json([
             'success' => true,
-            'data'    => [
-                'user'  => $user->toApiArray(),
-                'token' => $token,
-            ],
+            'data'    => $this->sessionPayload($user, $this->context($request), $token),
             'message' => 'Logged in successfully.',
         ]);
     }
@@ -115,17 +125,52 @@ class AuthController extends Controller
 
     // --------------------------------------------------------------------- me
 
+    /**
+     * The principal plus the *effective* capability set for this role on this platform.
+     *
+     * Both clients build their navigation from `permissions` and land on `home`. They never derive
+     * access from `role_code`, so a client cannot show a surface the API would refuse — and the
+     * answer changes per platform on purpose: the same student gets `qr.scan` on mobile and not on
+     * web, because that is what the role+platform matrix decides, not a frontend rule.
+     */
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user    = $request->user();
+        $context = $this->context($request);
 
         return response()->json([
             'success' => true,
             'data'    => [
                 'user'        => $user->toApiArray(),
                 'assignments' => $user->assignments,
+                'home'        => $user->homeRoute(),
+                'platform'    => $context->platform,
+                'permissions' => $context->permissions(),
+                'workspace'   => match ($user->role) {
+                    Roles::STUDENT => 'student',
+                    Roles::STAFF   => 'staff',
+                    Roles::ADMIN   => 'admin',
+                    default         => 'visitor',
+                },
             ],
         ]);
+    }
+
+    private function context(Request $request): ClientContext
+    {
+        return ClientContext::fromRequest($request);
+    }
+
+    private function sessionPayload(User $user, ClientContext $context, string $token): array
+    {
+        return [
+            'user'        => $user->toApiArray(),
+            'token'       => $token,
+            'assignments' => $user->assignments,
+            'home'        => $user->homeRoute(),
+            'platform'    => $context->platform,
+            'permissions' => $context->permissions(),
+        ];
     }
 
     // --------------------------------------------------------- update profile

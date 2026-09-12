@@ -16,7 +16,7 @@ class Room extends Model
     protected $fillable = [
         'floor_id', 'code', 'name', 'type', 'capacity', 'area_m2',
         'plan_x', 'plan_y', 'lat', 'lng', 'features',
-        'requires_admission', 'status', 'image_url',
+        'requires_admission', 'status', 'is_public', 'access_rule', 'image_url',
     ];
 
     protected function casts(): array
@@ -30,6 +30,8 @@ class Room extends Model
             'lng'               => 'float',
             'features'          => 'array',
             'requires_admission'=> 'boolean',
+            'is_public'         => 'boolean',
+            'access_rule'       => 'array',
         ];
     }
 
@@ -63,6 +65,8 @@ class Room extends Model
             'features'           => $this->features ?? [],
             'requires_admission' => $this->requires_admission,
             'status'             => $this->status,
+            'is_public'          => (bool) ($this->is_public ?? true),
+            'access_rule'        => $this->access_rule,
             'image_url'          => $this->image_url,
             'building_code'      => $building?->code,
             'building_name'      => $building?->name,

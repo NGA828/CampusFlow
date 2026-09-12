@@ -21,7 +21,7 @@ class AcademicTest extends TestCase
         $student = User::where('role', 'student')->first();
 
         $response = $this->actingAs($student, 'sanctum')
-            ->getJson('/api/v1/academic/timetable');
+            ->getJson('/api/v1/student/timetable');
 
         $response->assertStatus(200)
             ->assertJsonPath('success', true);
@@ -29,7 +29,10 @@ class AcademicTest extends TestCase
 
     public function test_can_list_courses(): void
     {
-        $response = $this->getJson('/api/v1/academic/courses');
+        // The catalogue is a resident read: a course list is campus truth, and it is mounted under
+        // `/campus` for every signed-in role rather than under a student path.
+        $response = $this->actingAs(User::where('role', 'student')->firstOrFail(), 'sanctum')
+            ->getJson('/api/v1/campus/academic/courses');
 
         $response->assertStatus(200)
             ->assertJsonPath('success', true);

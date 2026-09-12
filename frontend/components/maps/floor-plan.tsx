@@ -8,8 +8,8 @@
  * (tap a room, follow a route) and the administrator's spatial editor.
  */
 import { useMemo, useState } from 'react';
-import { cx } from '../ui/kit';
-import type { FloorPlanPayload, NavigationNode, Room, Route } from '../../lib/api/types';
+import { cx } from '@/components/ui/kit';
+import type { FloorPlanPayload, NavigationNode, Room, Route } from '@/lib/api/types';
 
 const ROOM_FILL: Record<Room['room_type'], string> = {
   lecture: '#dfe4ff',

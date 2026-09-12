@@ -1,10 +1,10 @@
 'use client';
 
-import { useAsync, relativeTime } from '../../../../lib/hooks';
-import { adminApi } from '../../../../lib/api/endpoints';
-import { Card, CardSkeleton, EmptyState, ErrorState, Progress, SectionHeading, Stat } from '../../../../components/ui/kit';
-import { PageHeader } from '../../../../components/layout/app-shell';
-import { BarChart } from '../../../../components/admin/table';
+import { useAsync, relativeTime } from '@/lib/hooks';
+import { adminApi } from '@/lib/api/endpoints';
+import { Card, CardSkeleton, EmptyState, ErrorState, Progress, SectionHeading, Stat } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
+import { BarChart } from '@/components/admin/table';
 
 export default function AdminAnalyticsPage() {
   const analytics = useAsync(() => adminApi.analytics(), []);

@@ -2,13 +2,28 @@
  * Session handling for the mobile app.
  *
  * The Sanctum-style bearer token lives in the device keychain (`expo-secure-store`) and is
- * validated against `GET /auth/me` on launch, so a revoked or expired token signs the user out
+ * validated against `GET /me` on launch — the same self-scoped read the account screen uses — so a revoked
+ * or expired token signs the user out
  * instead of leaving the app in a half-authenticated state.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { ApiError, authApi, loadToken, saveToken } from './api';
 import type { SessionInfo, User } from './types';
+
+/**
+ * Where each role belongs on this device.
+ *
+ * The mobile app has no universal home screen. A student lands on the next-class card, a member of staff
+ * lands on the line they are running, an administrator lands on the alert feed. Which tree the router puts
+ * you in is decided here, once, from the token's role — not by a conditional inside a shared screen.
+ */
+export const ROLE_ROOT = {
+  student: '/student',
+  staff: '/staff',
+  admin: '/admin',
+} as const;
+
 
 interface AuthValue {
   user: User | null;

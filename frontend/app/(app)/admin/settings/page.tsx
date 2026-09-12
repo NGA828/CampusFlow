@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useAsync, useDebounced, relativeTime } from '../../../../lib/hooks';
-import { adminApi } from '../../../../lib/api/endpoints';
-import { ApiError } from '../../../../lib/api/client';
-import { Badge, Button, Card, CardSkeleton, ErrorState, Field, Input, SectionHeading, Tabs } from '../../../../components/ui/kit';
-import { PageHeader } from '../../../../components/layout/app-shell';
-import { ResourceTable, type Column } from '../../../../components/admin/table';
-import { useToast } from '../../../../components/ui/toast';
-import type { AuditLogRow } from '../../../../lib/api/types';
+import { useAsync, useDebounced, relativeTime } from '@/lib/hooks';
+import { adminApi } from '@/lib/api/endpoints';
+import { ApiError } from '@/lib/api/client';
+import { Badge, Button, Card, CardSkeleton, ErrorState, Field, Input, SectionHeading, Tabs } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
+import { ResourceTable, type Column } from '@/components/admin/table';
+import { useToast } from '@/components/ui/toast';
+import type { AuditLogRow } from '@/lib/api/types';
 
 const KNOWN_SETTINGS: { key: string; label: string; description: string; placeholder?: string }[] = [
   { key: 'campus.timezone', label: 'Campus timezone', description: 'Used for class reminders, service windows and queue deadlines.', placeholder: 'UTC' },

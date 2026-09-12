@@ -2,13 +2,13 @@
 
 import { use, useCallback } from 'react';
 import Link from 'next/link';
-import { useAsync, formatDuration, formatClock, relativeTime, statusLabel, STATUS_TONES } from '../../../../../lib/hooks';
-import { staffApi } from '../../../../../lib/api/endpoints';
-import { ApiError } from '../../../../../lib/api/client';
-import { useRealtimeEvent } from '../../../../../lib/realtime/realtime-context';
-import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, SectionHeading, Stat } from '../../../../../components/ui/kit';
-import { PageHeader } from '../../../../../components/layout/app-shell';
-import { useToast } from '../../../../../components/ui/toast';
+import { useAsync, formatDuration, formatClock, relativeTime, statusLabel, STATUS_TONES } from '@/lib/hooks';
+import { staffApi } from '@/lib/api/endpoints';
+import { ApiError } from '@/lib/api/client';
+import { useRealtimeEvent } from '@/lib/realtime/realtime-context';
+import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, SectionHeading, Stat } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
+import { useToast } from '@/components/ui/toast';
 
 export default function StaffQueuePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -34,7 +34,7 @@ export default function StaffQueuePage({ params }: { params: Promise<{ id: strin
   if (detail.error) {
     return (
       <div>
-        <PageHeader title="Queue console" breadcrumb={[{ label: 'Operations', href: '/staff' }, { label: 'Queue' }]} />
+        <PageHeader title="Queue console" breadcrumb={[{ label: 'Operations', href: '/staff/dashboard' }, { label: 'Queue' }]} />
         <ErrorState message={detail.error} onRetry={detail.reload} />
       </div>
     );
@@ -43,7 +43,7 @@ export default function StaffQueuePage({ params }: { params: Promise<{ id: strin
   if (detail.loading || !detail.data) {
     return (
       <div>
-        <PageHeader title="Queue console" breadcrumb={[{ label: 'Operations', href: '/staff' }, { label: 'Queue' }]} />
+        <PageHeader title="Queue console" breadcrumb={[{ label: 'Operations', href: '/staff/dashboard' }, { label: 'Queue' }]} />
         <CardSkeleton rows={6} />
       </div>
     );
@@ -58,7 +58,7 @@ export default function StaffQueuePage({ params }: { params: Promise<{ id: strin
       <PageHeader
         title={`${queue.room_code} queue`}
         description={`${queue.room_name} · ${queue.building_code}, ${queue.floor_name} · admission capacity ${queue.admission_capacity}`}
-        breadcrumb={[{ label: 'Operations', href: '/staff' }, { label: `${queue.room_code} queue` }]}
+        breadcrumb={[{ label: 'Operations', href: '/staff/dashboard' }, { label: `${queue.room_code} queue` }]}
         actions={
           <>
             <Link href="/staff">

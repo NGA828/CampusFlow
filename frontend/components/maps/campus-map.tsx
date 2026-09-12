@@ -10,8 +10,8 @@
  * campus-sized area).
  */
 import { useMemo, useState } from 'react';
-import { cx } from '../ui/kit';
-import type { Building, Position, Route } from '../../lib/api/types';
+import { cx } from '@/components/ui/kit';
+import type { Building, Position, Route } from '@/lib/api/types';
 
 export interface MapMarker {
   lat: number;

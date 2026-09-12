@@ -1,14 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useAsync, useDebounced, dayName } from '../../../../lib/hooks';
-import { adminApi, staffApi } from '../../../../lib/api/endpoints';
-import { ApiError } from '../../../../lib/api/client';
-import { Badge, Button, Card, ConfirmDialog, Field, Input, Modal, SectionHeading, Select, Tabs, Textarea } from '../../../../components/ui/kit';
-import { PageHeader } from '../../../../components/layout/app-shell';
-import { ResourceTable, type Column } from '../../../../components/admin/table';
-import { useToast } from '../../../../components/ui/toast';
-import type { Course, Enrollment, Term, TimetableEntry } from '../../../../lib/api/types';
+import { useAsync, useDebounced, dayName } from '@/lib/hooks';
+import { adminApi, staffApi } from '@/lib/api/endpoints';
+import { ApiError } from '@/lib/api/client';
+import { Badge, Button, Card, ConfirmDialog, Field, Input, Modal, SectionHeading, Select, Tabs, Textarea } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
+import { ResourceTable, type Column } from '@/components/admin/table';
+import { useToast } from '@/components/ui/toast';
+import type { Course, Enrollment, Term, TimetableEntry } from '@/lib/api/types';
 
 type Tab = 'courses' | 'terms' | 'enrollments' | 'timetable';
 

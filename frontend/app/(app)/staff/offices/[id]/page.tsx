@@ -2,13 +2,13 @@
 
 import { use, useCallback } from 'react';
 import Link from 'next/link';
-import { useAsync, formatClock, formatDuration, relativeTime, statusLabel, STATUS_TONES } from '../../../../../lib/hooks';
-import { staffApi } from '../../../../../lib/api/endpoints';
-import { ApiError } from '../../../../../lib/api/client';
-import { useRealtimeEvent } from '../../../../../lib/realtime/realtime-context';
-import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, SectionHeading, Stat } from '../../../../../components/ui/kit';
-import { PageHeader } from '../../../../../components/layout/app-shell';
-import { useToast } from '../../../../../components/ui/toast';
+import { useAsync, formatClock, formatDuration, relativeTime, statusLabel, STATUS_TONES } from '@/lib/hooks';
+import { staffApi } from '@/lib/api/endpoints';
+import { ApiError } from '@/lib/api/client';
+import { useRealtimeEvent } from '@/lib/realtime/realtime-context';
+import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, SectionHeading, Stat } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
+import { useToast } from '@/components/ui/toast';
 
 export default function StaffOfficePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -34,7 +34,7 @@ export default function StaffOfficePage({ params }: { params: Promise<{ id: stri
   if (detail.error) {
     return (
       <div>
-        <PageHeader title="Office console" breadcrumb={[{ label: 'Operations', href: '/staff' }, { label: 'Office' }]} />
+        <PageHeader title="Office console" breadcrumb={[{ label: 'Operations', href: '/staff/dashboard' }, { label: 'Office' }]} />
         <ErrorState message={detail.error} onRetry={detail.reload} />
       </div>
     );
@@ -43,7 +43,7 @@ export default function StaffOfficePage({ params }: { params: Promise<{ id: stri
   if (detail.loading || !detail.data) {
     return (
       <div>
-        <PageHeader title="Office console" breadcrumb={[{ label: 'Operations', href: '/staff' }, { label: 'Office' }]} />
+        <PageHeader title="Office console" breadcrumb={[{ label: 'Operations', href: '/staff/dashboard' }, { label: 'Office' }]} />
         <CardSkeleton rows={6} />
       </div>
     );
@@ -60,7 +60,7 @@ export default function StaffOfficePage({ params }: { params: Promise<{ id: stri
       <PageHeader
         title={office.name}
         description={`${office.building_code} · ${office.floor_name}${office.room_code ? ` · ${office.room_code}` : ''} · ${office.concurrent_capacity} students served at once`}
-        breadcrumb={[{ label: 'Operations', href: '/staff' }, { label: office.name }]}
+        breadcrumb={[{ label: 'Operations', href: '/staff/dashboard' }, { label: office.name }]}
         actions={
           <>
             <Link href="/staff">

@@ -3,12 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useAuth } from '../../lib/auth/auth-context';
-import { useRealtime, useRealtimeEvent } from '../../lib/realtime/realtime-context';
-import { Button, Avatar, Badge, cx } from '../ui/kit';
-import { meApi } from '../../lib/api/endpoints';
-import type { NotificationRow } from '../../lib/api/types';
-import { relativeTime } from '../../lib/hooks';
+import { useAuth } from '@/lib/auth/auth-context';
+import { useRealtime, useRealtimeEvent } from '@/lib/realtime/realtime-context';
+import { Button, Avatar, Badge, cx } from '@/components/ui/kit';
+import { meApi } from '@/lib/api/endpoints';
+import type { NotificationRow } from '@/lib/api/types';
+import { relativeTime } from '@/lib/hooks';
 
 interface NavItem {
   href: string;
@@ -16,6 +16,8 @@ interface NavItem {
   icon: ReactNode;
   match?: string[];
   badge?: 'notifications' | 'ticket';
+  /** Shared surfaces (notifications, account) exist outside the role tree and are not a leak. */
+  shared?: boolean;
 }
 
 const icon = (path: ReactNode) => (
@@ -24,39 +26,116 @@ const icon = (path: ReactNode) => (
   </svg>
 );
 
-const STUDENT_NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: icon(<><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-4H4zM14 8h6V4h-6z" /></>) },
-  { href: '/timetable', label: 'Timetable', icon: icon(<><path d="M8 4v3M16 4v3M4 10h16M5 6h14a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z" /></>) },
-  { href: '/map', label: 'Campus map', icon: icon(<><path d="M9 4l6 2 6-2v14l-6 2-6-2-6 2V6z" /><path d="M9 4v14M15 6v14" /></>) },
-  { href: '/navigate', label: 'Navigate', icon: icon(<><path d="M12 21s7-5.4 7-11a7 7 0 10-14 0c0 5.6 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" /></>) },
-  { href: '/rooms', label: 'Rooms', icon: icon(<><path d="M4 20V6a2 2 0 012-2h8a2 2 0 012 2v14M4 20h16M16 20v-8h2a2 2 0 012 2v6M8 8h4v4H8z" /></>) },
-  { href: '/queue', label: 'Room queues', icon: icon(<><path d="M4 6h16M4 12h10M4 18h7" /><circle cx="17" cy="12" r="3" /></>) },
-  { href: '/offices', label: 'Offices', icon: icon(<><path d="M4 20h16M6 20V9l6-4 6 4v11M10 20v-5h4v5" /></>) },
-  { href: '/assistant', label: 'Assistant', icon: icon(<><circle cx="12" cy="12" r="9" /><path d="M8.5 13.5c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8M9.5 9.5v.5M14.5 9.5v.5" /></>) },
-  { href: '/events', label: 'Events', icon: icon(<><path d="M12 3l2.6 5.6 6 .7-4.4 4.1 1.2 6-5.4-3-5.4 3 1.2-6L3.4 9.3l6-.7z" /></>) },
-  { href: '/notifications', label: 'Notifications', icon: icon(<><path d="M6 9a6 6 0 1112 0c0 4 1.5 5.5 1.5 5.5h-15S6 13 6 9zM10 20a2 2 0 004 0" /></>), badge: 'notifications' },
+type NavSection = { title: string; items: NavItem[] };
+
+/**
+ * Three navigation trees, chosen by role — not one menu with items switched on and off.
+ *
+ * The difference matters twice over. A student never sees an "Operations" group they would only be
+ * refused, and a staff member never sees "Room queues" that would tempt them into a queue they are
+ * supposed to be *running*. Each entry below also exists at that URL for that role only: the route
+ * trees in `app/(app)/student`, `staff` and `admin` are gated by `RoleGate`, and the API rejects the
+ * same combinations independently of this file.
+ *
+ * Nothing here is a camera, a scanner, or a live navigation control. Those capabilities are mobile-only
+ * (`qr.scan`, `navigation.live`), so this app has no page that could honour them, and no dead button
+ * pretending that it does.
+ */
+const STUDENT_SECTIONS: NavSection[] = [
+  {
+    title: 'Today',
+    items: [
+      { href: '/student/dashboard', label: 'Dashboard', icon: icon(<><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-4H4zM14 8h6V4h-6z" /></>) },
+      { href: '/student/timetable', label: 'Timetable', icon: icon(<><path d="M8 4v3M16 4v3M4 10h16M5 6h14a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z" /></>) },
+      { href: '/notifications', label: 'Notifications', icon: icon(<><path d="M6 9a6 6 0 1112 0c0 4 1.5 5.5 1.5 5.5h-15S6 13 6 9zM10 20a2 2 0 004 0" /></>), badge: 'notifications' },
+    ],
+  },
+  {
+    title: 'Campus',
+    items: [
+      { href: '/student/campus/map', label: 'Map & route preview', icon: icon(<><path d="M9 4l6 2 6-2v14l-6 2-6-2-6 2V6z" /><path d="M9 4v14M15 6v14" /></>) },
+      { href: '/student/campus/rooms', label: 'Rooms & availability', icon: icon(<><path d="M4 20V6a2 2 0 012-2h8a2 2 0 012 2v14M4 20h16M16 20v-8h2a2 2 0 012 2v6M8 8h4v4H8z" /></>) },
+      { href: '/student/campus/events', label: 'Events', icon: icon(<><path d="M12 3l2.6 5.6 6 .7-4.4 4.1 1.2 6-5.4-3-5.4 3 1.2-6L3.4 9.3l6-.7z" /></>) },
+      { href: '/student/announcements', label: 'Announcements', icon: icon(<><path d="M4 6h16v10H5.5L4 18z" /><path d="M8 10h8" /></>) },
+    ],
+  },
+  {
+    title: 'Services',
+    items: [
+      { href: '/student/services/queues', label: 'Room queue tickets', icon: icon(<><path d="M4 6h16M4 12h10M4 18h7" /><circle cx="17" cy="12" r="3" /></>) },
+      { href: '/student/services/offices', label: 'Office tickets', icon: icon(<><path d="M4 20h16M6 20V9l6-4 6 4v11M10 20v-5h4v5" /></>) },
+      { href: '/student/assistant', label: 'AI assistant', icon: icon(<><circle cx="12" cy="12" r="9" /><path d="M8.5 13.5c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8M9.5 9.5v.5M14.5 9.5v.5" /></>) },
+    ],
+  },
 ];
 
-const STAFF_NAV: NavItem[] = [
-  { href: '/staff', label: 'Operations', icon: icon(<><path d="M4 20V8l8-4 8 4v12M9 20v-6h6v6" /></>) },
-  { href: '/staff/timetable', label: 'Timetable', icon: icon(<><path d="M8 4v3M16 4v3M4 10h16M5 6h14a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z" /></>) },
-  { href: '/staff/content', label: 'Events & notices', icon: icon(<><path d="M4 6h16v10H5.5L4 18z" /><path d="M8 10h8" /></>) },
+const STAFF_SECTIONS: NavSection[] = [
+  {
+    title: 'Operations',
+    items: [
+      { href: '/staff/dashboard', label: 'Service desk', icon: icon(<><path d="M4 20V8l8-4 8 4v12M9 20v-6h6v6" /></>) },
+      { href: '/staff/queues', label: 'My room queues', icon: icon(<><path d="M4 6h16M4 12h10M4 18h7" /><circle cx="17" cy="12" r="3" /></>) },
+      { href: '/staff/offices', label: 'My offices', icon: icon(<><path d="M4 20h16M6 20V9l6-4 6 4v11M10 20v-5h4v5" /></>) },
+    ],
+  },
+  {
+    title: 'Teaching & content',
+    items: [
+      { href: '/staff/timetable', label: 'My timetable', icon: icon(<><path d="M8 4v3M16 4v3M4 10h16M5 6h14a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z" /></>) },
+      { href: '/staff/content', label: 'Events & notices', icon: icon(<><path d="M12 3l2.6 5.6 6 .7-4.4 4.1 1.2 6-5.4-3-5.4 3 1.2-6L3.4 9.3l6-.7z" /></>) },
+    ],
+  },
+  {
+    title: 'Campus',
+    items: [
+      { href: '/staff/rooms', label: 'Rooms I can run', icon: icon(<><path d="M4 20V6a2 2 0 012-2h8a2 2 0 012 2v14M4 20h16M16 20v-8h2a2 2 0 012 2v6M8 8h4v4H8z" /></>) },
+      { href: '/notifications', label: 'Notifications', icon: icon(<><path d="M6 9a6 6 0 1112 0c0 4 1.5 5.5 1.5 5.5h-15S6 13 6 9zM10 20a2 2 0 004 0" /></>), badge: 'notifications', shared: true },
+    ],
+  },
 ];
 
-const ADMIN_NAV: NavItem[] = [
-  { href: '/admin', label: 'Overview', icon: icon(<><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-4H4zM14 8h6V4h-6z" /></>) },
-  { href: '/admin/users', label: 'Users & roles', icon: icon(<><circle cx="9" cy="9" r="3" /><path d="M3 20a6 6 0 0112 0M16 11a3 3 0 100-6M18 20a5 5 0 00-3-4.6" /></>) },
-  { href: '/admin/campus', label: 'Campus & floors', icon: icon(<><path d="M4 20V7a2 2 0 012-2h6l2 2h4a2 2 0 012 2v11M4 20h16M9 12h2M9 16h2M14 12h2M14 16h2" /></>) },
-  { href: '/admin/spatial', label: 'Navigation & QR', icon: icon(<><path d="M12 21s7-5.4 7-11a7 7 0 10-14 0c0 5.6 7 11 7 11z" /><circle cx="12" cy="10" r="2" /></>) },
-  { href: '/admin/services', label: 'Queues & offices', icon: icon(<><path d="M4 6h16M4 12h10M4 18h7" /><circle cx="17" cy="12" r="3" /></>) },
-  { href: '/admin/academics', label: 'Academics', icon: icon(<><path d="M4 6h16M4 12h16M4 18h10" /></>) },
-  { href: '/admin/analytics', label: 'Analytics', icon: icon(<><path d="M4 20V6M10 20v-8M16 20v-5M20 20H4" /></>) },
-  { href: '/admin/settings', label: 'Settings & audit', icon: icon(<><circle cx="12" cy="12" r="3" /><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3l-1.4-1.4M19.1 19.1l-1.4-1.4M17.7 6.3l1.4-1.4M4.9 19.1l1.4-1.4" /></>) },
+const ADMIN_SECTIONS: NavSection[] = [
+  {
+    title: 'Platform',
+    items: [
+      { href: '/admin/dashboard', label: 'Overview', icon: icon(<><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-4H4zM14 8h6V4h-6z" /></>) },
+      { href: '/admin/alerts', label: 'Alerts', icon: icon(<><path d="M12 9v4M12 16.5v.5M10.3 3.9L2.5 18a2 2 0 001.7 3h15.6a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" /></>) },
+      { href: '/admin/analytics', label: 'Analytics', icon: icon(<><path d="M4 20V6M10 20v-8M16 20v-5M20 20H4" /></>) },
+    ],
+  },
+  {
+    title: 'Access',
+    items: [
+      { href: '/admin/users', label: 'Users & roles', icon: icon(<><circle cx="9" cy="9" r="3" /><path d="M3 20a6 6 0 0112 0M16 11a3 3 0 100-6M18 20a5 5 0 00-3-4.6" /></>) },
+      { href: '/admin/settings', label: 'Settings & audit', icon: icon(<><circle cx="12" cy="12" r="3" /><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3l-1.4-1.4M19.1 19.1l-1.4-1.4M17.7 6.3l1.4-1.4M4.9 19.1l1.4-1.4" /></>) },
+    ],
+  },
+  {
+    title: 'Campus model',
+    items: [
+      { href: '/admin/campus', label: 'Buildings & rooms', icon: icon(<><path d="M4 20V7a2 2 0 012-2h6l2 2h4a2 2 0 012 2v11M4 20h16M9 12h2M9 16h2M14 12h2M14 16h2" /></>) },
+      { href: '/admin/spatial', label: 'Maps, QR & geofences', icon: icon(<><path d="M12 21s7-5.4 7-11a7 7 0 10-14 0c0 5.6 7 11 7 11z" /><circle cx="12" cy="10" r="2" /></>) },
+      { href: '/admin/services', label: 'Queues & offices', icon: icon(<><path d="M4 6h16M4 12h10M4 18h7" /><circle cx="17" cy="12" r="3" /></>) },
+      { href: '/admin/academics', label: 'Academics', icon: icon(<><path d="M4 6h16M4 12h16M4 18h10" /></>) },
+    ],
+  },
 ];
+
+const SECTIONS_BY_ROLE: Record<string, NavSection[]> = {
+  student: STUDENT_SECTIONS,
+  staff: STAFF_SECTIONS,
+  admin: ADMIN_SECTIONS,
+};
+
+const WORKSPACE_LABEL: Record<string, { name: string; purpose: string; home: string }> = {
+  student: { name: 'Student workspace', purpose: 'Plan your week, check room and office availability, preview a route.', home: '/student/dashboard' },
+  staff: { name: 'Operations console', purpose: 'Run the lines and desks you are assigned to. Policy is set in the admin console.', home: '/staff/dashboard' },
+  admin: { name: 'Administration', purpose: 'Configure the campus, its services, and who may do what.', home: '/admin/dashboard' },
+};
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { user, isStaff, isAdmin, logout } = useAuth();
+  const { user, logout } = useAuth();
   const { connected } = useRealtime();
   const [unread, setUnread] = useState(0);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
@@ -64,17 +143,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const navigation = useMemo(() => {
-    const items = [...STUDENT_NAV];
-    if (isStaff) items.splice(1, 0, ...STAFF_NAV);
-    if (isAdmin) items.push(...ADMIN_NAV);
-    return items;
-  }, [isStaff, isAdmin]);
+  const role = user?.role_code ?? 'student';
+  const sections = SECTIONS_BY_ROLE[role] ?? STUDENT_SECTIONS;
+  const workspace = WORKSPACE_LABEL[role] ?? WORKSPACE_LABEL.student;
+  const navigation = useMemo(() => sections.flatMap((section) => section.items), [sections]);
 
-  const mobileNav = useMemo(() => {
-    const primary = ['/dashboard', '/timetable', '/map', '/queue', '/assistant'];
-    return navigation.filter((item) => primary.includes(item.href));
-  }, [navigation]);
+  // A narrow responsive bar, drawn from the same role tree rather than a separate "mobile" list —
+  // the phone-sized web is still the web workspace, and the native app is where the camera lives.
+  const mobileNav = useMemo(() => navigation.slice(0, 4), [navigation]);
 
   useEffect(() => {
     if (!user) return;
@@ -112,7 +188,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-dvh bg-ink-50 lg:grid lg:grid-cols-[264px_1fr]">
       {/* Sidebar (desktop) */}
       <aside className="sticky top-0 hidden h-dvh flex-col border-r border-ink-100 bg-white lg:flex">
-        <Link href="/dashboard" className="flex items-center gap-2.5 px-5 py-5">
+        <Link href={workspace.home} className="flex items-center gap-2.5 px-5 py-5">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-[14px] font-bold text-white">CF</span>
           <span>
             <span className="block text-[14px] leading-tight font-semibold text-ink-900">CampusFlow</span>
@@ -120,8 +196,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
         </Link>
 
+        <p className="px-5 pb-3 text-[11px] leading-snug text-ink-400">{workspace.purpose}</p>
+
         <nav className="scrollbar-thin flex-1 overflow-y-auto px-3 pb-4">
-          {navigation.map((item) => {
+          {sections.map((section) => (
+            <div key={section.title} className="mb-3">
+              <p className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-ink-400">{section.title}</p>
+              {section.items.map((item) => {
             const active = pathname === item.href || (item.match ?? []).some((match) => pathname.startsWith(match));
             const count = item.badge === 'notifications' ? unread : 0;
             return (
@@ -138,7 +219,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {count > 0 ? <Badge tone="danger" className="!px-2 !py-0">{count}</Badge> : null}
               </Link>
             );
-          })}
+                })}
+              </div>
+            ))}
+
+          <div className="mt-2 rounded-[10px] border border-dashed border-ink-200 px-3 py-2.5 text-[11.5px] leading-snug text-ink-500">
+            On your phone, CampusFlow adds the camera: scan a location code, join a queue from the door
+            and follow turn-by-turn navigation. Those actions stay on mobile by design.
+          </div>
         </nav>
 
         <div className="border-t border-ink-100 px-3 py-3">
@@ -162,8 +250,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
           {menuOpen ? (
             <div className="mt-1 rounded-[10px] border border-ink-100 bg-white p-1 shadow-[var(--shadow-card)]">
-              <Link href="/profile" className="block rounded-[8px] px-3 py-2 text-[13px] text-ink-700 hover:bg-ink-50">
-                Profile settings
+              <Link href="/account" className="block rounded-[8px] px-3 py-2 text-[13px] text-ink-700 hover:bg-ink-50">
+                Account & devices
               </Link>
               <Link href="/status" className="block rounded-[8px] px-3 py-2 text-[13px] text-ink-700 hover:bg-ink-50">
                 Service status
@@ -190,20 +278,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
               </svg>
             </button>
-            <Link href="/dashboard" className="flex items-center gap-2 lg:hidden">
+            <Link href={workspace.home} className="flex items-center gap-2 lg:hidden">
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-[12px] font-bold text-white">CF</span>
             </Link>
 
             <div className="ml-auto flex items-center gap-1.5">
-              <Link
-                href="/scan"
-                className="hidden items-center gap-1.5 rounded-[10px] border border-ink-200 px-3 py-2 text-[13px] font-medium text-ink-700 hover:border-ink-300 sm:flex"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path d="M4 8V6a2 2 0 012-2h2M20 8V6a2 2 0 00-2-2h-2M4 16v2a2 2 0 002 2h2M20 16v2a2 2 0 01-2 2h-2M4 12h16" strokeLinecap="round" />
-                </svg>
-                Scan a code
-              </Link>
+              <span className="hidden items-center gap-1.5 rounded-[10px] bg-ink-100/80 px-3 py-2 text-[12px] font-medium text-ink-600 sm:flex">
+                {workspace.name}
+              </span>
 
               <div className="relative">
                 <button
@@ -254,7 +336,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 ) : null}
               </div>
 
-              <Link href="/profile" className="hidden items-center gap-2 rounded-[10px] border border-ink-200 px-2 py-1.5 hover:border-ink-300 sm:flex">
+              <Link href="/account" title="Account & devices" className="hidden items-center gap-2 rounded-[10px] border border-ink-200 px-2 py-1.5 hover:border-ink-300 sm:flex">
                 <Avatar name={user?.name ?? 'Guest'} size={26} />
                 <span className="text-[12.5px] font-medium text-ink-700">{user?.name?.split(' ')[0]}</span>
               </Link>

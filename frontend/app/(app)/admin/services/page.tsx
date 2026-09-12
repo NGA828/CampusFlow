@@ -1,14 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useAsync, dayShort } from '../../../../lib/hooks';
-import { adminApi, campusApi } from '../../../../lib/api/endpoints';
-import { ApiError } from '../../../../lib/api/client';
-import { Badge, Button, Card, ConfirmDialog, Field, Input, Modal, SectionHeading, Select, Tabs, Textarea } from '../../../../components/ui/kit';
-import { PageHeader } from '../../../../components/layout/app-shell';
-import { ResourceTable, type Column } from '../../../../components/admin/table';
-import { useToast } from '../../../../components/ui/toast';
-import type { Office, Room, RoomQueueConfig, ServiceWindow } from '../../../../lib/api/types';
+import { useAsync, dayShort } from '@/lib/hooks';
+import { adminApi, campusApi } from '@/lib/api/endpoints';
+import { ApiError } from '@/lib/api/client';
+import { Badge, Button, Card, ConfirmDialog, Field, Input, Modal, SectionHeading, Select, Tabs, Textarea } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
+import { ResourceTable, type Column } from '@/components/admin/table';
+import { useToast } from '@/components/ui/toast';
+import type { AdminOfficeRow, Office, Room, RoomQueueConfig, ServiceWindow } from '@/lib/api/types';
 
 type Tab = 'queues' | 'offices' | 'windows';
 
@@ -128,8 +128,7 @@ export default function AdminServicesPage() {
         code: office.code,
         name: office.name,
         description: office.description ?? '',
-        building_id: office.building_id,
-        floor_id: office.floor_id ?? '',
+        room_id: office.room_id ?? '',
         ticket_prefix: office.ticket_prefix,
         service_duration_minutes: String(office.service_duration_minutes),
         concurrent_capacity: String(office.concurrent_capacity),
@@ -137,6 +136,7 @@ export default function AdminServicesPage() {
         check_in_radius_m: String(office.check_in_radius_m),
         grace_period_seconds: String(office.grace_period_seconds),
         requires_proximity_to_request: String(office.requires_proximity_to_request),
+        requires_appointment: String(office.requires_appointment),
         contact_email: office.contact_email ?? '',
         is_active: String(office.is_active),
       },
@@ -150,8 +150,7 @@ export default function AdminServicesPage() {
         code: '',
         name: '',
         description: '',
-        building_id: buildingOptions[0]?.id ?? '',
-        floor_id: '',
+        room_id: '',
         ticket_prefix: '',
         service_duration_minutes: '15',
         concurrent_capacity: '1',
@@ -159,6 +158,7 @@ export default function AdminServicesPage() {
         check_in_radius_m: '40',
         grace_period_seconds: '180',
         requires_proximity_to_request: 'true',
+        requires_appointment: 'false',
         contact_email: '',
         is_active: 'true',
       },
@@ -173,8 +173,9 @@ export default function AdminServicesPage() {
       code: officeDraft.values.code,
       name: officeDraft.values.name,
       description: officeDraft.values.description || null,
-      building_id: officeDraft.values.building_id,
-      floor_id: officeDraft.values.floor_id || undefined,
+      room_id: officeDraft.values.room_id || null,
+      // `is_active` maps onto the office status column server-side; the console keeps the plain word.
+      is_active: officeDraft.values.is_active === 'true',
       ticket_prefix: officeDraft.values.ticket_prefix,
       service_duration_minutes: Number(officeDraft.values.service_duration_minutes),
       concurrent_capacity: Number(officeDraft.values.concurrent_capacity),
@@ -182,10 +183,10 @@ export default function AdminServicesPage() {
       check_in_radius_m: Number(officeDraft.values.check_in_radius_m),
       grace_period_seconds: Number(officeDraft.values.grace_period_seconds),
       requires_proximity_to_request: officeDraft.values.requires_proximity_to_request === 'true',
+      requires_appointment: officeDraft.values.requires_appointment === 'true',
       contact_email: officeDraft.values.contact_email || null,
-      is_active: officeDraft.values.is_active === 'true',
     };
-    if (body.floor_id === undefined) delete body.floor_id;
+
     try {
       if (officeDraft.id) await adminApi.updateOffice(officeDraft.id, body);
       else await adminApi.createOffice(body);
@@ -299,7 +300,7 @@ export default function AdminServicesPage() {
     { key: 'status', header: 'Status', render: (row) => <Badge tone={row.is_active ? 'success' : 'neutral'}>{row.is_active ? 'active' : 'paused'}</Badge> },
   ];
 
-  const officeColumns: Column<Office>[] = [
+  const officeColumns: Column<AdminOfficeRow>[] = [
     {
       key: 'office',
       header: 'Office',
@@ -324,6 +325,7 @@ export default function AdminServicesPage() {
         <div className="flex items-center gap-1.5">
           <Badge tone={row.is_open_now ? 'success' : 'neutral'}>{row.is_open_now ? 'open' : 'closed'}</Badge>
           <span className="tnum text-[12px] text-ink-500">{row.waiting ?? 0} waiting</span>
+          {row.requires_proximity_to_request ? <Badge tone="warning">on-site only</Badge> : null}
         </div>
       ),
     },
@@ -566,17 +568,19 @@ export default function AdminServicesPage() {
             <Field label="Name" htmlFor="office-name">
               <Input id="office-name" value={officeDraft.values.name} onChange={(event) => setOfficeDraft({ ...officeDraft, values: { ...officeDraft.values, name: event.target.value } })} />
             </Field>
-            <Field label="Building" htmlFor="office-building">
-              <Select id="office-building" value={officeDraft.values.building_id} onChange={(event) => setOfficeDraft({ ...officeDraft, values: { ...officeDraft.values, building_id: event.target.value, floor_id: '' } })}>
-                {buildingOptions.map((option) => (
+            <Field
+              label="Room"
+              htmlFor="office-room"
+              hint="An office lives in a room: that single link is what gives the desk its building, floor, map position and check-in radius."
+            >
+              <Select id="office-room" value={officeDraft.values.room_id} onChange={(event) => setOfficeDraft({ ...officeDraft, values: { ...officeDraft.values, room_id: event.target.value } })}>
+                <option value="">No room — desk is not bookable on site</option>
+                {roomOptions.map((option) => (
                   <option key={option.id} value={option.id}>
                     {option.code} · {option.name}
                   </option>
                 ))}
               </Select>
-            </Field>
-            <Field label="Floor" htmlFor="office-floor">
-              <Input id="office-floor" placeholder="Floor UUID" className="font-mono text-[12px]" value={officeDraft.values.floor_id} onChange={(event) => setOfficeDraft({ ...officeDraft, values: { ...officeDraft.values, floor_id: event.target.value } })} />
             </Field>
             <Field label="Ticket prefix" htmlFor="office-prefix" hint="Produces numbers like AFFAIRS-024.">
               <Input id="office-prefix" value={officeDraft.values.ticket_prefix} onChange={(event) => setOfficeDraft({ ...officeDraft, values: { ...officeDraft.values, ticket_prefix: event.target.value } })} />
@@ -607,6 +611,16 @@ export default function AdminServicesPage() {
               >
                 <option value="true">Required</option>
                 <option value="false">Requests allowed remotely</option>
+              </Select>
+            </Field>
+            <Field label="Appointment required" htmlFor="office-appointment" hint="When required, the student must book a slot before the desk will issue a ticket.">
+              <Select
+                id="office-appointment"
+                value={officeDraft.values.requires_appointment}
+                onChange={(event) => setOfficeDraft({ ...officeDraft, values: { ...officeDraft.values, requires_appointment: event.target.value } })}
+              >
+                <option value="false">Walk-in allowed</option>
+                <option value="true">Appointment only</option>
               </Select>
             </Field>
             <div className="sm:col-span-2">
