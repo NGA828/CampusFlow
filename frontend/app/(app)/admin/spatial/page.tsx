@@ -1,15 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useAsync, useDebounced, formatClock } from '../../../../lib/hooks';
-import { adminApi, campusApi } from '../../../../lib/api/endpoints';
-import { ApiError } from '../../../../lib/api/client';
-import { Badge, Button, ConfirmDialog, Field, Input, Modal, SectionHeading, Select, Tabs, Textarea } from '../../../../components/ui/kit';
-import { PageHeader } from '../../../../components/layout/app-shell';
-import { ResourceTable, type Column } from '../../../../components/admin/table';
-import { FloorPlan } from '../../../../components/maps/floor-plan';
-import { useToast } from '../../../../components/ui/toast';
-import type { Geofence, NavigationEdge, NavigationNode, QrNode, Room } from '../../../../lib/api/types';
+import { useAsync, useDebounced, formatClock } from '@/lib/hooks';
+import { adminApi, campusApi } from '@/lib/api/endpoints';
+import { ApiError } from '@/lib/api/client';
+import { Badge, Button, ConfirmDialog, Field, Input, Modal, SectionHeading, Select, Tabs, Textarea } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
+import { ResourceTable, type Column } from '@/components/admin/table';
+import { FloorPlan } from '@/components/maps/floor-plan';
+import { useToast } from '@/components/ui/toast';
+import type { Geofence, NavigationEdge, NavigationNode, QrNode, Room } from '@/lib/api/types';
 
 type Tab = 'qr' | 'nodes' | 'edges' | 'geofences' | 'plan';
 

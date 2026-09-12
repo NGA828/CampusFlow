@@ -4,39 +4,60 @@
  * Authentication state for the whole app.
  *
  * The token lives in `localStorage` (written by the API client), and the principal is
- * always re-read from `GET /auth/me` so permissions and staff scopes come from the
+ * always re-read from `GET /me` (the self-scoped read, not an auth endpoint) so permissions and staff scopes come from the
  * backend — the client never decides what a user may do.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ApiError, getToken, setToken } from '../api/client';
-import { authApi } from '../api/endpoints';
-import type { Role, StaffAssignment, User } from '../api/types';
+import { ApiError, getToken, setToken } from '@/lib/api/client';
+import { authApi } from '@/lib/api/endpoints';
+import type { Role, StaffAssignment, User } from '@/lib/api/types';
 
-interface AuthContextValue {
+/**
+ * Where each principal belongs. Four products, four homes — there is no `/dashboard` that works for
+ * everybody, and the redirect after login is the first place that has to prove it.
+ */
+export const ROLE_HOME: Record<Role, string> = {
+  visitor: '/',
+  student: '/student/dashboard',
+  staff: '/staff/dashboard',
+  admin: '/admin/dashboard',
+};
+
+export interface AuthContextValue {
   user: User | null;
   assignments: StaffAssignment[];
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
+  /**
+   * Public self-registration creates students, full stop. Staff and administrator accounts are issued
+   * by administration (`POST /admin/users`), because "which role do you claim to be" cannot be a
+   * self-serve field on a sign-up form — that choice is the whole access model.
+   */
   register: (input: {
     name: string;
     email: string;
     password: string;
     password_confirmation: string;
-    role?: 'student' | 'staff';
     registration_no?: string;
     department?: string;
+    program?: string;
   }) => Promise<User>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  /**
+   * Roles are compared exactly, never by rank. `isStaff` used to mean "staff or above", which is how an
+   * administrator ended up inside a staff screen; a role is an identity, not a privilege level, and the
+   * console a person gets is decided by which role they hold.
+   */
+  isStudent: boolean;
   isStaff: boolean;
   isAdmin: boolean;
+  home: string;
   can: (permission: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-const RANK: Record<Role, number> = { visitor: 0, student: 10, staff: 20, admin: 30 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -74,6 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const onUnauthenticated = () => {
       setUser(null);
       setAssignments([]);
+      // A 401 from anywhere ends the session and returns the person to the sign-in screen; it never
+      // forwards them into a role workspace, because at this moment we do not know who they are.
       router.replace('/login');
     };
     const onToken = () => void load();
@@ -122,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   const value = useMemo<AuthContextValue>(() => {
-    const isStaff = user ? RANK[user.role_code] >= RANK.staff : false;
+    const role = user?.role_code;
     return {
       user,
       assignments,
@@ -131,8 +154,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       refresh: load,
-      isStaff,
-      isAdmin: user?.role_code === 'admin',
+      isStudent: role === 'student',
+      isStaff: role === 'staff',
+      isAdmin: role === 'admin',
+      home: role ? ROLE_HOME[role] : '/',
       can: (permission: string) => Boolean(user?.permissions?.includes(permission)),
     };
   }, [user, assignments, loading, login, register, logout, load]);
@@ -146,9 +171,17 @@ export function useAuth(): AuthContextValue {
   return context;
 }
 
-/** Route guard used by the authenticated layout. */
+/**
+ * Route guard for an authenticated role tree.
+ *
+ * `roles` is an allow-list, and an administrator is *not* exempt: an admin who wanders into
+ * `/student/dashboard` is a person looking at the wrong product, and the correct answer is to send them
+ * to their own console — where their real powers live — rather than to grant a cross-role read of
+ * somebody else's workspace. The server enforces the same rule again on every request; this hook only
+ * decides what the browser shows while that happens.
+ */
 export function useRequireAuth(roles?: Role[]) {
-  const { user, loading, isAdmin } = useAuth();
+  const { user, loading, home } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -157,10 +190,10 @@ export function useRequireAuth(roles?: Role[]) {
       router.replace('/login');
       return;
     }
-    if (roles && roles.length > 0 && !roles.includes(user.role_code) && !isAdmin) {
-      router.replace('/dashboard');
+    if (roles && roles.length > 0 && !roles.includes(user.role_code)) {
+      router.replace(home);
     }
-  }, [loading, user, roles, router, isAdmin]);
+  }, [loading, user, roles, router, home]);
 
   return { user, loading };
 }

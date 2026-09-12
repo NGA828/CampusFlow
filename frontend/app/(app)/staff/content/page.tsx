@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useAsync, formatDate, relativeTime } from '../../../../lib/hooks';
-import { campusApi, engagementApi, staffApi } from '../../../../lib/api/endpoints';
-import { ApiError } from '../../../../lib/api/client';
-import { Badge, Button, Card, CardSkeleton, ConfirmDialog, EmptyState, ErrorState, Field, Input, Modal, Select, Tabs, Textarea, Toggle } from '../../../../components/ui/kit';
-import { PageHeader } from '../../../../components/layout/app-shell';
-import { useToast } from '../../../../components/ui/toast';
+import { useAsync, formatDate, relativeTime } from '@/lib/hooks';
+import { campusApi, engagementApi, staffApi } from '@/lib/api/endpoints';
+import { ApiError } from '@/lib/api/client';
+import { Badge, Button, Card, CardSkeleton, ConfirmDialog, EmptyState, ErrorState, Field, Input, Modal, Select, Tabs, Textarea, Toggle } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
+import { useToast } from '@/components/ui/toast';
 
 const CATEGORIES = ['academic', 'career', 'social', 'sport', 'wellbeing', 'administrative'] as const;
 

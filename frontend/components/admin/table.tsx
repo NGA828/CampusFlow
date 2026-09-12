@@ -1,8 +1,8 @@
 'use client';
 
 import { type ReactNode } from 'react';
-import { Button, Card, CardSkeleton, EmptyState, ErrorState, Input } from '../ui/kit';
-import type { PageMeta } from '../../lib/api/types';
+import { Button, Card, CardSkeleton, EmptyState, ErrorState, Input } from '@/components/ui/kit';
+import type { PageMeta } from '@/lib/api/types';
 
 export interface Column<T> {
   key: string;

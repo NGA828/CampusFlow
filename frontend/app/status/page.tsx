@@ -1,17 +1,20 @@
 'use client';
 
-import { useAsync, formatClock, relativeTime } from '../../lib/hooks';
-import { campusApi, queueApi, officeApi } from '../../lib/api/endpoints';
-import { Badge, Card, CardSkeleton, ErrorState } from '../../components/ui/kit';
-import { PageHeader } from '../../components/layout/app-shell';
+import { useAsync, formatClock, relativeTime } from '@/lib/hooks';
+import { campusApi, publicApi } from '@/lib/api/endpoints';
+import { Badge, Card, CardSkeleton, ErrorState } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
 
 export default function StatusPage() {
+  // This page is readable without signing in, so it is fed entirely by `/public/*`. That is not a
+  // stylistic choice: `/campus/*` and `/student/*` would answer a visitor with 401, and the queue and
+  // office *lines* behind them are resident data. Visitors get service health and desk hours; the
+  // number of people waiting in a corridor is not public information.
   const health = useAsync(() => campusApi.health(), []);
-  const queues = useAsync(() => queueApi.list(), []);
-  const offices = useAsync(() => officeApi.list(), []);
+  const overview = useAsync(() => publicApi.overview(), []);
+  const offices = useAsync(() => publicApi.offices(), []);
 
-  const totalWaiting = (queues.data?.queues ?? []).reduce((sum, queue) => sum + queue.waiting, 0);
-  const openOffices = (offices.data?.offices ?? []).filter((office) => office.is_open_now).length;
+  const openOffices = (offices.data?.offices ?? []).filter((office) => office.is_open).length;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -59,35 +62,32 @@ export default function StatusPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Card>
-              <p className="text-[13px] font-semibold text-ink-800">Room admission queues</p>
+              <p className="text-[13px] font-semibold text-ink-800">Mapped campus</p>
               <p className="mt-1 text-[12.5px] text-ink-500">
-                {queues.loading ? 'Checking…' : `${queues.data?.queues.length ?? 0} configured · ${totalWaiting} people waiting`}
+                {overview.loading
+                  ? 'Checking…'
+                  : `${overview.data?.stats.buildings ?? 0} buildings · ${overview.data?.stats.rooms ?? 0} rooms · ${overview.data?.stats.seats ?? 0} seats`}
               </p>
-              {queues.data?.queues.length ? (
-                <ul className="mt-3 space-y-2">
-                  {queues.data.queues.slice(0, 4).map((queue) => (
-                    <li key={queue.id} className="flex items-center justify-between text-[12.5px]">
-                      <span className="text-ink-700">
-                        {queue.room_code} · {queue.room_name}
-                      </span>
-                      <span className="tnum text-ink-500">{queue.waiting} waiting</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+              <p className="mt-3 text-[12px] leading-relaxed text-ink-500">
+                Live queue lengths, room occupancy and timetables are available to signed-in students, staff and
+                administration — not to the open internet.
+              </p>
             </Card>
 
             <Card>
               <p className="text-[13px] font-semibold text-ink-800">Administrative offices</p>
               <p className="mt-1 text-[12.5px] text-ink-500">
-                {offices.loading ? 'Checking…' : `${offices.data?.offices.length ?? 0} offices · ${openOffices} open now`}
+                {offices.loading ? 'Checking…' : `${offices.data?.offices.length ?? 0} published · ${openOffices} open now`}
               </p>
               {offices.data?.offices.length ? (
                 <ul className="mt-3 space-y-2">
                   {offices.data.offices.map((office) => (
                     <li key={office.id} className="flex items-center justify-between text-[12.5px]">
-                      <span className="text-ink-700">{office.name}</span>
-                      <Badge tone={office.is_open_now ? 'success' : 'neutral'}>{office.is_open_now ? 'Open' : 'Closed'}</Badge>
+                      <span className="text-ink-700">
+                        {office.name}
+                        {office.opening_hours ? <span className="text-ink-400"> · {office.opening_hours}</span> : null}
+                      </span>
+                      <Badge tone={office.is_open ? 'success' : 'neutral'}>{office.is_open ? 'Open' : 'Closed'}</Badge>
                     </li>
                   ))}
                 </ul>

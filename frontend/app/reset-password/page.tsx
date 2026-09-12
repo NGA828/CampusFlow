@@ -3,9 +3,9 @@
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { authApi } from '../../lib/api/endpoints';
-import { Button, Field, Input } from '../../components/ui/kit';
-import { ApiError } from '../../lib/api/client';
+import { authApi } from '@/lib/api/endpoints';
+import { Button, Field, Input } from '@/components/ui/kit';
+import { ApiError } from '@/lib/api/client';
 
 export default function ResetPasswordPage() {
   return (

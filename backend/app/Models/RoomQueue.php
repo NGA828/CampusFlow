@@ -14,7 +14,9 @@ class RoomQueue extends Model
 
     protected $fillable = [
         'room_id', 'is_open', 'capacity', 'max_capacity', 'current_count',
-        'call_window_minutes', 'proximity_radius_m', 'mode', 'welcome_message',
+        'call_window_minutes', 'no_show_grace_minutes', 'proximity_radius_m',
+        'join_requires_proximity', 'allow_multiple_active_tickets', 'avg_service_minutes',
+        'mode', 'welcome_message',
     ];
 
     protected function casts(): array
@@ -24,8 +26,12 @@ class RoomQueue extends Model
             'capacity'             => 'integer',
             'max_capacity'         => 'integer',
             'current_count'        => 'integer',
-            'call_window_minutes'  => 'integer',
-            'proximity_radius_m'   => 'float',
+            'call_window_minutes'    => 'integer',
+            'no_show_grace_minutes'  => 'integer',
+            'proximity_radius_m'     => 'float',
+            'join_requires_proximity'   => 'boolean',
+            'allow_multiple_active_tickets' => 'boolean',
+            'avg_service_minutes'    => 'integer',
         ];
     }
 
@@ -48,7 +54,11 @@ class RoomQueue extends Model
             'current_count'         => $this->current_count,
             'available'             => max(0, $this->capacity - $this->current_count),
             'call_window_minutes'   => $this->call_window_minutes,
+            'no_show_grace_minutes' => $this->no_show_grace_minutes,
             'proximity_radius_m'    => $this->proximity_radius_m,
+            'join_requires_proximity'      => (bool) ($this->join_requires_proximity ?? true),
+            'allow_multiple_active_tickets'=> (bool) ($this->allow_multiple_active_tickets ?? false),
+            'avg_service_minutes'   => $this->avg_service_minutes,
             'mode'                  => $this->mode,
             'welcome_message'       => $this->welcome_message,
         ];

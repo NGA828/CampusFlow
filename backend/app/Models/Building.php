@@ -13,8 +13,8 @@ class Building extends Model
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'code', 'name', 'short_name', 'description', 'lat', 'lng',
-        'footprint', 'image_url', 'status', 'floors_count',
+        'code', 'name', 'short_name', 'description', 'address', 'lat', 'lng',
+        'footprint', 'image_url', 'status', 'is_public', 'floors_count',
     ];
 
     protected function casts(): array
@@ -24,6 +24,7 @@ class Building extends Model
             'lng'          => 'float',
             'footprint'    => 'array',
             'floors_count' => 'integer',
+            'is_public'    => 'boolean',
         ];
     }
 
@@ -45,6 +46,8 @@ class Building extends Model
             'name'         => $this->name,
             'short_name'   => $this->short_name,
             'description'  => $this->description,
+            'address'      => $this->address,
+            'is_public'    => (bool) ($this->is_public ?? true),
             'lat'          => $this->lat,
             'lng'          => $this->lng,
             'footprint'    => $this->footprint,

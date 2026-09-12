@@ -22,8 +22,11 @@ class NavigationTest extends TestCase
         $user = \App\Models\User::where('role', 'student')->first();
         $qr = QrNode::first();
 
+        // Scanning is a mobile grant: the same request from a browser is refused with
+        // PLATFORM_NOT_SUPPORTED, which is why the web client has no scanner at all.
         $response = $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/positioning/scan', [
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/positioning/scan', [
                 'code' => $qr->code,
             ]);
 
@@ -35,7 +38,8 @@ class NavigationTest extends TestCase
     {
         $nodes = NavigationNode::take(2)->get();
 
-        $response = $this->postJson('/api/v1/navigation/route', [
+        $response = $this->actingAs(User::where('role', 'student')->firstOrFail(), 'sanctum')
+            ->postJson('/api/v1/campus/navigation/route', [
             'from_node_id' => $nodes[0]->id,
             'to_node_id'   => $nodes[1]->id,
         ]);

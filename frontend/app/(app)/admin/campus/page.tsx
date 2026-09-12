@@ -1,14 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useAsync, useDebounced } from '../../../../lib/hooks';
-import { adminApi } from '../../../../lib/api/endpoints';
-import { ApiError } from '../../../../lib/api/client';
-import { Badge, Button, ConfirmDialog, Field, Input, Modal, Select, Tabs, Textarea } from '../../../../components/ui/kit';
-import { PageHeader } from '../../../../components/layout/app-shell';
-import { ResourceTable, type Column } from '../../../../components/admin/table';
-import { useToast } from '../../../../components/ui/toast';
-import type { Building, Floor, Room } from '../../../../lib/api/types';
+import { useAsync, useDebounced } from '@/lib/hooks';
+import { adminApi } from '@/lib/api/endpoints';
+import { ApiError } from '@/lib/api/client';
+import { Badge, Button, ConfirmDialog, Field, Input, Modal, Select, Tabs, Textarea } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
+import { ResourceTable, type Column } from '@/components/admin/table';
+import { useToast } from '@/components/ui/toast';
+import type { Building, Floor, Room } from '@/lib/api/types';
 
 type Tab = 'buildings' | 'floors' | 'rooms';
 

@@ -6,6 +6,7 @@ use App\Models\Announcement;
 use App\Models\CampusEvent;
 use App\Models\Office;
 use App\Models\OfficeEvent;
+use App\Models\OfficeServiceWindow;
 use App\Models\OfficeStaff;
 use App\Models\OfficeTicket;
 use App\Models\QueueEvent;
@@ -24,12 +25,82 @@ class StaffController extends Controller
 
     private function requireStaff(Request $request): bool
     {
-        return in_array($request->user()->role, ['staff', 'admin']);
+        $user = $request->user();
+
+        return $user !== null
+            && $user->isActive()
+            && $user->hasPermission(\App\Support\Access\Permissions::QUEUE_OPERATE_ASSIGNED);
     }
 
     private function forbidden(): JsonResponse
     {
         return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+    }
+
+    /**
+     * Resolve a queue and assert the caller runs it.
+     *
+     * Staff authority is *scoped*: `staff_assignments` decides which lines a person may operate, so
+     * "you are staff" is necessary but never sufficient. Admins pass through (an explicit override in
+     * the permission registry, for continuity when a duty officer is absent).
+     */
+    private function findQueue(Request $request, string $id): RoomQueue
+    {
+        $queue = RoomQueue::with(['room.floor.building'])->findOrFail($id);
+
+        abort_unless(
+            \App\Support\Access\StaffScope::canOperateQueue($request->user(), $queue),
+            403,
+            'This queue is outside your assignment scope.',
+        );
+
+        return $queue;
+    }
+
+    private function assertQueue(Request $request, string $id): void
+    {
+        $this->findQueue($request, $id);
+    }
+
+    private function findQueueTicket(Request $request, string $ticketId): QueueTicket
+    {
+        $ticket = QueueTicket::with(['queue.room'])->findOrFail($ticketId);
+
+        $queue = $ticket->queue;
+
+        abort_unless(
+            $queue && \App\Support\Access\StaffScope::canOperateQueue($request->user(), $queue),
+            403,
+            'This ticket belongs to a queue outside your assignment scope.',
+        );
+
+        return $ticket;
+    }
+
+    private function findOffice(Request $request, string $id): Office
+    {
+        $office = Office::with(['serviceWindows', 'room.floor.building'])->findOrFail($id);
+
+        abort_unless(
+            \App\Support\Access\StaffScope::canOperateOffice($request->user(), $office),
+            403,
+            'This office is outside your assignment scope.',
+        );
+
+        return $office;
+    }
+
+    private function findOfficeTicket(Request $request, string $ticketId): OfficeTicket
+    {
+        $ticket = OfficeTicket::with('office')->findOrFail($ticketId);
+
+        abort_unless(
+            $ticket->office && \App\Support\Access\StaffScope::canOperateOffice($request->user(), $ticket->office),
+            403,
+            'This ticket belongs to an office outside your assignment scope.',
+        );
+
+        return $ticket;
     }
 
     /* ---------------------------------------------------------------- dashboard */
@@ -226,7 +297,7 @@ class StaffController extends Controller
     {
         if (!$this->requireStaff($request)) return $this->forbidden();
 
-        $queue = RoomQueue::with(['room'])->findOrFail($id);
+        $queue = $this->findQueue($request, $id);
 
         $tickets = QueueTicket::with(['user'])
             ->where('queue_id', $id)
@@ -261,6 +332,8 @@ class StaffController extends Controller
     public function callNext(Request $request, string $id): JsonResponse
     {
         if (!$this->requireStaff($request)) return $this->forbidden();
+
+        $this->assertQueue($request, $id);
 
         $result = DB::transaction(function () use ($request, $id) {
             $queue  = RoomQueue::findOrFail($id);
@@ -301,10 +374,22 @@ class StaffController extends Controller
     {
         if (!$this->requireStaff($request)) return $this->forbidden();
 
-        $ticket = QueueTicket::findOrFail($ticketId);
+        $ticket = $this->findQueueTicket($request, $ticketId);
 
         DB::transaction(function () use ($ticket, $request) {
             $queue = RoomQueue::where('id', $ticket->queue_id)->lockForUpdate()->first();
+
+            // Admission is the moment a person becomes a body in the room, so this is where the
+            // occupancy counter moves — and it is capped by the room's capacity, which is the whole
+            // point of a controlled room. A second admit of the same ticket must not double-count.
+            if ($ticket->status === 'admitted') {
+                return;
+            }
+
+            if ($queue && $queue->capacity > 0 && (int) $queue->current_count >= (int) $queue->capacity) {
+                abort(422, 'This room is at capacity — admit someone else first.');
+            }
+
             $ticket->update(['status' => 'admitted', 'admitted_at' => now()]);
             if ($queue) $queue->increment('current_count');
             QueueEvent::create([
@@ -328,9 +413,19 @@ class StaffController extends Controller
     {
         if (!$this->requireStaff($request)) return $this->forbidden();
 
-        $ticket = QueueTicket::findOrFail($ticketId);
+        $ticket = $this->findQueueTicket($request, $ticketId);
         DB::transaction(function () use ($ticket, $request) {
+            $wasInside = $ticket->status === 'admitted';
+
             $ticket->update(['status' => 'completed', 'completed_at' => now()]);
+
+            if ($wasInside) {
+                $queue = RoomQueue::where('id', $ticket->queue_id)->lockForUpdate()->first();
+                if ($queue && (int) $queue->current_count > 0) {
+                    $queue->decrement('current_count');
+                }
+            }
+
             QueueEvent::create([
                 'ticket_id'  => $ticket->id,
                 'type'       => 'completed',
@@ -349,7 +444,7 @@ class StaffController extends Controller
     {
         if (!$this->requireStaff($request)) return $this->forbidden();
 
-        $ticket = QueueTicket::findOrFail($ticketId);
+        $ticket = $this->findQueueTicket($request, $ticketId);
         DB::transaction(function () use ($ticket, $request) {
             $ticket->update(['status' => 'no_show', 'cancelled_at' => now(), 'cancelled_by' => 'staff']);
             QueueEvent::create([
@@ -395,7 +490,7 @@ class StaffController extends Controller
     {
         if (!$this->requireStaff($request)) return $this->forbidden();
 
-        $office  = Office::with(['serviceWindows'])->findOrFail($id);
+        $office  = $this->findOffice($request, $id);
         $tickets = OfficeTicket::with(['user'])
             ->where('office_id', $id)
             ->whereNotIn('status', ['completed', 'cancelled', 'no_show'])
@@ -411,7 +506,7 @@ class StaffController extends Controller
             'data'    => [
                 'office'  => $office->toApiArray(),
                 'line'    => $tickets,
-                'windows' => $office->serviceWindows->map(fn($w) => $w->toArray()),
+                'windows' => $office->serviceWindows->map(fn (OfficeServiceWindow $window) => $window->toApiArray())->values(),
                 'counts'  => [
                     'waiting'    => $tickets->where('status', 'waiting')->count(),
                     'called'     => $tickets->where('status', 'called')->count(),
@@ -427,6 +522,8 @@ class StaffController extends Controller
     public function officeCallNext(Request $request, string $id): JsonResponse
     {
         if (!$this->requireStaff($request)) return $this->forbidden();
+
+        $this->findOffice($request, $id);
 
         $result = DB::transaction(function () use ($request, $id) {
             $ticket = OfficeTicket::where('office_id', $id)
@@ -465,7 +562,7 @@ class StaffController extends Controller
     {
         if (!$this->requireStaff($request)) return $this->forbidden();
 
-        $ticket = OfficeTicket::findOrFail($ticketId);
+        $ticket = $this->findOfficeTicket($request, $ticketId);
         DB::transaction(function () use ($ticket, $request) {
             $ticket->update(['status' => 'in_service', 'service_started_at' => now()]);
             OfficeEvent::create([
@@ -486,7 +583,7 @@ class StaffController extends Controller
     {
         if (!$this->requireStaff($request)) return $this->forbidden();
 
-        $ticket = OfficeTicket::findOrFail($ticketId);
+        $ticket = $this->findOfficeTicket($request, $ticketId);
         DB::transaction(function () use ($ticket, $request) {
             $ticket->update(['status' => 'in_service', 'service_started_at' => $ticket->service_started_at ?? now()]);
             OfficeEvent::create([
@@ -507,7 +604,7 @@ class StaffController extends Controller
     {
         if (!$this->requireStaff($request)) return $this->forbidden();
 
-        $ticket = OfficeTicket::findOrFail($ticketId);
+        $ticket = $this->findOfficeTicket($request, $ticketId);
         DB::transaction(function () use ($ticket, $request) {
             $ticket->update(['status' => 'completed', 'completed_at' => now()]);
             OfficeEvent::create([
@@ -528,7 +625,7 @@ class StaffController extends Controller
     {
         if (!$this->requireStaff($request)) return $this->forbidden();
 
-        $ticket = OfficeTicket::findOrFail($ticketId);
+        $ticket = $this->findOfficeTicket($request, $ticketId);
         DB::transaction(function () use ($ticket, $request) {
             $ticket->update(['status' => 'no_show', 'cancelled_at' => now(), 'cancelled_by' => 'staff']);
             OfficeEvent::create([
@@ -733,5 +830,377 @@ class StaffController extends Controller
         Announcement::findOrFail($id)->delete();
 
         return response()->json(['success' => true, 'message' => 'Announcement deleted']);
+    }
+
+    /* ──────────────────────────────────────────────────── single queue */
+
+    /**
+     * GET /staff/queues/{queue}
+     *
+     * One queue, fully loaded — the shape the staff *mobile* companion uses, where the web console
+     * shows the whole board. Same authorization, smaller payload: a phone in a corridor should not
+     * pay for thirty rooms' statistics to answer "who is next?".
+     */
+    public function queueShow(Request $request, string $id): JsonResponse
+    {
+        if (!$this->requireStaff($request)) return $this->forbidden();
+
+        $queue = $this->findQueue($request, $id);
+
+        $active = QueueTicket::with('user')
+            ->where('queue_id', $queue->id)
+            ->whereNotIn('status', ['completed', 'cancelled', 'no_show'])
+            ->orderBy('position')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'queue'  => array_merge($queue->toApiArray(), [
+                    'room_code'     => $queue->room?->code,
+                    'room_name'     => $queue->room?->name,
+                    'building_code' => $queue->room?->floor?->building?->code,
+                    'floor_name'    => $queue->room?->floor?->name,
+                    'waiting'       => $active->where('status', 'waiting')->count(),
+                    'called'        => $active->where('status', 'called')->count(),
+                    'checked_in'    => $active->where('status', 'checked_in')->count(),
+                    'ahead_estimate_minutes' => $active->where('status', 'waiting')->count()
+                        * max(1, (int) ($queue->avg_service_minutes ?? 6)),
+                ]),
+                'next'   => $active->firstWhere('status', 'waiting')?->toApiArray(),
+                'current'=> $active->firstWhere('status', 'called')?->toApiArray(),
+            ],
+        ]);
+    }
+
+    /** POST /staff/queues/{queue}/open — start or close the line for this session. */
+    public function setQueueOpen(Request $request, string $id): JsonResponse
+    {
+        if (!$this->requireStaff($request)) return $this->forbidden();
+
+        $validated = $request->validate(['is_open' => ['required', 'boolean']]);
+        $queue = $this->findQueue($request, $id);
+
+        $queue->update(['is_open' => $validated['is_open']]);
+
+        // Queue open/close is not about a ticket, and `queue_events.ticket_id` is a non-nullable
+        // foreign key, so the operator action is written to the audit trail instead.
+        DB::table('audit_logs')->insert([
+            'user_id'      => $request->user()->id,
+            'action'       => $validated['is_open'] ? 'queue.opened' : 'queue.closed',
+            'subject_type' => RoomQueue::class,
+            'subject_id'   => (string) $queue->id,
+            'after'        => json_encode(['is_open' => $validated['is_open']]),
+            'created_at'   => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => ['queue' => $queue->fresh()->toApiArray()],
+        ]);
+    }
+
+    /** POST /staff/queue-tickets/{ticket}/call — call a specific student, not just the head of the line. */
+    public function callTicket(Request $request, string $ticketId): JsonResponse
+    {
+        if (!$this->requireStaff($request)) return $this->forbidden();
+
+        $ticket = $this->findQueueTicket($request, $ticketId);
+
+        if (!in_array($ticket->status, ['waiting', 'called'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only a waiting ticket can be called.',
+                'code'    => 'INVALID_TRANSITION',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($ticket, $request) {
+            // The check-in window is derived from the queue's grace period, so the deadline the
+            // student's countdown shows and the one the no-show sweep enforces cannot drift apart.
+            $ticket->update([
+                'status'    => 'called',
+                'called_at' => now(),
+            ]);
+
+            QueueEvent::create([
+                'ticket_id'  => $ticket->id,
+                'type'       => 'called',
+                'metadata'   => ['called_by' => $request->user()->id, 'explicit' => true],
+                'created_at' => now(),
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'data'    => ['ticket' => array_merge($ticket->fresh()->load('user')->toApiArray(), [
+                'user_name' => $ticket->user?->name,
+            ])],
+        ]);
+    }
+
+    /**
+     * POST /staff/queue-tickets/{ticket}/check-in
+     *
+     * The staff-side alternative to a student checking in on their own device: the student is
+     * standing in front of the desk, so the operator asserts presence. This is the one case where
+     * the "check-in is a mobile act" rule does not apply, because the mobile device is not required
+     * to prove somebody is present when a member of staff is vouching for it.
+     */
+    public function staffCheckIn(Request $request, string $ticketId): JsonResponse
+    {
+        if (!$this->requireStaff($request)) return $this->forbidden();
+
+        $ticket = $this->findQueueTicket($request, $ticketId);
+
+        if (!in_array($ticket->status, ['waiting', 'called', 'navigating'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This ticket cannot be checked in from its current state.',
+                'code'    => 'INVALID_TRANSITION',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($ticket, $request) {
+            $ticket->update(['status' => 'checked_in', 'checked_in_at' => now()]);
+
+            QueueEvent::create([
+                'ticket_id'  => $ticket->id,
+                'type'       => 'checked_in',
+                'metadata'   => ['by' => 'staff', 'staff_id' => $request->user()->id],
+                'created_at' => now(),
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'data'    => ['ticket' => $ticket->fresh()->toApiArray()],
+        ]);
+    }
+
+    /** POST /staff/office-tickets/{ticket}/call — call a named office ticket. */
+    public function officeCallTicket(Request $request, string $ticketId): JsonResponse
+    {
+        if (!$this->requireStaff($request)) return $this->forbidden();
+
+        $ticket = $this->findOfficeTicket($request, $ticketId);
+
+        if ($ticket->status !== 'waiting') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only a waiting ticket can be called.',
+                'code'    => 'INVALID_TRANSITION',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($ticket, $request) {
+            $ticket->update(['status' => 'called', 'called_at' => now()]);
+
+            OfficeEvent::create([
+                'ticket_id'  => $ticket->id,
+                'type'       => 'called',
+                'metadata'   => ['called_by' => $request->user()->id, 'window_id' => $request->input('window_id')],
+                'created_at' => now(),
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'data'    => ['called' => array_merge($ticket->fresh()->load('user')->toApiArray(), [
+                'user_name' => $ticket->user?->name,
+            ])],
+        ]);
+    }
+
+    /**
+     * GET /staff/students/{registrationNo}
+     *
+     * Identity verification at the desk: "is the person in front of me who the ticket says it is?".
+     * Deliberately narrow — name, programme, status and the tickets they hold. No contact details,
+     * no grades, no history beyond what is needed to serve the request, because a queue operator's
+     * job is verification and not surveillance.
+     */
+    public function studentLookup(Request $request, string $registrationNo): JsonResponse
+    {
+        if (!$this->requireStaff($request)) return $this->forbidden();
+
+        $student = User::query()
+            ->where('role', 'student')
+            ->where('registration_no', strtoupper(trim($registrationNo)))
+            ->first();
+
+        if (! $student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No student is registered with that number.',
+                'code'    => 'STUDENT_NOT_FOUND',
+            ], 404);
+        }
+
+        $activeQueues = QueueTicket::with('queue.room')
+            ->where('user_id', $student->id)
+            ->whereIn('status', ['waiting', 'called', 'navigating', 'checked_in'])
+            ->get()
+            ->map(fn ($t) => [
+                'ticket_number' => $t->ticketNumber(),
+                'status'        => $t->status,
+                'room_code'     => $t->queue?->room?->code,
+                'position'      => $t->position,
+            ]);
+
+        $activeOffices = OfficeTicket::with('office')
+            ->where('user_id', $student->id)
+            ->whereIn('status', ['waiting', 'called', 'approaching', 'in_service'])
+            ->get()
+            ->map(fn ($t) => [
+                'ticket_number' => $t->ticket_number,
+                'status'        => $t->status,
+                'office'        => $t->office?->name,
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'student' => [
+                    'name'            => $student->name,
+                    'registration_no' => $student->registration_no,
+                    'program'         => $student->program,
+                    'department'      => $student->department,
+                    'year_level'      => $student->year_level,
+                    'status'          => $student->status,
+                ],
+                'queue_tickets'  => $activeQueues,
+                'office_tickets' => $activeOffices,
+            ],
+        ]);
+    }
+
+    /**
+     * GET /staff/analytics
+     *
+     * Operational analytics for the lines this person runs — not the campus-wide picture, which is
+     * an administration concern. Scope is the same `staff_assignments` scope the operations use, so
+     * a duty officer sees their building's numbers and nothing more.
+     */
+    public function analytics(Request $request): JsonResponse
+    {
+        if (!$this->requireStaff($request)) return $this->forbidden();
+
+        $user = $request->user();
+        $from = $request->date('from') ?? now()->subDays(7)->startOfDay();
+        $to   = $request->date('to') ?? now()->endOfDay();
+
+        $queues = $user->role === 'admin'
+            ? RoomQueue::pluck('id')->all()
+            : RoomQueue::get()->filter(fn ($q) => \App\Support\Access\StaffScope::canOperateQueue($user, $q))->pluck('id')->all();
+
+        $offices = $user->role === 'admin'
+            ? Office::pluck('id')->all()
+            : Office::get()->filter(fn ($o) => \App\Support\Access\StaffScope::canOperateOffice($user, $o))->pluck('id')->all();
+
+        $tickets = QueueTicket::whereIn('queue_id', $queues)
+            ->whereBetween('created_at', [$from, $to])
+            ->get();
+
+        $issued = $tickets->count();
+        $served = $tickets->whereIn('status', ['admitted', 'completed'])->count();
+        $noShow = $tickets->where('status', 'no_show')->count();
+
+        $waited = $tickets->filter(fn ($t) => $t->checked_in_at && $t->created_at)
+            ->map(fn ($t) => $t->created_at->diffInSeconds($t->checked_in_at));
+
+        $officeTickets = OfficeTicket::whereIn('office_id', $offices)
+            ->whereBetween('created_at', [$from, $to])
+            ->get();
+
+        $servedTimes = $officeTickets->filter(fn ($t) => $t->service_started_at && $t->called_at)
+            ->map(fn ($t) => $t->called_at->diffInSeconds($t->service_started_at));
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'range' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],
+                'scope' => ['queues' => count($queues), 'offices' => count($offices)],
+                'queues' => [
+                    'issued'        => $issued,
+                    'served'        => $served,
+                    'no_shows'      => $noShow,
+                    'service_rate'  => $issued > 0 ? round($served / $issued, 3) : null,
+                    'no_show_rate'  => $issued > 0 ? round($noShow / $issued, 3) : null,
+                    'median_wait_s' => $waited->isNotEmpty() ? (int) $waited->median() : null,
+                    'average_wait_s'=> $waited->isNotEmpty() ? (int) $waited->avg() : null,
+                ],
+                'offices' => [
+                    'issued'   => $officeTickets->count(),
+                    'completed'=> $officeTickets->where('status', 'completed')->count(),
+                    'no_shows' => $officeTickets->where('status', 'no_show')->count(),
+                    'median_call_to_service_s' => $servedTimes->isNotEmpty() ? (int) $servedTimes->median() : null,
+                ],
+                'per_queue' => collect($queues)->map(function ($queueId) use ($from, $to) {
+                    $rows = QueueTicket::where('queue_id', $queueId)
+                        ->whereBetween('created_at', [$from, $to])
+                        ->get(['status', 'created_at', 'checked_in_at', 'admitted_at']);
+
+                    return [
+                        'queue_id' => $queueId,
+                        'room_code' => RoomQueue::with('room')->find($queueId)?->room?->code,
+                        'issued' => $rows->count(),
+                        'served' => $rows->whereIn('status', ['admitted', 'completed'])->count(),
+                        'no_shows' => $rows->where('status', 'no_show')->count(),
+                        'waiting_now' => $rows->where('status', 'waiting')->count(),
+                    ];
+                })->values(),
+                'generated_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
+     * PATCH /staff/rooms/{room}
+     *
+     * The one write a staff member may make on campus data: correcting a room record inside their
+     * own assignment scope (capacity, availability, features). Buildings, floors, geometry, QR
+     * anchors and the routing graph are administration, and there is no route here for them.
+     */
+    public function updateRoom(Request $request, string $room): JsonResponse
+    {
+        if (!$this->requireStaff($request)) return $this->forbidden();
+
+        $record = Room::findOrFail($room);
+
+        abort_unless(
+            \App\Support\Access\StaffScope::canManageRoom($request->user(), $record),
+            403,
+            'This room is outside your assignment scope.',
+        );
+
+        // A status field, not a room editor. Everything else on this row is the estate's decision: capacity
+        // drives a queue's admission limit, `access_rule` decides who may enter, and visibility is what a
+        // visitor sees — none of which belongs on a screen an operator uses between students.
+        $validated = $request->validate([
+            'status' => ['required', 'string', Rule::in(['available', 'occupied', 'closed', 'maintenance'])],
+        ]);
+
+        $before = $record->status;
+
+        if ($before !== $validated['status']) {
+            $record->update(['status' => $validated['status']]);
+
+            DB::table('audit_logs')->insert([
+                'user_id'      => $request->user()->id,
+                'action'       => 'room.status.changed',
+                'subject_type' => Room::class,
+                'subject_id'   => (string) $record->id,
+                'before'       => json_encode(['status' => $before]),
+                'after'        => json_encode(['status' => $validated['status']]),
+                'ip_address'   => $request->ip(),
+                'created_at'   => now(),
+            ]);
+        }
+
+        return response()->json(['success' => true, 'data' => [
+            'room'    => $record->fresh()->toApiArray(true),
+            'changed' => $before !== $validated['status'],
+        ]]);
     }
 }

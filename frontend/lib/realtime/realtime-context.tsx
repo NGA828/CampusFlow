@@ -8,7 +8,7 @@
  * channels a principal may join; the client can only listen.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { getToken } from '../api/client';
+import { getToken } from '@/lib/api/client';
 
 export interface RealtimeEvent<T = Record<string, unknown>> {
   channel: string;

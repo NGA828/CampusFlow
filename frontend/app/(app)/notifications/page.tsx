@@ -2,26 +2,26 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useAsync, relativeTime } from '../../../lib/hooks';
-import { meApi } from '../../../lib/api/endpoints';
-import { useAuth } from '../../../lib/auth/auth-context';
-import { useRealtimeEvent } from '../../../lib/realtime/realtime-context';
-import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, Tabs } from '../../../components/ui/kit';
-import { PageHeader } from '../../../components/layout/app-shell';
-import { useToast } from '../../../components/ui/toast';
-import type { NotificationRow } from '../../../lib/api/types';
+import { useAsync, relativeTime } from '@/lib/hooks';
+import { meApi } from '@/lib/api/endpoints';
+import { useAuth } from '@/lib/auth/auth-context';
+import { useRealtimeEvent } from '@/lib/realtime/realtime-context';
+import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, Tabs } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
+import { useToast } from '@/components/ui/toast';
+import type { NotificationRow } from '@/lib/api/types';
 
 const LINK_FOR_TYPE: Record<string, string> = {
-  'queue.ticket_issued': '/queue',
-  'queue.called': '/queue',
-  'queue.position_updated': '/queue',
-  'queue.no_show': '/queue',
-  'office.ticket_issued': '/offices',
-  'office.called': '/offices',
-  'office.approaching': '/offices',
+  'queue.ticket_issued': '/student/services/queues',
+  'queue.called': '/student/services/queues',
+  'queue.position_updated': '/student/services/queues',
+  'queue.no_show': '/student/services/queues',
+  'office.ticket_issued': '/student/services/offices',
+  'office.called': '/student/services/offices',
+  'office.approaching': '/student/services/offices',
   'navigation.:id': '/navigate',
-  'event.reminder': '/events',
-  'class.reminder': '/timetable',
+  'event.reminder': '/student/campus/events',
+  'class.reminder': '/student/timetable',
 };
 
 export default function NotificationsPage() {
@@ -62,12 +62,12 @@ export default function NotificationsPage() {
   };
 
   const linkFor = (notification: NotificationRow): string | null => {
-    if (notification.type.startsWith('queue.')) return '/queue';
-    if (notification.type.startsWith('office.')) return '/offices';
+    if (notification.type.startsWith('queue.')) return '/student/services/queues';
+    if (notification.type.startsWith('office.')) return '/student/services/offices';
     if (notification.type.startsWith('navigation.')) return '/navigate';
-    if (notification.type.startsWith('event.')) return '/events';
-    if (notification.type.startsWith('class.')) return '/timetable';
-    if (notification.type.startsWith('announcement.')) return '/announcements';
+    if (notification.type.startsWith('event.')) return '/student/campus/events';
+    if (notification.type.startsWith('class.')) return '/student/timetable';
+    if (notification.type.startsWith('announcement.')) return '/student/announcements';
     return LINK_FOR_TYPE[notification.type] ?? null;
   };
 

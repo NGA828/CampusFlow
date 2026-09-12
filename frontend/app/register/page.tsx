@@ -3,17 +3,16 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../../lib/auth/auth-context';
-import { Button, Field, Input, SegmentedControl } from '../../components/ui/kit';
-import { useToast } from '../../components/ui/toast';
-import { ApiError } from '../../lib/api/client';
+import { useAuth } from '@/lib/auth/auth-context';
+import { Button, Field, Input } from '@/components/ui/kit';
+import { useToast } from '@/components/ui/toast';
+import { ApiError } from '@/lib/api/client';
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register } = useAuth();
   const toast = useToast();
-  const [role, setRole] = useState<'student' | 'staff'>('student');
-  const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '', registration_no: '', department: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '', registration_no: '', department: '', program: '' });
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
@@ -26,17 +25,17 @@ export default function RegisterPage() {
     setError(null);
     setFieldErrors({});
     try {
-      const user = await register({
+      await register({
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
         password_confirmation: form.password_confirmation,
-        role,
         registration_no: form.registration_no.trim() || undefined,
         department: form.department.trim() || undefined,
+        program: form.program.trim() || undefined,
       });
       toast.success('Account created', 'You are signed in and ready to go.');
-      router.replace(user.role_code === 'staff' ? '/staff' : '/dashboard');
+      router.replace('/student/dashboard');
     } catch (caught) {
       if (caught instanceof ApiError) {
         setError(caught.message);
@@ -59,19 +58,11 @@ export default function RegisterPage() {
 
         <h1 className="text-[24px] font-semibold text-ink-900">Create your account</h1>
         <p className="mt-1 text-[13.5px] text-ink-500">
-          Student accounts are created immediately. Staff accounts are activated by an administrator — you will see the student areas until then.
+          Sign-up creates a <strong className="font-medium text-ink-700">student</strong> account. Staff and
+          administrator accounts are issued by the university — a role is something an institution grants, not
+          something you pick here, and the server will refuse anything else. If you were told to expect access,
+          sign in with the account you were given.
         </p>
-
-        <div className="mt-6">
-          <SegmentedControl
-            value={role}
-            onChange={setRole}
-            options={[
-              { value: 'student', label: 'Student' },
-              { value: 'staff', label: 'Staff member' },
-            ]}
-          />
-        </div>
 
         <form onSubmit={submit} className="mt-5 space-y-4">
           <Field label="Full name" htmlFor="name" error={fieldErrors.name?.[0]}>
@@ -99,11 +90,11 @@ export default function RegisterPage() {
             />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={role === 'student' ? 'Registration number' : 'Staff number'} htmlFor="registration_no" error={fieldErrors.registration_no?.[0]}>
-              <Input id="registration_no" value={form.registration_no} onChange={update('registration_no')} placeholder={role === 'student' ? '2026-0110' : 'STF-1010'} />
+            <Field label="Registration number" htmlFor="registration_no" error={fieldErrors.registration_no?.[0]} hint="If your university already issued one.">
+              <Input id="registration_no" value={form.registration_no} onChange={update('registration_no')} placeholder="2026-0110" />
             </Field>
-            <Field label="Department" htmlFor="department" error={fieldErrors.department?.[0]}>
-              <Input id="department" value={form.department} onChange={update('department')} placeholder="Computer Science" />
+            <Field label="Programme" htmlFor="program" error={fieldErrors.program?.[0]}>
+              <Input id="program" value={form.program} onChange={update('program')} placeholder="Computer Science" />
             </Field>
           </div>
 

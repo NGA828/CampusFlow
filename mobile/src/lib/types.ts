@@ -78,21 +78,32 @@ export interface Room {
   floor_level?: number;
 }
 
+/**
+ * One day in one room, as `GET /campus/rooms/{room}` computes it. No `opens_at`/`closes_at`: a room has no
+ * opening hours in this campus, only a schedule — so what a student is told is whether the room is free
+ * right now, what is in it, and when the next gap opens.
+ */
 export interface RoomAvailability {
+  room_id: UUID;
+  date: string;
   is_open: boolean;
   is_available_now: boolean;
   next_free_at: string | null;
-  current_session: { course_code: string; course_title: string; ends_at: string } | null;
-  busy: boolean;
+  current_session: { course_code: string | null; course_title: string | null; starts_at: string; ends_at: string; session_type: string } | null;
+  busy: { starts_at: string; ends_at: string; course_code: string | null; course_title: string | null; session_type: string }[];
   free_slots: { starts_at: string; ends_at: string }[];
-  occupancy: { enrolled: number; capacity: number } | null;
+  session_count: number;
+  /** Presence from the admission queue, not seat count: `inside` is who the campus believes is in the room. */
+  occupancy: { inside: number; capacity: number } | null;
+  queue: { id: UUID; waiting: number; requires_proximity: boolean; is_active: boolean } | null;
+  reason: string | null;
   headline: string;
 }
 
 export interface RoomDetail {
   room: Room;
   availability: RoomAvailability;
-  week: { day_of_week: number; starts_at: string; ends_at: string; course_code: string; course_title: string; session_type: string }[];
+  week: { id: UUID; day_of_week: number; starts_at: string; ends_at: string; course_code: string | null; course_title: string | null; session_type: string }[];
 }
 
 export interface TimetableEntry {
@@ -125,26 +136,52 @@ export interface TimetableWeek {
   entries: TimetableEntry[];
 }
 
+/**
+ * One line on the campus board — `GET /campus/queues`, `GET /campus/queues/{id}`, and the same object
+ * embedded in a student's ticket view.
+ *
+ * The queue's own policy (radius, capacity, windows, no-show grace) is included because a student deciding
+ * where to stand needs to know why a join was refused before they walk across campus for it.
+ */
 export interface QueueListItem {
   id: UUID;
   room_id: UUID;
+  is_open: boolean;
+  capacity: number;
+  max_capacity: number | null;
+  current_count: number;
+  available: number;
+  call_window_minutes: number | null;
+  no_show_grace_minutes: number | null;
+  proximity_radius_m: number;
+  join_requires_proximity: boolean;
+  allow_multiple_active_tickets: boolean;
+  avg_service_minutes: number | null;
+  mode: string | null;
+  welcome_message: string | null;
   is_active: boolean;
   admission_capacity: number;
   avg_service_seconds: number;
-  proximity_radius_m: number;
   requires_proximity_to_join: boolean;
   check_in_window_seconds: number;
-  opens_at: string | null;
-  closes_at: string | null;
-  notes: string | null;
-  room_code: string;
-  room_name: string;
-  building_code: string;
-  building_name: string;
-  floor_name: string;
+  room_code: string | null;
+  room_name: string | null;
+  building_code: string | null;
+  building_name: string | null;
+  floor_name: string | null;
   waiting: number;
   serving: number;
   my_ticket_id: UUID | null;
+}
+
+/** `GET /campus/rooms/{room}/queue` — the line outside a specific door. */
+export interface RoomQueueSnapshot {
+  queue: QueueListItem;
+  room: Room;
+  active_waiting: number;
+  current_occupancy: number;
+  max_capacity: number | null;
+  my_ticket: QueueTicket | null;
 }
 
 export interface QueueTicket {
@@ -237,6 +274,8 @@ export interface OfficeSummary {
   daily_capacity_used: number;
   daily_capacity: number | null;
   staff: { id: UUID; name: string; role: string }[];
+  /** This caller's live ticket for that desk, if they hold one — the board and the desk screen read the same field. */
+  my_ticket: OfficeTicketView | null;
 }
 
 export interface OfficeTicket {
@@ -325,6 +364,252 @@ export interface DashboardPayload {
   events: CampusEvent[];
   building_alerts: { id: UUID; code: string; name: string; status: string }[];
   position: Position | null;
+  term: { code: string; name: string } | null;
+  campus_snapshot: { open_queues: number; rooms_in_queue: number; enrolled_courses: number };
+  /**
+   * The verbs the server is willing to honour for this principal *on this platform*. The phone renders
+   * its action sheet from this list — it never decides for itself that a student may do something.
+   */
+  quick_actions: { id: string; label: string; href: string; kind: string }[];
+}
+
+/** What an operator sees when they open the app standing in a corridor. */
+/**
+ * Staff mobile dashboard — `GET /staff/dashboard`.
+ *
+ * Note what is *not* here: no student timetable, no navigation, no QR "scan to see where a student is".
+ * A staff phone answers one question — where is my line, and who do I call next — and this payload is
+ * exactly that. The same role on the web console (`/staff/queues`, `/staff/analytics`) gets the operational
+ * depth: history, windows, capacity, staffing.
+ */
+export interface StaffMobileDashboard {
+  scopes: { queues: number; offices: number };
+  queues: StaffQueueCard[];
+  offices: StaffOfficeCard[];
+  pending_queue_actions: StaffQueueAction[];
+  pending_office_actions: StaffOfficeAction[];
+  teaching_today: unknown[];
+  kpis: { served_today: number; waiting_now: number; offices_open: number };
+  campus_time: { date: string; dayOfWeek: number; time: string; minutes: number };
+}
+
+/** One room line the operator owns, with the ticket currently at the desk. */
+export interface StaffQueueCard {
+  queue_id: UUID;
+  room_id: UUID | null;
+  room_code: string | null;
+  room_name: string | null;
+  building_code: string | null;
+  floor_name: string | null;
+  is_active: boolean;
+  admission_capacity: number;
+  avg_service_seconds: number;
+  max_size: number | null;
+  proximity_radius_m: number | null;
+  requires_proximity_to_join: boolean;
+  waiting: number;
+  occupying: number;
+  checked_in: number;
+  current: {
+    id: UUID;
+    ticket_number: string;
+    position: number;
+    status: string;
+    student_name: string;
+    issued_at: string | null;
+    called_at: string | null;
+    check_in_deadline: string | null;
+    checked_in_at: string | null;
+    eta_seconds: number | null;
+    wait_seconds: number;
+    checked_in: boolean;
+  } | null;
+}
+
+/** One office line the operator is rostered on. */
+export interface StaffOfficeCard {
+  office_id: UUID;
+  name: string;
+  code: string;
+  ticket_prefix: string;
+  concurrent_capacity: number;
+  service_duration_minutes: number;
+  check_in_radius_m: number;
+  is_active: boolean;
+  building_code: string | null;
+  floor_name: string | null;
+  room_code: string | null;
+  waiting: number;
+  in_service: number;
+  completed_today: number;
+  current: {
+    id: UUID;
+    ticket_number: string;
+    position: number;
+    status: string;
+    student_name: string;
+    subject: string | null;
+    requested_at: string | null;
+    called_at: string | null;
+    check_in_deadline: string | null;
+    checked_in_at: string | null;
+    service_started_at: string | null;
+    wait_seconds: number;
+    checked_in: boolean;
+    service_minutes: number;
+  } | null;
+}
+
+/** A ticket waiting on a decision from the person at the desk. */
+export interface StaffQueueAction {
+  id: UUID;
+  ticket_number: string;
+  status: string;
+  position: number;
+  check_in_deadline: string | null;
+  student_name: string;
+  room_code: string | null;
+  room_name: string | null;
+  queue_id: UUID;
+}
+
+export interface StaffOfficeAction {
+  id: UUID;
+  ticket_number: string;
+  status: string;
+  position: number;
+  check_in_deadline: string | null;
+  subject: string | null;
+  student_name: string;
+  office_id?: UUID;
+  office_name?: string | null;
+}
+
+/**
+ * A queue line, exactly as `GET /staff/queues/{id}/line` returns it: the queue configuration, the people in
+ * it, and the counts that drive the header. Identity fields are present because the operator is calling
+ * these students by name — a staff phone never browses a student's history from here.
+ */
+export interface StaffQueueLineRow {
+  id: UUID;
+  queue_id: UUID;
+  room_id: UUID | null;
+  room_code: string | null;
+  room_name: string | null;
+  position: number;
+  status: string;
+  join_source: string | null;
+  joined_at: string | null;
+  called_at: string | null;
+  checked_in_at: string | null;
+  admitted_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  ticket_number: string;
+  check_in_deadline: string | null;
+  seconds_until_deadline: number | null;
+  can_check_in: boolean;
+  can_cancel: boolean;
+  user_name: string | null;
+  user_email: string | null;
+}
+
+export interface StaffQueueLinePayload {
+  queue: {
+    id: UUID;
+    room_id: UUID;
+    is_open: boolean;
+    capacity: number;
+    max_capacity: number | null;
+    current_count: number;
+    available: number;
+    call_window_minutes: number | null;
+    no_show_grace_minutes: number | null;
+    proximity_radius_m: number | null;
+    join_requires_proximity: boolean;
+    allow_multiple_active_tickets: boolean;
+    avg_service_minutes: number | null;
+    mode: string | null;
+    welcome_message: string | null;
+    room_code: string | null;
+    room_name: string | null;
+  };
+  line: StaffQueueLineRow[];
+  counts: { waiting: number; called: number; checked_in: number };
+}
+
+export interface StaffOfficeLineRow {
+  id: UUID;
+  office_id: UUID;
+  office_name: string | null;
+  office_code: string | null;
+  ticket_number: string;
+  subject: string | null;
+  notes: string | null;
+  status: string;
+  window_id: UUID | null;
+  sequence_no: number | null;
+  position: number;
+  join_source: string | null;
+  joined_at: string | null;
+  called_at: string | null;
+  service_started_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  user_name: string | null;
+  user_email: string | null;
+}
+
+export interface StaffOfficeLinePayload {
+  office: {
+    id: UUID;
+    code: string;
+    name: string;
+    is_open: boolean;
+    status: string;
+    ticket_prefix: string;
+    avg_service_minutes: number | null;
+    service_duration_minutes: number;
+    daily_capacity: number | null;
+    requires_proximity_to_request: boolean;
+    grace_period_seconds: number;
+    building_code: string | null;
+    floor_name: string | null;
+    room_code: string | null;
+  };
+  line: StaffOfficeLineRow[];
+  windows: ServiceWindow[];
+  counts: { waiting: number; called: number; in_service: number };
+}
+
+/** `GET /staff/students/{registrationNo}` — verification, not browsing. */
+export interface StaffStudentLookup {
+  student: {
+    name: string;
+    registration_no: string | null;
+    program: string | null;
+    department: string | null;
+    year_level: string | null;
+    status: string | null;
+  };
+  queue_tickets: { ticket_number: string; status: string; room_code: string | null; position: number }[];
+  office_tickets: { ticket_number: string; status: string; office: string | null }[];
+}
+
+/** The whole of administration on a phone: what is wrong, and whether you have looked at it yet. */
+export interface AdminMobileMonitoring {
+  generated_at: string;
+  queues: { open: number; waiting_now: number; issued_today: number; served_today: number; no_show_rate_today: number | null };
+  offices: { open: number; waiting_now: number; completed_today: number };
+  platform: { active_queues: number; navigation_today: number; unacknowledged_alerts: number; users: number };
+}
+
+export interface AdminAlert {
+  key: string;
+  severity: 'critical' | 'warning' | 'info';
+  title: string;
+  detail: string;
+  target?: string;
 }
 
 export interface AiMessage {

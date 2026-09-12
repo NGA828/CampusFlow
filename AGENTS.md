@@ -23,4 +23,14 @@ Hard gates — never skip for convenience:
 8. Centralized API clients via NEXT_PUBLIC_API_URL / EXPO_PUBLIC_API_URL —
    no scattered hardcoded URLs (§36).
 9. Tests before "done" (§64–§69, §93).
+9b. Role × platform separation is enforced by scripts, not by review:
+   `npm run check:separation` fails when either client calls a route that
+   does not exist, when a mobile-only capability is wired into the web
+   client (or the reverse), when a feature test asserts against a dead path,
+   or when a route has no screen in front of it. `npm run check:php` parses
+   every backend file (there is no PHP runtime in this environment, so a
+   syntax error is otherwise invisible until someone runs `artisan`), and
+   `npm run typecheck` covers both clients. All three run in
+   `npm run check` and must be green before a claim of "done".
+   See docs/role-platform-matrix.md and docs/platform-role-audit.md.
 10. Incremental, backend-first development per §75.

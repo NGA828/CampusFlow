@@ -54,6 +54,14 @@ export function setToken(token: string | null): void {
   window.dispatchEvent(new CustomEvent('campusflow:token', { detail: token }));
 }
 
+/**
+ * Which product is calling. The backend's `Platform` gate trusts this header only as a *hint about
+ * the client*, never as authority — role and permissions come from the token — but it is what lets
+ * `/student/positioning/scan` answer 403 PLATFORM_NOT_SUPPORTED for a browser while the phone on the
+ * same account succeeds. Mobile sends `mobile`; anything unlabelled is treated as web.
+ */
+export const CLIENT_PLATFORM = 'web';
+
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
@@ -95,7 +103,7 @@ export function newIdempotencyKey(prefix = 'cf'): string {
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, query, signal, idempotencyKey, auth = true } = options;
-  const headers: Record<string, string> = { accept: 'application/json' };
+  const headers: Record<string, string> = { accept: 'application/json', 'X-CampusFlow-Client': CLIENT_PLATFORM };
   if (body !== undefined) headers['content-type'] = 'application/json';
   const token = auth ? getToken() : null;
   if (token) headers.authorization = `Bearer ${token}`;
@@ -149,6 +157,8 @@ export const api = {
   get: <T>(path: string, options: Omit<RequestOptions, 'method' | 'body'> = {}) => request<T>(path, { ...options, method: 'GET' }),
   post: <T>(path: string, body?: unknown, options: Omit<RequestOptions, 'method' | 'body'> = {}) =>
     request<T>(path, { ...options, method: 'POST', body }),
+  put: <T>(path: string, body?: unknown, options: Omit<RequestOptions, 'method' | 'body'> = {}) =>
+    request<T>(path, { ...options, method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown, options: Omit<RequestOptions, 'method' | 'body'> = {}) =>
     request<T>(path, { ...options, method: 'PATCH', body }),
   delete: <T>(path: string, options: Omit<RequestOptions, 'method' | 'body'> = {}) => request<T>(path, { ...options, method: 'DELETE' }),

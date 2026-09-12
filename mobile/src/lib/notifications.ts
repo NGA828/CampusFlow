@@ -11,7 +11,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-import { meApi } from './api';
+import { accountApi } from './api';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -44,7 +44,7 @@ export async function registerForPush(): Promise<string | null> {
 
     const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
     const token = (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined)).data;
-    await meApi.registerDevice({ token, platform: Platform.OS === 'ios' ? 'ios' : 'android' });
+    await accountApi.registerDevice({ token, platform: Platform.OS === 'ios' ? 'ios' : 'android' });
     return token;
   } catch {
     // Silent by design: a missing push token never blocks the app.

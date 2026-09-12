@@ -2,7 +2,7 @@
   "name": "campusflow",
   "version": "1.0.0",
   "private": true,
-  "description": "CampusFlow — Intelligent Campus Management, Navigation and Student Services Platform",
+  "description": "CampusFlow \u2014 Intelligent Campus Management, Navigation and Student Services Platform",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "setup": "composer install --working-dir=backend && npm --prefix frontend install && npm --prefix mobile install && php backend/artisan migrate --seed",
@@ -11,9 +11,16 @@
     "db:reset": "php backend/artisan migrate:fresh --seed",
     "test": "php backend/artisan test",
     "typecheck": "npm --prefix frontend run typecheck && npm --prefix mobile exec tsc -- --noEmit",
-    "lint": "npm --prefix frontend run lint"
+    "lint": "npm --prefix frontend run lint",
+    "check:php": "node scripts/check-php-syntax.mjs",
+    "check:api": "node scripts/check-api-contract.mjs",
+    "check": "npm run check:php && npm run check:api && npm run typecheck",
+    "check:separation": "node scripts/check-api-contract.mjs"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "php-parser": "^3.7.0"
   }
 }

@@ -1,10 +1,10 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { campusApi } from '../lib/api/endpoints';
-import { SiteHeader } from '../components/landing/site-header';
-import { HeroWindow, RouteMock } from '../components/landing/hero-art';
-import { MobileScreenList, PhoneShowcase } from '../components/landing/phone-showcase';
-import { Counter, Parallax, Reveal, ScrollProgress, Stagger, StaggerItem } from '../components/landing/motion-primitives';
+import { publicApi } from '@/lib/api/endpoints';
+import { SiteHeader } from '@/components/landing/site-header';
+import { HeroWindow, RouteMock } from '@/components/landing/hero-art';
+import { MobileScreenList, PhoneShowcase } from '@/components/landing/phone-showcase';
+import { Counter, Parallax, Reveal, ScrollProgress, Stagger, StaggerItem } from '@/components/landing/motion-primitives';
 
 export const revalidate = 60;
 
@@ -56,7 +56,7 @@ const STEPS = [
 ];
 
 export default async function LandingPage() {
-  const overview = await campusApi.publicOverview().catch(() => null);
+  const overview = await publicApi.overview().catch(() => null);
 
   const stats = [
     { label: 'Buildings mapped', value: overview?.stats.buildings ?? 0 },
@@ -236,7 +236,7 @@ export default async function LandingPage() {
                 </li>
               ))}
             </ul>
-            <Link href="/map" className="mt-7 inline-flex items-center gap-2 text-[14px] font-semibold text-brand-300 hover:text-brand-200">
+            <Link href="/student/campus/map" className="mt-7 inline-flex items-center gap-2 text-[14px] font-semibold text-brand-300 hover:text-brand-200">
               Open the campus map
               <span aria-hidden="true">→</span>
             </Link>
@@ -366,7 +366,7 @@ EXPO_PUBLIC_API_URL=http://<your-lan-ip>:8000/api/v1 npm run start
                   timetable, never stored as a flag.
                 </p>
               </div>
-              <Link href="/rooms" className="text-[13.5px] font-semibold text-brand-300 hover:text-brand-200">
+              <Link href="/student/campus/rooms" className="text-[13.5px] font-semibold text-brand-300 hover:text-brand-200">
                 Browse rooms →
               </Link>
             </div>
@@ -428,7 +428,7 @@ EXPO_PUBLIC_API_URL=http://<your-lan-ip>:8000/api/v1 npm run start
             <Reveal>
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <h2 className="text-2xl font-semibold tracking-tight">What&apos;s happening</h2>
-                <Link href="/events" className="text-[13.5px] font-semibold text-brand-300 hover:text-brand-200">
+                <Link href="/student/campus/events" className="text-[13.5px] font-semibold text-brand-300 hover:text-brand-200">
                   All events →
                 </Link>
               </div>

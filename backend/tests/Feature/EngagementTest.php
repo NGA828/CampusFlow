@@ -19,7 +19,7 @@ class EngagementTest extends TestCase
 
     public function test_can_list_events(): void
     {
-        $response = $this->getJson('/api/v1/events');
+        $response = $this->getJson('/api/v1/public/events');
 
         $response->assertStatus(200)
             ->assertJsonPath('success', true);
@@ -31,7 +31,7 @@ class EngagementTest extends TestCase
         $event = CampusEvent::first();
 
         $response = $this->actingAs($student, 'sanctum')
-            ->postJson("/api/v1/events/{$event->id}/register");
+            ->postJson("/api/v1/student/events/{$event->id}/register");
 
         $response->assertStatus(201)
             ->assertJsonPath('success', true);

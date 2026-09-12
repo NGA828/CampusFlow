@@ -25,6 +25,7 @@ use App\Models\TimetableEntry;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Support\Access\Roles;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -33,9 +34,21 @@ class AdminController extends Controller
 {
     /* ──────────────────────────────────────── guard */
 
+    /**
+     * Defensive second layer.
+     *
+     * routes/api.php already gates this whole controller behind `role:admin`; this exists so a route
+     * that is later moved out of that group cannot accidentally become public, and so the check is
+     * phrased as a capability (the admin role's own governance permission) instead of a string
+     * comparison scattered through 60 methods.
+     */
     private function requireAdmin(Request $request): bool
     {
-        return $request->user()?->role === 'admin';
+        $user = $request->user();
+
+        return $user !== null
+            && $user->role === Roles::ADMIN
+            && $user->isActive();
     }
 
     private function forbidden(): JsonResponse
@@ -96,14 +109,19 @@ class AdminController extends Controller
         $issued7d = QueueTicket::where('created_at', '>=', $now->copy()->subDays(7))->count();
         $officeIssued7d = OfficeTicket::where('created_at', '>=', $now->copy()->subDays(7))->count();
         $navigation7d = NavigationSession::where('created_at', '>=', $now->copy()->subDays(7));
-        $recentAudit = DB::table('audit_logs')->orderByDesc('created_at')->limit(8)->get()->map(fn ($log) => [
-            'id' => $log->id,
-            'action' => $log->action,
-            'entity_type' => $log->entity_type,
-            'entity_id' => $log->entity_id,
-            'actor_name' => null,
-            'created_at' => $log->created_at,
-        ])->values();
+        $recentAudit = DB::table('audit_logs')
+            ->leftJoin('users', 'users.id', '=', 'audit_logs.user_id')
+            ->orderByDesc('audit_logs.created_at')
+            ->limit(8)
+            ->get(['audit_logs.id', 'audit_logs.action', 'audit_logs.subject_type', 'audit_logs.subject_id', 'users.name as actor_name', 'audit_logs.created_at'])
+            ->map(fn ($log) => [
+                'id'           => $log->id,
+                'action'       => $log->action,
+                'subject_type' => $log->subject_type,
+                'subject_id'   => $log->subject_id,
+                'actor_name'   => $log->actor_name,
+                'created_at'   => $log->created_at,
+            ])->values();
 
         return $this->ok([
             'kpis' => [
@@ -132,7 +150,7 @@ class AdminController extends Controller
             ],
             'live_queues' => $queues,
             'recent_audit' => $recentAudit,
-            'buildings' => Building::orderBy('code')->get()->map(fn ($building) => ['id' => $building->id, 'code' => $building->code, 'name' => $building->name, 'status' => $building->status, 'is_public' => $building->is_public])->values(),
+            'buildings' => Building::orderBy('code')->get()->map(fn ($building) => ['id' => $building->id, 'code' => $building->code, 'name' => $building->name, 'status' => $building->status, 'is_public' => (bool) ($building->is_public ?? true)])->values(),
         ]);
     }
 
@@ -233,10 +251,44 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
 
-        $request->validate(['role' => 'required|in:admin,staff,student,visitor']);
-        $user->update(['role' => $request->input('role')]);
+        $validated = $request->validate(['role' => 'required|in:admin,staff,student,visitor']);
+        $role = $validated['role'];
 
-        return $this->ok(['user' => $user->fresh()]);
+        // Two ways to lock everybody out of the platform are refused here rather than in a form: taking
+        // your own admin away mid-session, and leaving the campus with no administrator at all. A client
+        // can hide the option, but hiding is not a rule — this is.
+        if ($user->id === $request->user()->id && $role !== Roles::ADMIN) {
+            return $this->fail('You cannot remove your own administrator role. Ask another administrator to transfer it first.', 409, [], 'SELF_DEMOTION');
+        }
+
+        if ($user->role === Roles::ADMIN && $role !== Roles::ADMIN) {
+            $remaining = User::query()->where('role', Roles::ADMIN)->where('id', '!=', $user->id)->where('status', 'active')->count();
+
+            if ($remaining === 0) {
+                return $this->fail('This is the last active administrator. Promote somebody else before demoting them.', 409, [], 'LAST_ADMIN');
+            }
+        }
+
+        $before = $user->role;
+
+        if ($before === $role) {
+            return $this->ok(['user' => $user->fresh(), 'changed' => false]);
+        }
+
+        $user->update(['role' => $role]);
+
+        DB::table('audit_logs')->insert([
+            'user_id'      => $request->user()->id,
+            'action'       => 'user.role.changed',
+            'subject_type' => User::class,
+            'subject_id'   => (string) $user->id,
+            'before'       => json_encode(['role' => $before]),
+            'after'        => json_encode(['role' => $role]),
+            'ip_address'   => $request->ip(),
+            'created_at'   => now(),
+        ]);
+
+        return $this->ok(['user' => $user->fresh(), 'changed' => true]);
     }
 
     public function deleteUser(Request $request, User $user): JsonResponse
@@ -296,7 +348,7 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $request->validate(['code' => 'required|string|unique:buildings,code', 'name' => 'required|string']);
-        $b = Building::create($request->only(['code', 'name', 'short_name', 'description', 'lat', 'lng', 'footprint', 'image_url', 'status']));
+        $b = Building::create($request->only(['code', 'name', 'short_name', 'description', 'address', 'lat', 'lng', 'footprint', 'image_url', 'status', 'is_public']));
         return $this->ok($b->toApiArray(), 201);
     }
 
@@ -304,7 +356,7 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $b = Building::findOrFail($id);
-        $b->update($request->only(['code', 'name', 'short_name', 'description', 'lat', 'lng', 'footprint', 'image_url', 'status']));
+        $b->update($request->only(['code', 'name', 'short_name', 'description', 'address', 'lat', 'lng', 'footprint', 'image_url', 'status', 'is_public']));
         return $this->ok($b->fresh()->toApiArray());
     }
 
@@ -328,7 +380,7 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $request->validate(['building_id' => 'required|uuid|exists:buildings,id', 'level' => 'required|integer', 'name' => 'required|string']);
-        $f = Floor::create($request->only(['building_id', 'level', 'code', 'name', 'plan_url', 'plan_width', 'plan_height', 'status']));
+        $f = Floor::create($request->only(['building_id', 'level', 'code', 'name', 'plan_url', 'plan_svg', 'plan_width_m', 'plan_height_m', 'status']));
         return $this->ok($f->toApiArray(), 201);
     }
 
@@ -336,7 +388,7 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $f = Floor::findOrFail($id);
-        $f->update($request->only(['level', 'code', 'name', 'plan_url', 'plan_width', 'plan_height', 'status']));
+        $f->update($request->only(['level', 'code', 'name', 'plan_url', 'plan_svg', 'plan_width_m', 'plan_height_m', 'status']));
         return $this->ok($f->fresh()->toApiArray());
     }
 
@@ -362,7 +414,7 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $request->validate(['floor_id' => 'required|uuid|exists:floors,id', 'code' => 'required|string', 'name' => 'required|string']);
-        $r = Room::create($request->only(['floor_id', 'code', 'name', 'type', 'capacity', 'area_m2', 'plan_x', 'plan_y', 'lat', 'lng', 'features', 'requires_admission', 'status', 'image_url']));
+        $r = Room::create($request->only(['floor_id', 'code', 'name', 'type', 'capacity', 'area_m2', 'plan_x', 'plan_y', 'lat', 'lng', 'features', 'requires_admission', 'status', 'is_public', 'access_rule', 'image_url']));
         return $this->ok($r->toApiArray(), 201);
     }
 
@@ -370,7 +422,7 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $r = Room::findOrFail($id);
-        $r->update($request->only(['code', 'name', 'type', 'capacity', 'area_m2', 'plan_x', 'plan_y', 'lat', 'lng', 'features', 'requires_admission', 'status', 'image_url']));
+        $r->update($request->only(['code', 'name', 'type', 'capacity', 'area_m2', 'plan_x', 'plan_y', 'lat', 'lng', 'features', 'requires_admission', 'status', 'is_public', 'access_rule', 'image_url']));
         return $this->ok($r->fresh()->toApiArray());
     }
 
@@ -628,18 +680,35 @@ class AdminController extends Controller
 
     /* ─────────────────────────────────────── offices */
 
+    /**
+     * GET /admin/offices
+     *
+     * Configuration plus the live figures an administrator needs while setting that configuration: if you
+     * tighten a daily capacity you want to see today's issuance move on the same screen.
+     */
     public function adminOffices(Request $request): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        $q = Office::withTrashed()->when(!$request->boolean('with_deleted'), fn($q) => $q->whereNull('deleted_at'));
-        return $this->ok($this->paginate($q->orderBy('name'), $request, fn($o) => $o->toApiArray()));
+        $q = Office::with('room.floor.building')->withTrashed()->when(!$request->boolean('with_deleted'), fn($q) => $q->whereNull('deleted_at'));
+        return $this->ok($this->paginate($q->orderBy('name'), $request, function (Office $office) {
+            $waiting = OfficeTicket::where('office_id', $office->id)->where('status', 'waiting')->count();
+            $inService = OfficeTicket::where('office_id', $office->id)->where('status', 'in_service')->count();
+            return array_merge($office->toApiArray(), [
+                'is_open_now' => $office->isEffectivelyOpen(),
+                'waiting' => $waiting,
+                'in_service' => $inService,
+                'daily_capacity_used' => OfficeTicket::where('office_id', $office->id)->whereDate('created_at', now())->count(),
+                'estimated_wait_minutes' => $waiting * max(1, (int) ($office->avg_service_minutes ?? 10)),
+            ]);
+        }));
     }
 
     public function createOffice(Request $request): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        $request->validate(['code' => 'required|string|unique:offices,code', 'name' => 'required|string']);
-        $o = Office::create($request->only(['code', 'name', 'description', 'room_id', 'status', 'is_open', 'opening_hours', 'phone', 'email', 'image_url', 'avg_service_minutes']));
+        $request->validate(['code' => 'required|string|max:30|unique:offices,code', 'name' => 'required|string|max:120']);
+        // Every office policy the console exposes has to arrive here, or the toggle becomes decoration.
+        $o = Office::create($request->only(['code', 'name', 'description', 'room_id', 'status', 'is_open', 'opening_hours', 'phone', 'email', 'image_url', 'avg_service_minutes', 'ticket_prefix', 'concurrent_capacity', 'check_in_radius_m', 'daily_capacity', 'requires_appointment', 'requires_proximity_to_request', 'grace_period_seconds', 'service_duration_minutes', 'contact_email', 'contact_phone', 'is_active']));
         return $this->ok($o->toApiArray(), 201);
     }
 
@@ -647,7 +716,7 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $o = Office::findOrFail($id);
-        $o->update($request->only(['code', 'name', 'description', 'room_id', 'status', 'is_open', 'opening_hours', 'phone', 'email', 'image_url', 'avg_service_minutes']));
+        $o->update($request->only(['code', 'name', 'description', 'room_id', 'status', 'is_open', 'opening_hours', 'phone', 'email', 'image_url', 'avg_service_minutes', 'ticket_prefix', 'concurrent_capacity', 'check_in_radius_m', 'daily_capacity', 'requires_appointment', 'requires_proximity_to_request', 'grace_period_seconds', 'service_duration_minutes', 'contact_email', 'contact_phone', 'is_active']));
         return $this->ok($o->fresh()->toApiArray());
     }
 
@@ -670,17 +739,24 @@ class AdminController extends Controller
     public function createServiceWindow(Request $request): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        $request->validate(['office_id' => 'required|uuid|exists:offices,id', 'label' => 'required|string']);
-        $w = OfficeServiceWindow::create($request->only(['office_id', 'label', 'status']));
-        return $this->ok($w->toArray(), 201);
+        $request->validate([
+            'office_id'   => 'required|uuid|exists:offices,id',
+            'label'       => 'required|string|max:80',
+            'day_of_week' => ['required', 'integer', 'between:0,6'],
+            'opens_at'    => 'required|date_format:H:i',
+            'closes_at'   => 'required|date_format:H:i|after:opens_at',
+            'capacity'    => 'nullable|integer|min:1|max:500',
+        ]);
+        $w = OfficeServiceWindow::create($request->only(['office_id', 'label', 'status', 'day_of_week', 'opens_at', 'closes_at', 'capacity', 'avg_service_minutes', 'is_active', 'served_by_user_id']));
+        return $this->ok($w->toApiArray(), 201);
     }
 
     public function updateServiceWindow(Request $request, string $id): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $w = OfficeServiceWindow::findOrFail($id);
-        $w->update($request->only(['label', 'status']));
-        return $this->ok($w->fresh()->toArray());
+        $w->update($request->only(['label', 'status', 'day_of_week', 'opens_at', 'closes_at', 'capacity', 'avg_service_minutes', 'is_active', 'served_by_user_id']));
+        return $this->ok($w->fresh()->toApiArray());
     }
 
     public function deleteServiceWindow(Request $request, string $id): JsonResponse
@@ -764,38 +840,445 @@ class AdminController extends Controller
 
     public function settings(): JsonResponse
     {
-        $settings = DB::table('settings')->get()->map(fn($s) => [
-            'key'   => $s->key,
-            'value' => $s->value,
-        ]);
+        // The column is json, so it is decoded on the way out: the console then edits `true` and `5`
+        // instead of the strings \"true\" and \"5\", and a value it saves comes back with the same type.
+        $settings = DB::table('settings')->get()->map(function ($row) {
+            $decoded = json_decode((string) $row->value, true);
+
+            return [
+                'key'         => $row->key,
+                'value'       => json_last_error() === JSON_ERROR_NONE ? $decoded : $row->value,
+                'description' => $row->description ?? null,
+                'group'       => $row->group ?? 'general',
+            ];
+        });
         return $this->ok(['settings' => $settings]);
     }
 
-    public function updateSettings(Request $request): JsonResponse
-    {
-        $input = $request->all();
-        foreach ($input as $key => $value) {
-            DB::table('settings')->updateOrInsert(
-                ['key' => $key],
-                ['value' => is_array($value) ? json_encode($value) : (string) $value, 'updated_at' => now()]
-            );
-        }
-        return response()->json(['success' => true, 'message' => 'Settings updated']);
-    }
-
+    /**
+     * PATCH /admin/settings/{key} — the only way a setting changes.
+     *
+     * Two rules here are the difference between a settings store and a global `$_GET`: the key must already
+     * exist, so an administrator is editing something the platform understands rather than inventing a
+     * name a code path will never read; and the previous value is written to the audit log beside the new
+     * one, because a policy change nobody can date is a policy change nobody can undo. The value is
+     * JSON-encoded rather than cast to a string, so a boolean stays a boolean and `true` does not become
+     * the four characters that used to make every reader guess.
+     */
     public function updateSetting(Request $request, string $key): JsonResponse
     {
-        $request->validate(['value' => 'required']);
-        $value = is_array($request->input('value')) ? json_encode($request->input('value')) : (string) $request->input('value');
-        DB::table('settings')->updateOrInsert(['key' => $key], ['value' => $value, 'updated_at' => now()]);
-        return $this->ok(['setting' => ['key' => $key, 'value' => $value]]);
+        $validated = $request->validate(['value' => ['required', 'nullable']]);
+
+        $existing = DB::table('settings')->where('key', $key)->first();
+
+        if (! $existing) {
+            return $this->fail(
+                'There is no setting called ' . $key . '. Options are registered by the platform; add one through a deployment, not from the console.',
+                422,
+                [],
+                'UNKNOWN_SETTING',
+            );
+        }
+
+        $encoded = json_encode($validated['value']);
+
+        DB::table('settings')->where('key', $key)->update([
+            'value'      => $encoded,
+            'updated_at' => now(),
+        ]);
+
+        DB::table('audit_logs')->insert([
+            'user_id'      => $request->user()->id,
+            'action'       => 'settings.updated',
+            'subject_type' => 'setting',
+            'subject_id'   => mb_substr($key, 0, 40),
+            'before'       => json_encode(['value' => $existing->value]),
+            'after'        => json_encode(['value' => $encoded]),
+            'ip_address'   => $request->ip(),
+            'created_at'   => now(),
+        ]);
+
+        return $this->ok(['setting' => ['key' => $key, 'value' => $validated['value']]]);
     }
 
     /* ─────────────────────────────────────── audit logs */
 
     public function auditLogs(Request $request): JsonResponse
     {
-        $logs = DB::table('audit_logs')->orderBy('created_at', 'desc')->paginate(50);
-        return $this->ok($this->paginate(DB::table('audit_logs')->orderBy('created_at', 'desc'), $request));
+        if (!$this->requireAdmin($request)) return $this->forbidden();
+
+        $query = DB::table('audit_logs')
+            ->leftJoin('users', 'users.id', '=', 'audit_logs.user_id')
+            ->select([
+                'audit_logs.id',
+                'audit_logs.action',
+                'audit_logs.subject_type',
+                'audit_logs.subject_id',
+                'audit_logs.user_id',
+                'users.name as actor_name',
+                'audit_logs.ip_address',
+                'audit_logs.created_at',
+            ])
+            ->when($request->query('action'), fn($q, $action) => $q->where('audit_logs.action', $action))
+            ->when($request->query('user_id'), fn($q, $id) => $q->where('audit_logs.user_id', $id))
+            ->orderByDesc('audit_logs.created_at');
+
+        return $this->ok($this->paginate($query, $request, fn($log) => [
+            'id'           => $log->id,
+            'action'       => $log->action,
+            'subject_type' => $log->subject_type,
+            'subject_id'   => $log->subject_id,
+            'user_id'      => $log->user_id,
+            'actor_name'   => $log->actor_name,
+            'ip_address'   => $log->ip_address,
+            'created_at'   => $log->created_at,
+        ]));
+    }
+
+    /* ─────────────────────────────────────── roles & permissions registry */
+
+    /**
+     * GET /admin/roles
+     *
+     * Renders the authoritative registry (App\Support\Access\Permissions) rather than a table an
+     * operator types into. That is deliberate: at this stage roles are a product decision, so the
+     * screen is a *readable answer* to "who may do what, on which platform" — and the moment a
+     * deployment needs custom roles, this endpoint is where the DB-backed registry is swapped in
+     * without the client changing.
+     */
+    public function roles(Request $request): JsonResponse
+    {
+        if (!$this->requireAdmin($request)) return $this->forbidden();
+
+        $counts = [
+            'student' => User::where('role', 'student')->count(),
+            'staff'   => User::where('role', 'staff')->count(),
+            'admin'   => User::where('role', 'admin')->count(),
+            'visitor' => User::where('role', 'visitor')->count(),
+        ];
+
+        $roles = collect(['student', 'staff', 'admin'])->map(fn ($role) => [
+            'code'        => $role,
+            'label'       => Roles::label($role),
+            'users'       => $counts[$role],
+            'home_route'  => \App\Support\Access\Roles::homeRoute($role),
+            'permissions' => \App\Support\Access\Permissions::forRole($role),
+            'platforms'   => [
+                'web'    => \App\Support\Access\Platforms::allowedPermissions($role, 'web'),
+                'mobile' => \App\Support\Access\Platforms::allowedPermissions($role, 'mobile'),
+            ],
+        ])->values();
+
+        return $this->ok([
+            'roles'    => $roles,
+            'registry' => \App\Support\Access\Permissions::registry(),
+            'assignments' => [
+                'total'     => StaffAssignment::count(),
+                'unassigned_staff' => User::where('role', 'staff')
+                    ->whereDoesntHave('staffAssignments')
+                    ->count(),
+            ],
+        ]);
+    }
+
+    /* ─────────────────────────────────────── admin mobile monitoring */
+
+    /**
+     * GET /admin/alerts
+     *
+     * The whole of the administrator's mobile surface: a derived feed of conditions that need a
+     * human, each with the numbers that justify it. Alerts are computed, never stored, so an alert
+     * cannot outlive the state that produced it. Acknowledging writes a fingerprint so the same
+     * condition stops re-firing until it changes.
+     */
+    /**
+     * The alert feed, as data.
+     *
+     * Split out of the endpoint so `GET /admin/monitoring/summary` can count the same conditions the
+     * alert screen shows, instead of a second copy of the rules drifting apart from the first.
+     *
+     * @return list<array{key: string, severity: string, title: string, detail: string, target?: string}>
+     */
+    /**
+     * POST /admin/alerts/ack
+     *
+     * Body: { fingerprint, note? }. Acknowledging mutes the *condition*, not an id: a new occurrence
+     * with a different fingerprint surfaces again immediately.
+     */
+    /**
+     * GET /admin/alerts
+     *
+     * The alert feed is **computed from live state**, never stored. There is no `alerts` table: an
+     * alert is a condition the platform notices while you look — an over-capacity line, a queue open
+     * for a room that is not available, a desk closed with students still holding tickets, staff
+     * accounts with no scope to operate anything, a burst of failed scans. Nothing can therefore go
+     * stale, and nothing can be quietly deleted.
+     *
+     * What *is* stored is the human act of acknowledging: `POST /admin/alerts/ack` mutes one
+     * fingerprint, and only that fingerprint. A recurrence with a new fingerprint (another hour,
+     * another day, another room) surfaces again immediately.
+     */
+    public function alerts(Request $request): JsonResponse
+    {
+        if (!$this->requireAdmin($request)) return $this->forbidden();
+
+        return $this->ok([
+            'alerts'       => $this->deriveAlerts(),
+            'counts'       => $this->alertCounts(),
+            'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /** @return list<array{key: string, severity: string, title: string, detail: string, target?: string}> */
+    private function deriveAlerts(): array
+    {
+        $muted = DB::table('alert_acknowledgements')->pluck('fingerprint')->all();
+        $today = now()->toDateString();
+        $alerts = [];
+
+        // 1 + 2 — the line and the room must agree with each other.
+        foreach (RoomQueue::with('room.floor.building')->where('is_open', true)->get() as $queue) {
+            $waiting = QueueTicket::where('queue_id', $queue->id)
+                ->whereIn('status', ['waiting', 'called', 'checked_in'])
+                ->count();
+
+            if ($waiting > max(1, (int) ($queue->max_capacity ?? 0))) {
+                $alerts[] = [
+                    'key'      => 'queue_over_capacity:' . $queue->id . ':' . $queue->room?->code,
+                    'severity' => 'warning',
+                    'title'    => ($queue->room?->code ?? 'Queue') . ' is past its line limit',
+                    'detail'   => $waiting . ' active tickets against a maximum of ' . (int) ($queue->max_capacity ?? 0) . '.',
+                    'target'   => '/admin/services',
+                ];
+            }
+
+            $roomAvailable = $queue->room && $queue->room->status !== 'closed';
+
+            if ($waiting > 0 && ! $roomAvailable) {
+                $alerts[] = [
+                    'key'      => 'queue_open_for_closed_room:' . $queue->id,
+                    'severity' => 'critical',
+                    'title'    => 'A queue is open for a room that is not available',
+                    'detail'   => ($queue->room?->code ?? 'Room') . ' has ' . $waiting . ' students waiting but its status is ' . ($queue->room?->status ?? 'missing') . '.',
+                    'target'   => '/admin/campus',
+                ];
+            }
+        }
+
+        // 3 — a desk closed with people still holding a ticket is the failure a student feels first.
+        $stranded = OfficeTicket::whereIn('status', ['waiting', 'called', 'approaching'])->count()
+            + OfficeTicket::where('status', 'in_service')->count();
+
+        if ($stranded > 0 && Office::where('is_open', false)->where('status', 'active')->exists()) {
+            $alerts[] = [
+                'key'      => 'offices_closed_with_line:' . $today,
+                'severity' => 'critical',
+                'title'    => $stranded . ' office tickets are unattended',
+                'detail'   => 'At least one active office is closed while tickets are still in the line.',
+                'target'   => '/admin/services',
+            ];
+        }
+
+        // 4 + 5 — controlled rooms the mobile app cannot route to, or cannot gate entry for.
+        $unroutable = Room::where('requires_admission', true)->whereNull('lat')->count();
+        if ($unroutable > 0) {
+            $alerts[] = [
+                'key'      => 'rooms_without_coordinates:' . $today,
+                'severity' => 'warning',
+                'title'    => $unroutable . ' admission rooms have no coordinates',
+                'detail'   => 'Proximity checks and navigation cannot work for a room that is not placed on a plan.',
+                'target'   => '/admin/spatial',
+            ];
+        }
+
+        $noQueue = Room::where('requires_admission', true)
+            ->whereDoesntHave('queue')
+            ->count();
+
+        if ($noQueue > 0) {
+            $alerts[] = [
+                'key'      => 'rooms_requiring_admission_without_queue:' . $today,
+                'severity' => 'warning',
+                'title'    => $noQueue . ' rooms demand a ticket but have no queue',
+                'detail'   => 'Students cannot obtain the ticket these rooms require, so the rule blocks the door with no way through.',
+                'target'   => '/admin/services',
+            ];
+        }
+
+        // 6 — scope misconfiguration: an operator who is allowed nothing.
+        // Only worth reporting under strict scoping: when unassigned staff fall back to the whole
+        // campus, an unassigned account can still work, and the alert would be noise.
+        if (config('campusflow.access.unassigned_staff_scope', 'campus') !== 'campus') {
+            $unassigned = User::where('role', 'staff')
+                ->where('status', 'active')
+                ->whereDoesntHave('staffAssignments')
+                ->count();
+
+            if ($unassigned > 0) {
+                $alerts[] = [
+                    'key'      => 'staff_without_assignments:' . $today,
+                    'severity' => 'critical',
+                    'title'    => $unassigned . ' staff accounts cannot operate anything',
+                    'detail'   => 'Strict scoping means an unassigned staff member has no queues and no offices, so sign-in leads nowhere.',
+                    'target'   => '/admin/users',
+                ];
+            }
+        }
+
+        // 7 — a spike in rejected scans means anchors were rotated, printed over, or removed.
+        $failedScans = DB::table('audit_logs')
+            ->where('action', 'positioning.scan_failed')
+            ->where('created_at', '>=', now()->subHour())
+            ->count();
+
+        if ($failedScans > 5) {
+            $alerts[] = [
+                'key'      => 'scan_failures:' . now()->format('Y-m-d-H'),
+                'severity' => 'warning',
+                'title'    => $failedScans . ' failed QR scans in the last hour',
+                'detail'   => 'Codes on the wall are not resolving — check whether anchors were regenerated or deactivated.',
+                'target'   => '/admin/spatial',
+            ];
+        }
+
+        return array_values(array_filter(
+            $alerts,
+            fn (array $alert) => ! in_array($alert['key'], $muted, true)
+        ));
+    }
+
+    /** @return array{critical: int, warning: int, acknowledged: int} */
+    private function alertCounts(): array
+    {
+        $alerts = collect($this->deriveAlerts());
+
+        return [
+            'critical'     => $alerts->where('severity', 'critical')->count(),
+            'warning'      => $alerts->where('severity', 'warning')->count(),
+            'acknowledged' => DB::table('alert_acknowledgements')->count(),
+        ];
+    }
+
+    public function acknowledgeAlert(Request $request): JsonResponse
+    {
+        if (!$this->requireAdmin($request)) return $this->forbidden();
+
+        $validated = $request->validate([
+            'fingerprint' => ['required', 'string', 'max:160'],
+            'note'        => ['nullable', 'string', 'max:300'],
+        ]);
+
+        DB::table('alert_acknowledgements')->updateOrInsert(
+            ['fingerprint' => $validated['fingerprint']],
+            [
+                'type'            => explode(':', $validated['fingerprint'])[0],
+                'acknowledged_by' => $request->user()->id,
+                'note'            => $validated['note'] ?? null,
+                'acknowledged_at' => now(),
+            ],
+        );
+
+        return $this->ok(['acknowledged' => $validated['fingerprint']], 201);
+    }
+
+    /** GET /admin/monitoring/summary — the four numbers an administrator checks from a phone. */
+    public function monitoringSummary(Request $request): JsonResponse
+    {
+        if (!$this->requireAdmin($request)) return $this->forbidden();
+
+        $today = now()->startOfDay();
+
+        $issued = QueueTicket::where('created_at', '>=', $today)->count();
+        $served = QueueTicket::where('status', 'admitted')->where('admitted_at', '>=', $today)->count();
+        $noShows = QueueTicket::where('status', 'no_show')->where('created_at', '>=', $today)->count();
+
+        return $this->ok([
+            'generated_at' => now()->toIso8601String(),
+            'queues' => [
+                'open'      => RoomQueue::where('is_open', true)->count(),
+                'waiting_now' => QueueTicket::where('status', 'waiting')->count(),
+                'issued_today' => $issued,
+                'served_today' => $served,
+                'no_show_rate_today' => $issued > 0 ? round($noShows / $issued, 3) : null,
+            ],
+            'offices' => [
+                'open'   => Office::where('is_open', true)->count(),
+                'waiting_now' => OfficeTicket::where('status', 'waiting')->count(),
+                'completed_today' => OfficeTicket::where('status', 'completed')->where('completed_at', '>=', $today)->count(),
+            ],
+            'platform' => [
+                'active_queues'    => RoomQueue::where('is_open', true)->count(),
+                'navigation_today' => NavigationSession::where('created_at', '>=', $today)->count(),
+                'unacknowledged_alerts' => count($this->deriveAlerts()),
+                'users' => User::count(),
+            ],
+        ]);
+    }
+
+    /* ─────────────────────────────────────── geofences */
+
+    public function geofences(Request $request): JsonResponse
+    {
+        if (!$this->requireAdmin($request)) return $this->forbidden();
+
+        $query = \App\Models\Geofence::with(['building', 'floor', 'room'])
+            ->when($request->query('building_id'), fn($q, $id) => $q->where('building_id', $id))
+            ->when($request->query('type'), fn($q, $type) => $q->where('type', $type));
+
+        return $this->ok($this->paginate($query->orderBy('name'), $request, fn($g) => $g->toApiArray()));
+    }
+
+    public function createGeofence(Request $request): JsonResponse
+    {
+        if (!$this->requireAdmin($request)) return $this->forbidden();
+
+        $validated = $request->validate([
+            'name'       => ['required', 'string', 'max:120'],
+            'type'       => ['required', 'string', 'in:building,floor,room,campus_zone,parking,outdoor_area'],
+            'building_id'=> ['nullable', 'uuid', 'exists:buildings,id'],
+            'floor_id'   => ['nullable', 'uuid', 'exists:floors,id'],
+            'room_id'    => ['nullable', 'uuid', 'exists:rooms,id'],
+            'center_lat' => ['nullable', 'numeric', 'between:-90,90'],
+            'center_lng' => ['nullable', 'numeric', 'between:-180,180'],
+            'radius_m'   => ['nullable', 'numeric', 'min:1', 'max:5000'],
+            'polygon_json' => ['nullable', 'array'],
+            'is_active'  => ['sometimes', 'boolean'],
+        ]);
+
+        if (($validated['radius_m'] ?? null) === null && empty($validated['polygon_json'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A geofence needs either a radius (circle mode) or a polygon_json (polygon mode).',
+                'code'    => 'GEOFENCE_SHAPE_REQUIRED',
+            ], 422);
+        }
+
+        $geofence = \App\Models\Geofence::create($validated);
+
+        return $this->ok($geofence->toApiArray(), 201);
+    }
+
+    public function updateGeofence(Request $request, string $id): JsonResponse
+    {
+        if (!$this->requireAdmin($request)) return $this->forbidden();
+
+        $geofence = \App\Models\Geofence::findOrFail($id);
+
+        $geofence->update($request->only([
+            'name', 'type', 'building_id', 'floor_id', 'room_id',
+            'center_lat', 'center_lng', 'radius_m', 'polygon_json', 'is_active',
+        ]));
+
+        return $this->ok($geofence->fresh()->toApiArray());
+    }
+
+    public function deleteGeofence(Request $request, string $id): JsonResponse
+    {
+        if (!$this->requireAdmin($request)) return $this->forbidden();
+
+        $geofence = \App\Models\Geofence::findOrFail($id);
+        $geofence->delete();
+
+        return response()->json(['success' => true]);
     }
 }

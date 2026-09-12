@@ -46,6 +46,41 @@ class QueueTicket extends Model
         return in_array($this->status, ['completed', 'cancelled', 'no_show']);
     }
 
+    /** Display ticket number. Derived from the position so it is stable and never collides. */
+    public function ticketNumber(): string
+    {
+        return 'Q-' . str_pad((string) $this->position, 3, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * The instant at which a called ticket becomes a no-show: the queue's own grace window measured
+     * from when the student was called. Derived rather than stored, so changing an administrator's
+     * `call_window_minutes` applies to the tickets already on the line instead of stranding them.
+     */
+    public function checkInDeadline(): ?\Carbon\Carbon
+    {
+        if (! $this->called_at || $this->isTerminal()) {
+            return null;
+        }
+
+        $queue = $this->relationLoaded('queue') ? $this->queue : $this->queue()->first();
+        $grace = (int) ($queue?->no_show_grace_minutes ?? $queue?->call_window_minutes ?? 5);
+
+        return $this->called_at->copy()->addMinutes(max(1, $grace));
+    }
+
+    public function secondsUntilDeadline(): ?int
+    {
+        $deadline = $this->checkInDeadline();
+
+        return $deadline ? max(0, now()->diffInSeconds($deadline, false)) : null;
+    }
+
+    public function canStudentCheckIn(): bool
+    {
+        return in_array($this->status, ['waiting', 'called', 'navigating'], true);
+    }
+
     public function toApiArray(): array
     {
         $queue = $this->relationLoaded('queue') ? $this->queue : null;
@@ -66,6 +101,11 @@ class QueueTicket extends Model
             'admitted_at'     => $this->admitted_at?->toIso8601String(),
             'completed_at'    => $this->completed_at?->toIso8601String(),
             'cancelled_at'    => $this->cancelled_at?->toIso8601String(),
+            'ticket_number'   => $this->ticketNumber(),
+            'check_in_deadline'      => $this->checkInDeadline()?->toIso8601String(),
+            'seconds_until_deadline' => $this->secondsUntilDeadline(),
+            'can_check_in'    => $this->canStudentCheckIn(),
+            'can_cancel'      => ! $this->isTerminal(),
         ];
     }
 }

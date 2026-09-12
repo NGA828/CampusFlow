@@ -25,6 +25,41 @@ class OfficeTicket extends Model
     public function user(): BelongsTo   { return $this->belongsTo(User::class); }
     public function events(): HasMany   { return $this->hasMany(OfficeEvent::class, 'ticket_id')->orderBy('created_at'); }
 
+    /**
+     * The numeric tail of the issued ticket number (`REG-007` → 7).
+     *
+     * There is no `sequence_no` column and there does not need to be one: `ticket_number` is already
+     * allocated per office per day under a row lock, so parsing it back is exact and cannot drift.
+     */
+    public function sequenceNumber(): ?int
+    {
+        if (preg_match('/(\d+)$/', (string) $this->ticket_number, $m)) {
+            return (int) $m[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * Where this ticket stands in its office line, counted the same way every screen counts it.
+     *
+     * `sequence_no` is the immutable issue order for the day, so position never shifts when someone
+     * ahead is cancelled — a student watching "3 ahead" should not see the number jitter because the
+     * person in front left the line.
+     */
+    public function positionInLine(): int
+    {
+        if ($this->isTerminal()) {
+            return 0;
+        }
+
+        return (int) static::query()
+            ->where('office_id', $this->office_id)
+            ->whereIn('status', ['waiting', 'approaching', 'called', 'in_service'])
+            ->where('created_at', '<', $this->created_at)
+            ->count() + 1;
+    }
+
     public function isTerminal(): bool
     {
         return in_array($this->status, ['completed', 'cancelled', 'no_show']);
@@ -43,6 +78,9 @@ class OfficeTicket extends Model
             'subject'             => $this->subject,
             'notes'               => $this->notes,
             'status'              => $this->status,
+            'window_id'           => $this->window_id,
+            'sequence_no'         => $this->sequenceNumber(),
+            'position'            => $this->positionInLine(),
             'join_source'         => $this->join_source,
             'joined_at'           => $this->created_at?->toIso8601String(),
             'called_at'           => $this->called_at?->toIso8601String(),

@@ -2,17 +2,30 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\BusinessRuleException;
 use App\Models\QrNode;
 use App\Models\UserPosition;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Positioning endpoints:
- *   POST /positioning/scan       — resolve a QR code to a position
- *   GET  /positioning/current    — get the user's last known position
- *   POST /positioning/position   — update position from GPS/manual
- *   GET  /positioning/anchors    — list all active QR nodes (for map overlay)
+ * Indoor positioning.
+ *
+ *   POST /student/positioning/scan      — resolve an anchor code to a position (student only)
+ *   GET  /student/positioning/current   — this student's last known fix
+ *   POST /student/positioning/position  — write this student's own fix
+ *   GET  /campus/positioning/anchors    — active anchors, for a map overlay
+ *
+ * Scanning is a **student mobile** capability in this product: a visitor has no reason to claim a
+ * position inside a building, a student on the web is not standing at the wall, staff operate lines
+ * rather than hunt for rooms, and administration manages anchors through /admin/qr-nodes. The route
+ * therefore carries `role:student` plus `permission:qr.scan`, and that permission is registered for
+ * the mobile platform only — so the same student on the same account gets 403 from a browser, not a
+ * disabled button.
+ *
+ * A scan also validates the anchor's *version*: a printed code that predates a rotation stops being
+ * a position claim, because a revoked sticker must not keep working.
  */
 class PositioningController extends Controller
 {
@@ -21,14 +34,31 @@ class PositioningController extends Controller
         $validated = $request->validate([
             'payload' => ['sometimes', 'nullable', 'string'],
             'code'    => ['sometimes', 'nullable', 'string'],
+            'version' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ]);
 
         $code = $validated['code']
             ?? $this->extractCodeFromPayload($validated['payload'] ?? '');
 
-        $node = QrNode::where('code', $code)
-            ->where('is_active', true)
-            ->firstOrFail();
+        $node = QrNode::where('code', $code)->first();
+
+        if (! $node || ! $node->is_active) {
+            $this->logScanFailure($request, $code, $node ? 'revoked' : 'unknown');
+
+            throw new BusinessRuleException(
+                'That code is not a recognised CampusFlow anchor.',
+                'QR_UNKNOWN',
+            );
+        }
+
+        if (isset($validated['version']) && (int) $validated['version'] < (int) $node->version) {
+            $this->logScanFailure($request, $code, 'stale_version');
+
+            throw new BusinessRuleException(
+                'That print-out is out of date. Use the current code for this location.',
+                'QR_VERSION_STALE',
+            );
+        }
 
         // Persist position from this scan
         $this->upsertPosition($request->user()->id, [
@@ -86,12 +116,32 @@ class PositioningController extends Controller
         ]);
     }
 
-    public function anchors(): JsonResponse
+    /**
+     * GET /campus/positioning/anchors
+     *
+     * Anchor *labels and coordinates* for map rendering — deliberately not the codes themselves.
+     * Handing out live codes is what turns a map overlay into a supply of valid position claims.
+     */
+    public function anchors(Request $request): JsonResponse
     {
-        $anchors = QrNode::where('is_active', true)
+        $anchors = QrNode::with(['building', 'floor', 'room'])
+            ->where('is_active', true)
+            ->when($request->query('floor_id'), fn ($q, $id) => $q->where('floor_id', $id))
+            ->when($request->query('building_id'), fn ($q, $id) => $q->where('building_id', $id))
             ->orderBy('label')
             ->get()
-            ->map(fn ($n) => $n->toApiArray());
+            ->map(fn (QrNode $node) => [
+                'id'            => $node->id,
+                'label'         => $node->label,
+                'type'          => $node->type,
+                'lat'           => $node->lat,
+                'lng'           => $node->lng,
+                'plan_x'        => $node->plan_x,
+                'plan_y'        => $node->plan_y,
+                'building_code' => $node->building?->code,
+                'floor_name'    => $node->floor?->name,
+                'room_code'     => $node->room?->code,
+            ]);
 
         return response()->json([
             'success' => true,
@@ -124,6 +174,20 @@ class PositioningController extends Controller
             'source'      => $pos->source,
             'recorded_at' => $pos->recorded_at?->toIso8601String(),
         ];
+    }
+
+    /** Failed scans are counted by the admin alert feed; a spike means anchors were rotated or removed. */
+    private function logScanFailure(Request $request, string $code, string $reason): void
+    {
+        DB::table('audit_logs')->insert([
+            'user_id'      => $request->user()?->id,
+            'action'       => 'positioning.scan_failed',
+            'subject_type' => QrNode::class,
+            'subject_id'   => substr($code, 0, 40),
+            'after'        => json_encode(['reason' => $reason]),
+            'ip_address'   => $request->ip(),
+            'created_at'   => now(),
+        ]);
     }
 
     private function extractCodeFromPayload(string $payload): string

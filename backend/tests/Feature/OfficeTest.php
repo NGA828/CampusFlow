@@ -19,7 +19,7 @@ class OfficeTest extends TestCase
 
     public function test_can_list_offices(): void
     {
-        $response = $this->getJson('/api/v1/offices');
+        $response = $this->getJson('/api/v1/public/offices');
 
         $response->assertStatus(200)
             ->assertJsonPath('success', true);
@@ -33,7 +33,7 @@ class OfficeTest extends TestCase
         $office = Office::first();
 
         $response = $this->actingAs($student, 'sanctum')
-            ->postJson("/api/v1/offices/{$office->id}/tickets", [
+            ->postJson("/api/v1/student/offices/{$office->id}/tickets", [
                 'service_type' => 'Transcripts',
             ]);
 
@@ -47,13 +47,13 @@ class OfficeTest extends TestCase
         $office = Office::firstOrFail();
 
         $created = $this->actingAs($student, 'sanctum')
-            ->postJson("/api/v1/offices/{$office->id}/tickets", ['subject' => 'Transcripts']);
+            ->postJson("/api/v1/student/offices/{$office->id}/tickets", ['subject' => 'Transcripts']);
 
         $created->assertCreated()->assertJsonPath('success', true);
         $ticketId = $created->json('data.ticket.id');
 
         $this->actingAs($student, 'sanctum')
-            ->getJson("/api/v1/office-tickets/{$ticketId}")
+            ->getJson("/api/v1/student/office-tickets/{$ticketId}")
             ->assertOk()
             ->assertJsonPath('data.ticket.id', $ticketId)
             ->assertJsonStructure(['data' => ['office', 'people_ahead', 'can_cancel']]);

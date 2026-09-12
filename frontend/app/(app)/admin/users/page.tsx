@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useAsync, useDebounced, relativeTime } from '../../../../lib/hooks';
-import { adminApi, campusApi } from '../../../../lib/api/endpoints';
-import { ApiError } from '../../../../lib/api/client';
-import { Badge, Button, Card, ConfirmDialog, Field, Input, Modal, SectionHeading, Select, Tabs } from '../../../../components/ui/kit';
-import { PageHeader } from '../../../../components/layout/app-shell';
-import { ResourceTable, type Column } from '../../../../components/admin/table';
-import { useToast } from '../../../../components/ui/toast';
-import type { AdminUser, PageMeta } from '../../../../lib/api/types';
+import { useAsync, useDebounced, relativeTime } from '@/lib/hooks';
+import { adminApi, campusApi } from '@/lib/api/endpoints';
+import { ApiError } from '@/lib/api/client';
+import { Badge, Button, Card, ConfirmDialog, Field, Input, Modal, SectionHeading, Select, Tabs } from '@/components/ui/kit';
+import { PageHeader } from '@/components/layout/app-shell';
+import { ResourceTable, type Column } from '@/components/admin/table';
+import { useToast } from '@/components/ui/toast';
+import type { AdminUser, PageMeta } from '@/lib/api/types';
 
 const ROLES = ['student', 'staff', 'admin', 'visitor'] as const;
 
@@ -67,7 +67,11 @@ export default function AdminUsersPage() {
     setSaving(true);
     setFormError(null);
     try {
-      await adminApi.updateUser(editUser.id, { role_code: editUser.role_code, status: editUser.status, department: editUser.department });
+      // The role goes to its own endpoint, and only when it actually moved: a role change is an
+      // authorisation event with an audit trail, not a text field on a profile.
+      const before = (users.data?.items ?? []).find((row) => row.id === editUser.id)?.role_code;
+      if (before && before !== editUser.role_code) await adminApi.setUserRole(editUser.id, editUser.role_code);
+      await adminApi.updateUser(editUser.id, { status: editUser.status, department: editUser.department });
       toast.success('User updated');
       setEditUser(null);
       users.reload();

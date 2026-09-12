@@ -22,7 +22,10 @@ function RootNavigator() {
 
   useEffect(() => {
     if (!ready) return;
-    const inAuthGroup = (segments[0] as string) === '(auth)';
+    const first = segments[0] as string | undefined;
+    // Visitors on this device: the only thing a phone without a session can reach is the sign-in screen —
+    // there is no public browsing layer here, because maps, buildings and events are the web's job.
+    const inAuthGroup = first === '(auth)';
     if (!user && !inAuthGroup) router.replace('/login' as any);
     else if (user && inAuthGroup) router.replace('/' as any);
   }, [ready, user, segments, router]);
@@ -43,17 +46,13 @@ function RootNavigator() {
   }
 
   return (
+    // Three role trees, one switchboard above them (`app/index.tsx` sends a sign-in to its own root).
+    // Each tree owns its navigation, so nothing here decides what a student "should also see".
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#f6f7fb' } }}>
       <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="scan" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="assistant" />
-      <Stack.Screen name="offices" />
-      <Stack.Screen name="office/[code]" />
-      <Stack.Screen name="room/[code]" />
-      <Stack.Screen name="navigate/[code]" />
-      <Stack.Screen name="notifications" />
-      <Stack.Screen name="profile" />
+      <Stack.Screen name="student" />
+      <Stack.Screen name="staff" />
+      <Stack.Screen name="admin" />
     </Stack>
   );
 }
