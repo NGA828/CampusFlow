@@ -30,6 +30,14 @@ class RoomQueuePolicy
             && $this->context->may(Permissions::QUEUE_VIEW);
     }
 
+    /** Students may take tickets; queue operators only monitor or mutate the line. */
+    public function join(?User $user, RoomQueue $queue): bool
+    {
+        return $user !== null
+            && $user->role === Roles::STUDENT
+            && $this->context->may(Permissions::QUEUE_JOIN);
+    }
+
     /** The live line, with student names: operators only, inside their scope. */
     public function viewLine(?User $user, RoomQueue $queue): bool
     {

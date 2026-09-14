@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\BusinessRuleException;
 use App\Http\Controllers\Concerns\BuildsQueueViews;
+use App\Http\Controllers\Concerns\RespondsJson;
 use App\Models\Geofence;
 use App\Models\QrNode;
 use App\Models\QueueEvent;
@@ -18,7 +19,7 @@ use Illuminate\Support\Str;
 
 class QueueController extends Controller
 {
-    use BuildsQueueViews;
+    use BuildsQueueViews, RespondsJson;
 
     /**
      * Get queue details for a room.
@@ -106,7 +107,7 @@ class QueueController extends Controller
             ->get()
             ->filter(fn (RoomQueue $queue) => Gate::allows('view', $queue))
             ->map(fn (RoomQueue $queue) => $this->queuePayload($queue, $user?->id))
-            ->sortBy(fn ($a, $b) => [$a['building_code'], $a['room_code']] <=> [$b['building_code'], $b['room_code']])
+            ->sortBy(fn ($queue) => [$queue['building_code'], $queue['room_code']])
             ->values();
 
         return $this->ok([
@@ -178,7 +179,7 @@ class QueueController extends Controller
             $this->assertProximityToJoin($request, $queue);
         }
 
-        $clientKey = $request->header('Idempotency-Key') ?: $request->input('idempotency_key');
+        $clientKey = $request->input('idempotency_key') ?: $request->header('Idempotency-Key');
         $fix = $this->requestFix($request);
 
         return DB::transaction(function () use ($request, $queue, $user, $clientKey, $fix, $scanned) {

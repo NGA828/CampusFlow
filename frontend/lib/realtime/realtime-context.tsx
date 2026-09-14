@@ -69,7 +69,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const token = getToken();
     if (!token) {
-      setConnected(false);
+      queueMicrotask(() => {
+        setConnected(false);
+        setChannels([]);
+      });
       return;
     }
 
@@ -185,7 +188,10 @@ export function useRealtime(): RealtimeContextValue {
 export function useRealtimeEvent(channel: string | null, handler: Handler, deps: unknown[] = []): void {
   const { subscribe, subscribePrefix } = useRealtime();
   const handlerRef = useRef(handler);
-  handlerRef.current = handler;
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
 
   useEffect(() => {
     if (!channel) return;

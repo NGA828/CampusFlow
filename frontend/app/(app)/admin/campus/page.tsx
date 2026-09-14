@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useAsync, useDebounced } from '@/lib/hooks';
 import { adminApi } from '@/lib/api/endpoints';
 import { ApiError } from '@/lib/api/client';
-import { Badge, Button, ConfirmDialog, Field, Input, Modal, Select, Tabs, Textarea } from '@/components/ui/kit';
+import { Badge, Button, ConfirmDialog, Field, Input, Modal, Select, Tabs } from '@/components/ui/kit';
 import { PageHeader } from '@/components/layout/app-shell';
 import { ResourceTable, type Column } from '@/components/admin/table';
 import { useToast } from '@/components/ui/toast';
@@ -34,8 +34,8 @@ export default function AdminCampusPage() {
   const floors = useAsync(() => adminApi.floors({ per_page: 300 }), []);
   const rooms = useAsync(() => adminApi.rooms({ per_page: 400 }), []);
 
-  const buildingOptions = buildings.data?.items ?? [];
-  const floorOptions = floors.data?.items ?? [];
+  const buildingOptions = useMemo(() => buildings.data?.items ?? [], [buildings.data]);
+  const floorOptions = useMemo(() => floors.data?.items ?? [], [floors.data]);
 
   const filtered = useMemo(() => {
     const needle = debounced.trim().toLowerCase();

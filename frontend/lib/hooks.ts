@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ApiError } from './api/client';
 
 /** Fetch + loading/error state with automatic cancellation on unmount. */
@@ -10,26 +10,31 @@ export function useAsync<T>(factory: (signal: AbortSignal) => Promise<T>, deps: 
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const factoryRef = useRef(factory);
-  factoryRef.current = factory;
+
+  useEffect(() => {
+    factoryRef.current = factory;
+  }, [factory]);
 
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    setLoading(true);
-    setError(null);
-
-    factoryRef
-      .current(controller.signal)
-      .then((result) => {
-        if (active) setData(result);
-      })
-      .catch((caught: unknown) => {
-        if (!active || (caught as Error)?.name === 'AbortError') return;
-        setError(caught instanceof ApiError ? caught.message : 'The request failed. Please try again.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    queueMicrotask(() => {
+      if (!active) return;
+      setLoading(true);
+      setError(null);
+      void factoryRef
+        .current(controller.signal)
+        .then((result) => {
+          if (active) setData(result);
+        })
+        .catch((caught: unknown) => {
+          if (!active || (caught as Error)?.name === 'AbortError') return;
+          setError(caught instanceof ApiError ? caught.message : 'The request failed. Please try again.');
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    });
 
     return () => {
       active = false;
@@ -75,15 +80,14 @@ export function useNow(intervalMs = 30_000): Date {
 }
 
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
-  useEffect(() => {
+  const subscribe = useCallback((onStoreChange: () => void) => {
     const list = window.matchMedia(query);
-    setMatches(list.matches);
-    const listener = (event: MediaQueryListEvent) => setMatches(event.matches);
+    const listener = () => onStoreChange();
     list.addEventListener('change', listener);
     return () => list.removeEventListener('change', listener);
   }, [query]);
-  return matches;
+  const getSnapshot = useCallback(() => window.matchMedia(query).matches, [query]);
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
 
 /** Browser geolocation, used by the campus map and outdoor navigation. */

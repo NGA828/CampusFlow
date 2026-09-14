@@ -57,7 +57,16 @@ function OfficeDetail({ code }: { code: string }) {
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
-    if (active.data?.ticket) setTicket(active.data.ticket);
+    const nextTicket = active.data?.ticket;
+    if (!nextTicket) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!cancelled) setTicket(nextTicket);
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [active.data]);
 
   const request = async () => {

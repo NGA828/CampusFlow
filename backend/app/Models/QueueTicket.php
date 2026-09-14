@@ -34,6 +34,11 @@ class QueueTicket extends Model
             'joined_lng'    => 'float',
             'joined_plan_x' => 'float',
             'joined_plan_y' => 'float',
+            'called_at'     => 'datetime',
+            'checked_in_at' => 'datetime',
+            'admitted_at'   => 'datetime',
+            'completed_at'  => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 

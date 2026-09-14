@@ -24,9 +24,9 @@ Open <http://localhost:3100>. Seeded accounts (password `password123`):
 
 | Role | Email |
 | --- | --- |
-| Student | `student@campusflow.dev` |
-| Staff | `staff@campusflow.dev` |
-| Admin | `admin@campusflow.dev` |
+| Student | `student@campusflow.edu` |
+| Staff | `staff@campusflow.edu` |
+| Admin | `admin@campusflow.edu` |
 
 Database helpers: `npm run db:migrate`, `npm run db:seed`, `npm run db:reset`. Checks:
 `npm run typecheck`, `npm test` (Laravel API), and the Laravel feature tests provide the

@@ -49,7 +49,7 @@ export default function StaffTimetablePage() {
     [day],
   );
 
-  const entries = timetable.data?.entries ?? [];
+  const entries = useMemo(() => timetable.data?.entries ?? [], [timetable.data]);
 
   const byDay = useMemo(() => {
     const map = new Map<number, StaffTimetableRow[]>();

@@ -8,9 +8,9 @@ import { useAuth } from '@/lib/auth';
 import { colors, font, radius, spacing } from '@/lib/theme';
 
 const DEMO = [
-  { label: 'Student', email: 'student@campusflow.dev' },
-  { label: 'Staff', email: 'staff@campusflow.dev' },
-  { label: 'Admin', email: 'admin@campusflow.dev' },
+  { label: 'Student', email: 'student@campusflow.edu' },
+  { label: 'Staff', email: 'staff@campusflow.edu' },
+  { label: 'Admin', email: 'admin@campusflow.edu' },
 ];
 
 export default function LoginScreen() {
@@ -49,7 +49,7 @@ export default function LoginScreen() {
           <TextInput
             value={email}
             onChangeText={setEmail}
-            placeholder="you@campusflow.dev"
+            placeholder="you@campusflow.edu"
             placeholderTextColor={colors.ink400}
             autoCapitalize="none"
             autoComplete="email"
@@ -90,7 +90,7 @@ export default function LoginScreen() {
 
         <Card style={{ marginTop: spacing.lg }}>
           <H3>Demo accounts</H3>
-          <Small style={{ marginTop: 4 }}>Seeded campus accounts — password CampusFlow2026!</Small>
+          <Small style={{ marginTop: 4 }}>Seeded campus accounts — password password123</Small>
           <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
             {DEMO.map((account) => (
               <Button
@@ -99,7 +99,7 @@ export default function LoginScreen() {
                 variant="secondary"
                 onPress={() => {
                   setEmail(account.email);
-                  setPassword('CampusFlow2026!');
+                  setPassword('password123');
                 }}
               />
             ))}

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAsync } from '@/lib/hooks';
 import { assistantApi } from '@/lib/api/endpoints';
 import { ApiError } from '@/lib/api/client';
-import { Badge, Button, Card, CardSkeleton, EmptyState, SectionHeading, Spinner } from '@/components/ui/kit';
+import { Button, Card, CardSkeleton, SectionHeading, Spinner } from '@/components/ui/kit';
 import { PageHeader } from '@/components/layout/app-shell';
 import { relativeTime } from '@/lib/hooks';
 import type { AiMessage } from '@/lib/api/types';
@@ -26,6 +26,7 @@ export default function AssistantPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const localMessageId = useRef(0);
 
   const conversations = useAsync(() => assistantApi.conversations(), []);
   // The tool list is a server answer, not a client constant: which tools exist depends on role *and*
@@ -44,7 +45,7 @@ export default function AssistantPage() {
     setInput('');
 
     const optimistic: AiMessage = {
-      id: `local-${Date.now()}`,
+      id: `local-${++localMessageId.current}`,
       role: 'user',
       content: message,
       data: null,

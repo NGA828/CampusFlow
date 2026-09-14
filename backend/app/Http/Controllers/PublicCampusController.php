@@ -11,6 +11,7 @@ use App\Models\Office;
 use App\Models\Room;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /**
  * Visitor surface — the authenticated-free reading of campus.
@@ -58,7 +59,12 @@ class PublicCampusController extends Controller
     public function building(string $code): JsonResponse
     {
         $building = Building::query()
-            ->where(fn ($q) => $q->where('code', strtoupper($code))->orWhere('id', $code))
+            ->where(function ($query) use ($code) {
+                $query->where('code', strtoupper($code));
+                if (Str::isUuid($code)) {
+                    $query->orWhere('id', $code);
+                }
+            })
             ->where('is_public', true)
             ->firstOrFail();
 
@@ -138,10 +144,17 @@ class PublicCampusController extends Controller
     {
         $room = $this->publicRoomQuery()
             ->with('floor.building')
-            ->where(fn ($q) => $q->where('code', strtoupper($code))->orWhere('id', $code))
+            ->where(function ($query) use ($code) {
+                $query->where('code', strtoupper($code));
+                if (Str::isUuid($code)) {
+                    $query->orWhere('id', $code);
+                }
+            })
             ->firstOrFail();
 
-        return $this->ok(['room' => $this->roomProjection($room, true)]);
+        $projection = $this->roomProjection($room, true);
+
+        return $this->ok(array_merge($projection, ['room' => $projection]));
     }
 
     /**
@@ -260,7 +273,7 @@ class PublicCampusController extends Controller
     private function publicRoomQuery()
     {
         return Room::query()
-            ->where('status', 'active')
+            ->whereNotIn('status', ['closed', 'maintenance'])
             ->where('is_public', true)
             ->whereHas('floor.building', fn ($q) => $q->where('is_public', true));
     }

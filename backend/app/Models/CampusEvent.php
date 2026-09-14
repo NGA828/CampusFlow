@@ -7,6 +7,7 @@ class CampusEvent extends Model {
     protected $table = 'campus_events';
     protected $fillable = ['title','description','category','room_id','venue','starts_at','ends_at','capacity','image_url','status','created_by'];
     protected $dates = ['starts_at','ends_at'];
+    protected function casts(): array { return ['starts_at' => 'datetime', 'ends_at' => 'datetime']; }
     public function room()    { return $this->belongsTo(Room::class); }
     public function creator() { return $this->belongsTo(User::class,'created_by'); }
     public function registrations() { return $this->hasMany(EventRegistration::class,'event_id'); }

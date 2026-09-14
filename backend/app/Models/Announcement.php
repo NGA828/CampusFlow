@@ -22,7 +22,7 @@ class Announcement extends Model {
         return $query->whereNotNull('published_at')
             ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
             ->where(fn ($q) => $q->whereNull('target_roles')
-                ->orWhereJsonContains('target_roles', $user?->role_code ?? 'student')
+            ->orWhereJsonContains('target_roles', $user?->role ?? 'visitor')
                 ->orWhereJsonContains('target_roles', 'all'));
     }
     public function toApiArray(): array {

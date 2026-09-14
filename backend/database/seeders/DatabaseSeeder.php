@@ -170,7 +170,7 @@ class DatabaseSeeder extends Seeder
             'is_open'              => true,
             'capacity'            => 40,
             'max_capacity'        => 40,
-            'current_count'       => 12,
+            'current_count'        => 0,
             'call_window_minutes' => 10,
             'proximity_radius_m'  => 50.0,
             'mode'                => 'fifo',

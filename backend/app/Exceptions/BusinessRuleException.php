@@ -18,7 +18,7 @@ class BusinessRuleException extends Exception
     /** @param array<string, mixed> $context */
     public function __construct(
         string $message,
-        public readonly string $code = 'BUSINESS_RULE',
+        public readonly string $ruleCode = 'BUSINESS_RULE',
         public readonly int $status = Response::HTTP_UNPROCESSABLE_ENTITY,
         public readonly array $context = [],
     ) {

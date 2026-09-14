@@ -44,7 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return response()->json(array_merge([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'code'    => $e->code,
+                'code'    => $e->ruleCode,
             ], $e->context ? ['data' => $e->context] : []), $e->status);
         });
     })->create();

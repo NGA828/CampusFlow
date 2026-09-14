@@ -21,7 +21,7 @@ import type { QuickAction } from '@/lib/api/types';
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const dashboard = useAsync((signal) => studentApi.dashboard(), []);
+  const dashboard = useAsync(() => studentApi.dashboard(), []);
   const queues = useAsync(() => studentApi.queueBoard(), []);
 
   useRealtimeEvent(user ? `user:${user.id}` : null, () => dashboard.reload(), []);

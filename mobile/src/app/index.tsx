@@ -16,5 +16,5 @@ export default function Index() {
   if (!ready) return <Loading label="Restoring your session…" />;
   if (!user) return <Redirect href="/login" />;
 
-  return <Redirect href={ROLE_ROOT[user.role_code as keyof typeof ROLE_ROOT] ?? '/login'} />;
+  return <Redirect href={(ROLE_ROOT[user.role_code as keyof typeof ROLE_ROOT] ?? '/login') as any} />;
 }

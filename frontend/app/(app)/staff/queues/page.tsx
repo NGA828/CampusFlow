@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useAsync, formatDuration, relativeTime } from '@/lib/hooks';
+import { useAsync, relativeTime } from '@/lib/hooks';
 import { staffApi } from '@/lib/api/endpoints';
 import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, Progress, SectionHeading, Stat } from '@/components/ui/kit';
 import { PageHeader } from '@/components/layout/app-shell';

@@ -64,7 +64,15 @@ function RoutePreviewContent({ route, walking }: RoutePreviewProps) {
   }, [walking, route.legs, currentFloorId]);
 
   useEffect(() => {
-    if (indoorLeg) setMode('indoor');
+    if (!indoorLeg) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!cancelled) setMode('indoor');
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [indoorLeg]);
 
   return (

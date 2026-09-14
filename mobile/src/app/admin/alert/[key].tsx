@@ -28,7 +28,7 @@ export default function AdminAlertDetailScreen() {
     setBusy(true);
     try {
       await adminApi.acknowledge(fingerprint, 'Acknowledged from the mobile app');
-      router.replace('/admin/alerts');
+      router.replace('/admin/alerts' as any);
     } catch (caught) {
       Alert.alert('Alert', caught instanceof ApiError ? (caught.firstError ?? caught.message) : 'The alert could not be acknowledged.');
     } finally {

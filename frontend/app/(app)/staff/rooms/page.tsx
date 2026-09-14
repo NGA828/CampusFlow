@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAsync, useDebounced } from '@/lib/hooks';
 import { staffApi } from '@/lib/api/endpoints';
 import { ApiError } from '@/lib/api/client';
-import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, Input, SectionHeading, Select } from '@/components/ui/kit';
+import { Badge, Card, CardSkeleton, EmptyState, ErrorState, Input, SectionHeading, Select } from '@/components/ui/kit';
 import { PageHeader } from '@/components/layout/app-shell';
 import { useToast } from '@/components/ui/toast';
 import type { Room } from '@/lib/api/types';

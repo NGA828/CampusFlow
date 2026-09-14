@@ -90,6 +90,14 @@ class StudentDashboardController extends Controller
             ->latest('created_at')
             ->first();
 
+        $unreadNotifications = UserNotification::where('user_id', $user->id)->whereNull('read_at')->count();
+        $upcomingEvents = CampusEvent::query()
+            ->where('status', 'published')
+            ->whereBetween('starts_at', [$now, $now->copy()->addDays(7)])
+            ->orderBy('starts_at')
+            ->limit(3)
+            ->get(['id', 'title', 'starts_at', 'venue', 'category']);
+
         $nextClassData = null;
         if ($nextClass) {
             $nextClassData = $nextClass->toApiArray();
@@ -115,7 +123,8 @@ class StudentDashboardController extends Controller
             'queue_ticket'    => $queueTicket ? $this->ticketPayload($queueTicket) : null,
             'office_ticket'   => $officeTicket ? $this->officeTicketView($officeTicket) : null,
             'notifications'   => $this->recentNotifications($user),
-            'unread_notifications' => UserNotification::where('user_id', $user->id)->whereNull('read_at')->count(),
+            'unread_notifications' => $unreadNotifications,
+            'unread_count'    => $unreadNotifications,
             'announcements'   => Announcement::query()
                 ->whereNotNull('published_at')
                 ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>=', $now))
@@ -124,12 +133,8 @@ class StudentDashboardController extends Controller
                 ->get()
                 ->map(fn (Announcement $a) => $a->toApiArray())
                 ->values(),
-            'events'          => CampusEvent::query()
-                ->where('status', 'published')
-                ->whereBetween('starts_at', [$now, $now->copy()->addDays(7)])
-                ->orderBy('starts_at')
-                ->limit(3)
-                ->get(['id', 'title', 'starts_at', 'venue', 'category']),
+            'events'          => $upcomingEvents,
+            'upcoming_events' => $upcomingEvents,
             'campus_snapshot' => [
                 'open_queues'      => RoomQueue::where('is_open', true)->count(),
                 'rooms_in_queue'   => QueueTicket::whereIn('status', ['waiting'])->distinct('queue_id')->count('queue_id'),
@@ -172,6 +177,35 @@ class StudentDashboardController extends Controller
             ->where('term_code', $termCode)
             ->where('day_of_week', $dayOfWeek)
             ->whereIn('course_id', $courseIds);
+    }
+
+    private function lastFix(User $user): ?array
+    {
+        $position = UserPosition::with(['building', 'floor'])
+            ->where('user_id', $user->id)
+            ->latest('recorded_at')
+            ->first();
+
+        if (! $position) {
+            return null;
+        }
+
+        return [
+            'id'            => $position->id,
+            'user_id'       => $position->user_id,
+            'lat'           => $position->lat,
+            'lng'           => $position->lng,
+            'plan_x'        => $position->plan_x,
+            'plan_y'        => $position->plan_y,
+            'building_id'   => $position->building_id,
+            'floor_id'      => $position->floor_id,
+            'source'        => $position->source,
+            'accuracy_m'    => $position->accuracy_m,
+            'updated_at'    => $position->recorded_at?->toIso8601String(),
+            'building_code' => $position->building?->code,
+            'building_name' => $position->building?->name,
+            'floor_name'    => $position->floor?->name,
+        ];
     }
 
     /**

@@ -116,13 +116,14 @@ class PlatformRoleAccessTest extends TestCase
     public function test_student_may_not_configure_a_queue_even_though_admin_outranks_nobody_here(): void
     {
         $queue = RoomQueue::firstOrFail();
+        $originalCapacity = $queue->capacity;
 
         $this->actingAs($this->student(), 'sanctum')
             ->patchJson('/api/v1/admin/queues/' . $queue->id, ['capacity' => 99])
             ->assertStatus(403)
             ->assertJsonPath('code', 'ROLE_NOT_PERMITTED');
 
-        $this->assertSame(99, (int) $queue->fresh()->capacity, 'The refusal must not have written anything.');
+        $this->assertSame($originalCapacity, (int) $queue->fresh()->capacity, 'The refusal must not have written anything.');
     }
 
     public function test_staff_and_admin_cannot_take_a_students_place_in_a_line(): void

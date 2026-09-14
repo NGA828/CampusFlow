@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Concerns\BuildsOfficeSummaries;
+use App\Http\Controllers\Concerns\BuildsQueueViews;
 use App\Http\Controllers\Concerns\RespondsJson;
 use App\Http\Controllers\Controller;
 use App\Models\Office;
@@ -22,6 +23,7 @@ use Illuminate\Http\Request;
 class StudentTicketController extends Controller
 {
     use BuildsOfficeSummaries;
+    use BuildsQueueViews;
     use RespondsJson;
 
     private const ACTIVE_QUEUE_STATUSES  = ['waiting', 'called', 'navigating', 'checked_in'];
@@ -97,37 +99,17 @@ class StudentTicketController extends Controller
     /** GET /student/queues/board — the availability board (status only, no names). */
     public function queueBoard(Request $request): JsonResponse
     {
-        $userId = $request->user()->id;
-
         $boards = RoomQueue::with('room.floor.building')
-            ->get()
-            ->map(function (RoomQueue $queue) use ($userId) {
-                $mine = QueueTicket::query()
-                    ->where('queue_id', $queue->id)
-                    ->where('user_id', $userId)
-                    ->whereIn('status', self::ACTIVE_QUEUE_STATUSES)
-                    ->latest('created_at')
-                    ->first();
-
-                return [
-                    'queue_id'   => $queue->id,
-                    'room_id'    => $queue->room_id,
-                    'room_code'  => $queue->room?->code,
-                    'room_name'  => $queue->room?->name,
-                    'building'   => $queue->room?->floor?->building?->code,
-                    'floor'      => $queue->room?->floor?->name,
-                    'is_open'    => (bool) $queue->is_open,
-                    'waiting'    => QueueTicket::where('queue_id', $queue->id)->where('status', 'waiting')->count(),
-                    'occupancy'  => $queue->current_count,
-                    'capacity'   => $queue->capacity,
-                    'my_ticket'  => $mine?->toApiArray(),
-                ];
+            ->whereHas('room', function ($query) {
+                $query->where('status', '!=', 'archived');
             })
-            ->sortBy(fn ($board) => $board['room_code'] ?? 'zzz')
+            ->get()
+            ->map(fn (RoomQueue $queue) => $this->queuePayload($queue, $request->user()->id))
+            ->sortBy(fn ($board) => [$board['building_code'], $board['room_code']])
             ->values();
 
         return $this->ok([
-            'queues'   => $boards,
+            'queues' => $boards,
             'generated_at' => now()->toIso8601String(),
         ]);
     }

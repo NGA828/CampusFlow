@@ -1,10 +1,10 @@
 'use client';
 
-import { use, useMemo, useState } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
-import { useAsync, dayName, formatClock, formatDuration } from '@/lib/hooks';
-import { campusApi, officeApi, queueApi, studentApi } from '@/lib/api/endpoints';
-import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, KeyValue, Progress, SectionHeading } from '@/components/ui/kit';
+import { useAsync, dayName, formatClock } from '@/lib/hooks';
+import { campusApi, queueApi, studentApi } from '@/lib/api/endpoints';
+import { Badge, Button, Card, CardSkeleton, ErrorState, KeyValue, Progress, SectionHeading } from '@/components/ui/kit';
 import { PageHeader } from '@/components/layout/app-shell';
 import { useToast } from '@/components/ui/toast';
 import { ApiError } from '@/lib/api/client';

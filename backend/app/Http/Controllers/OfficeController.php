@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\BuildsOfficeSummaries;
+use App\Http\Controllers\Concerns\RespondsJson;
 use App\Models\Office;
 use App\Models\OfficeEvent;
 use App\Models\OfficeServiceWindow;
@@ -16,7 +17,7 @@ use Illuminate\Support\Str;
 
 class OfficeController extends Controller
 {
-    use BuildsOfficeSummaries;
+    use BuildsOfficeSummaries, RespondsJson;
 
     /**
      * GET /campus/offices — the shared office availability read.

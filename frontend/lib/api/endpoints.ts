@@ -51,7 +51,6 @@ import type {
   QueueLineRow,
   QueueListItem,
   QueueSnapshot,
-  QueueTicket,
   QueueTicketView,
   Room,
   RoomDetail,

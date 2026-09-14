@@ -10,7 +10,7 @@
     "db:seed": "php backend/artisan db:seed",
     "db:reset": "php backend/artisan migrate:fresh --seed",
     "test": "php backend/artisan test",
-    "typecheck": "npm --prefix frontend run typecheck && npm --prefix mobile exec tsc -- --noEmit",
+    "typecheck": "npm --prefix frontend run typecheck && npm --prefix mobile run typecheck",
     "lint": "npm --prefix frontend run lint",
     "check:php": "node scripts/check-php-syntax.mjs",
     "check:api": "node scripts/check-api-contract.mjs",

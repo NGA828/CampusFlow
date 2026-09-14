@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\NavigationNode;
 use App\Models\QrNode;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useAsync, useDebounced, formatDuration } from '@/lib/hooks';
-import { campusApi, queueApi, studentApi } from '@/lib/api/endpoints';
+import { campusApi, studentApi } from '@/lib/api/endpoints';
 import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, Field, Input, Select, Toggle } from '@/components/ui/kit';
 import { PageHeader } from '@/components/layout/app-shell';
 

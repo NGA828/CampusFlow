@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useAsync, formatClock, formatDuration, relativeTime, STATUS_TONES, statusLabel } from '@/lib/hooks';
+import { useAsync, formatClock, formatDuration, relativeTime, STATUS_TONES } from '@/lib/hooks';
 import { officeApi } from '@/lib/api/endpoints';
 import { ApiError } from '@/lib/api/client';
 import { Badge, Button, Card, CardSkeleton, ErrorState, KeyValue, SectionHeading } from '@/components/ui/kit';
@@ -34,7 +34,15 @@ export default function OfficeTicketPage({ params }: { params: Promise<{ id: str
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
-    if (ticket.data) setCurrent(ticket.data);
+    if (!ticket.data) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!cancelled) setCurrent(ticket.data);
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [ticket.data]);
 
   const act = async (kind: 'cancel' | 'check-in' | 'approaching') => {

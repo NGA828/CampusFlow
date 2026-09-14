@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import { useAsync, dayShort } from '@/lib/hooks';
-import { adminApi, campusApi } from '@/lib/api/endpoints';
+import { adminApi } from '@/lib/api/endpoints';
 import { ApiError } from '@/lib/api/client';
 import { Badge, Button, Card, ConfirmDialog, Field, Input, Modal, SectionHeading, Select, Tabs, Textarea } from '@/components/ui/kit';
 import { PageHeader } from '@/components/layout/app-shell';
 import { ResourceTable, type Column } from '@/components/admin/table';
 import { useToast } from '@/components/ui/toast';
-import type { AdminOfficeRow, Office, Room, RoomQueueConfig, ServiceWindow } from '@/lib/api/types';
+import type { AdminOfficeRow, Office, RoomQueueConfig, ServiceWindow } from '@/lib/api/types';
 
 type Tab = 'queues' | 'offices' | 'windows';
 
@@ -26,10 +26,8 @@ export default function AdminServicesPage() {
   const queues = useAsync(() => adminApi.queues(), []);
   const offices = useAsync(() => adminApi.offices({ per_page: 50 }), []);
   const windows = useAsync(() => adminApi.serviceWindows({ per_page: 100 }), []);
-  const buildings = useAsync(() => campusApi.buildings(), []);
   const rooms = useAsync(() => adminApi.rooms({ per_page: 400 }), []);
 
-  const buildingOptions = buildings.data?.buildings ?? [];
   const roomOptions = rooms.data?.items ?? [];
 
   const queueRooms = queues.data?.rooms_without_queue ?? [];

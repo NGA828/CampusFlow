@@ -34,17 +34,12 @@ export default function MapPage() {
   );
 
   useEffect(() => {
-    setFloorId(null);
-    setSelectedRoom(null);
-  }, [activeBuildingId]);
-
-  useEffect(() => {
     if (plan.data?.floor && position.data?.position?.floor_id && position.data.position.floor_id === plan.data.floor.id) {
       /* the caller is on this floor — nothing to do, the marker below picks it up */
     }
   }, [plan.data, position.data]);
 
-  const roomsOnFloor = plan.data?.rooms ?? [];
+  const roomsOnFloor = useMemo(() => plan.data?.rooms ?? [], [plan.data]);
   const busyCodes = useMemo(() => new Set(Object.keys(plan.data?.busy ?? {})), [plan.data]);
   const currentPosition = position.data?.position ?? null;
 
@@ -127,6 +122,8 @@ export default function MapPage() {
                       type="button"
                       onClick={() => {
                         setBuildingId(item.id);
+                        setFloorId(null);
+                        setSelectedRoom(null);
                         setMode('indoor');
                       }}
                       className={`flex w-full items-start gap-3 border-b border-ink-50 px-4 py-3 text-left transition-colors ${active ? 'bg-brand-50/60' : 'hover:bg-ink-50'}`}
@@ -159,6 +156,8 @@ export default function MapPage() {
                 selectedBuildingId={activeBuildingId}
                 onSelectBuilding={(id) => {
                   setBuildingId(id);
+                  setFloorId(null);
+                  setSelectedRoom(null);
                   setMode('indoor');
                 }}
                 markers={

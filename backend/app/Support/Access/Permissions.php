@@ -21,6 +21,12 @@ namespace App\Support\Access;
  */
 final class Permissions
 {
+    // Role keys mirror Roles so the grant table remains readable while staying valid PHP.
+    public const VISITOR = Roles::VISITOR;
+    public const STUDENT = Roles::STUDENT;
+    public const STAFF   = Roles::STAFF;
+    public const ADMIN   = Roles::ADMIN;
+
     // Academic
     public const TIMETABLE_VIEW_OWN      = 'timetable.view.own';
     public const TIMETABLE_MANAGE_ASSIGNED = 'timetable.manage.assigned';
@@ -182,7 +188,7 @@ final class Permissions
             return false;
         }
 
-        if ($platform === null || $platform === Platforms::UNKNOWN) {
+        if ($platform === null || $platform === Platforms::UNKNOWN || $platform === Platforms::API) {
             // An unidentified client keeps the role's own rights; it never gains any.
             return true;
         }
