@@ -24,7 +24,19 @@ class AcademicTest extends TestCase
             ->getJson('/api/v1/student/timetable');
 
         $response->assertStatus(200)
-            ->assertJsonPath('success', true);
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'data' => [
+                    'week_start',
+                    'dates',
+                    'entries' => [[
+                        'date',
+                        'course_title',
+                        'starts_at_iso',
+                        'ends_at_iso',
+                    ]],
+                ],
+            ]);
     }
 
     public function test_can_list_courses(): void

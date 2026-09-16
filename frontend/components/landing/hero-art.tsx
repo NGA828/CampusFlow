@@ -111,7 +111,7 @@ export function RouteMock({ className, showLabels = true }: { className?: string
         fill="#4340e0"
         stroke="#ffffff"
         strokeWidth="2.5"
-        initial={reduced ? { cx: ROUTE[3].x, cy: ROUTE[3].y } : { cx: ROUTE[0].x, cy: ROUTE[0].y }}
+        initial={reduced ? { cx: ROUTE[3].x, cy: ROUTE[3].y, r: 6 } : { cx: ROUTE[0].x, cy: ROUTE[0].y, r: 6 }}
         animate={reduced ? undefined : { cx: ROUTE.map((point) => point.x), cy: ROUTE.map((point) => point.y) }}
         transition={{ duration: 7, times: [0, 0.35, 0.75, 1], repeat: Infinity, repeatDelay: 0.6, ease: 'easeInOut' }}
       />
@@ -121,7 +121,7 @@ export function RouteMock({ className, showLabels = true }: { className?: string
           fill="none"
           stroke="#4340e0"
           strokeWidth="2"
-          initial={{ cx: ROUTE[0].x, cy: ROUTE[0].y, opacity: 0.5, scale: 1 }}
+          initial={{ cx: ROUTE[0].x, cy: ROUTE[0].y, opacity: 0.5, scale: 1, r: 6 }}
           animate={{
             cx: ROUTE.map((point) => point.x),
             cy: ROUTE.map((point) => point.y),

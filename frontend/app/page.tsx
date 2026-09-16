@@ -87,7 +87,7 @@ export default async function LandingPage() {
 
         <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-5 pt-12 pb-20 lg:grid-cols-[1.05fr_1fr] lg:pt-16 lg:pb-28">
           <div>
-            <Reveal>
+            <Reveal eager>
               <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-white/75 backdrop-blur">
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint-400 opacity-75" />
@@ -97,7 +97,7 @@ export default async function LandingPage() {
               </p>
             </Reveal>
 
-            <Stagger className="mt-6" step={0.1}>
+            <Stagger className="mt-6" step={0.1} eager>
               <StaggerItem>
                 <h1 className="max-w-2xl text-4xl leading-[1.06] font-semibold tracking-tight sm:text-6xl">
                   Find your room.
@@ -129,7 +129,7 @@ export default async function LandingPage() {
               </StaggerItem>
             </Stagger>
 
-            <Reveal delay={0.25} className="mt-12">
+            <Reveal eager delay={0.25} className="mt-12">
               {overview ? (
                 <dl className="grid max-w-xl grid-cols-2 gap-3 sm:grid-cols-4">
                   {stats.map((stat) => (

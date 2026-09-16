@@ -199,6 +199,26 @@ class PlatformRoleAccessTest extends TestCase
         }
     }
 
+    public function test_admin_analytics_returns_the_complete_overview_contract(): void
+    {
+        $response = $this->actingAs($this->admin(), 'sanctum')
+            ->getJson('/api/v1/admin/analytics');
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'data' => [
+                    'generated_at',
+                    'users',
+                    'campus',
+                    'queues',
+                    'offices',
+                    'navigation',
+                    'engagement',
+                    'utilisation',
+                ],
+            ]);
+    }
+
     public function test_admin_may_read_a_students_dashboard_because_it_is_a_student_route_not_a_private_one(): void
     {
         // Deliberate: the student tree is `role:student`, and even an administrator is refused there.

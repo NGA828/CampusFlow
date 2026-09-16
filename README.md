@@ -17,10 +17,10 @@ docs/       Architecture, API and design-research documentation
 
 ```bash
 npm run setup        # installs Laravel, frontend and mobile, migrates + seeds the database
-npm run dev          # Laravel API on :8000, web app on :3100
+npm run dev          # Laravel API on :8001, web app on :3000
 ```
 
-Open <http://localhost:3100>. Seeded accounts (password `password123`):
+Open <http://localhost:3000>. Seeded accounts (password `password123`):
 
 | Role | Email |
 | --- | --- |

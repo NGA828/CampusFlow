@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["*.e2b.app"],
+  turbopack: {
+    root: process.cwd(),
+  },
   /**
    * The generic screens this restructure removed (`/dashboard`, `/timetable`, `/map`, `/queue`,
    * `/offices`, `/announcements`, `/profile`, `/assistant`) answered every role with one page — the

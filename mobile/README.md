@@ -43,8 +43,20 @@ Demo accounts (seeded by `php ../backend/artisan db:seed`): `student@campusflow.
 ## Push notifications
 
 `src/lib/notifications.ts` requests permission and registers the Expo push token with
-`POST /me/devices` (best-effort: Expo Go and simulators cannot always mint a token). In-app and
-websocket delivery work regardless, and the notification centre always reads `GET /me/notifications`.
+`POST /me/devices` (best-effort). Expo Go does not load the remote-notification native module on
+Android from SDK 53 onward, so Expo Go skips push-token registration without preventing the app
+from starting. In-app and websocket delivery work regardless, and the notification centre always
+reads `GET /me/notifications`.
+
+To test Android push notifications, use a development build instead of Expo Go:
+
+```bash
+npx expo install expo-dev-client
+npx expo run:android
+npx expo start --dev-client
+```
+
+The `expo-notifications` config plugin in `app.json` is already configured for that build.
 
 ## Checks
 

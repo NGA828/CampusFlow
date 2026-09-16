@@ -27,14 +27,18 @@ class StudentTimetableController extends Controller
     /** GET /student/timetable — the whole week for the current term. */
     public function index(Request $request): JsonResponse
     {
+        $request->validate(['week' => ['nullable', 'date_format:Y-m-d']]);
         $term = $this->term($request);
         $courseIds = $this->courseIds($request);
+        $weekStart = $this->weekStart($request);
 
         if (! $term || $courseIds->isEmpty()) {
             return $this->ok([
                 'term'      => $term?->only(['code', 'name', 'starts_at', 'ends_at']),
+                'week_start' => $weekStart->toDateString(),
+                'dates'      => collect(range(0, 6))->map(fn (int $day) => $weekStart->copy()->addDays($day)->toDateString())->all(),
                 'entries'   => [],
-                'days'      => $this->emptyDays(),
+                'days'       => $this->emptyDays(),
                 'enrolments' => 0,
             ]);
         }
@@ -45,7 +49,7 @@ class StudentTimetableController extends Controller
             ->orderBy('day_of_week')
             ->orderBy('starts_at')
             ->get()
-            ->map(fn (TimetableEntry $e) => $e->toApiArray());
+            ->map(fn (TimetableEntry $e) => $this->withTiming($e->toApiArray(), $weekStart, $request));
 
         $days = $this->emptyDays();
         foreach ($entries as $entry) {
@@ -57,8 +61,10 @@ class StudentTimetableController extends Controller
 
         return $this->ok([
             'term'       => $term->only(['code', 'name', 'starts_at', 'ends_at']),
+            'week_start' => $weekStart->toDateString(),
+            'dates'      => collect(range(0, 6))->map(fn (int $day) => $weekStart->copy()->addDays($day)->toDateString())->all(),
             'entries'    => $entries->values(),
-            'days'       => array_values($days),
+            'days'        => array_values($days),
             'enrolments' => $courseIds->count(),
         ]);
     }
@@ -172,6 +178,38 @@ class StudentTimetableController extends Controller
             ->where('student_id', $request->user()->id)
             ->where('status', 'enrolled')
             ->pluck('course_id');
+    }
+
+    private function weekStart(Request $request): Carbon
+    {
+        $requested = $request->query('week');
+        $date = $requested ? Carbon::createFromFormat('Y-m-d', $requested) : Carbon::now();
+
+        return $date->startOfWeek(Carbon::MONDAY);
+    }
+
+    private function withTiming(array $entry, Carbon $weekStart, Request $request): array
+    {
+        $day = (int) ($entry['day_of_week'] ?? 0);
+        $date = $weekStart->copy()->addDays(($day + 6) % 7)->toDateString();
+        $startsAt = substr((string) ($entry['starts_at'] ?? '00:00:00'), 0, 8);
+        $endsAt = substr((string) ($entry['ends_at'] ?? '00:00:00'), 0, 8);
+        $start = Carbon::parse("{$date} {$startsAt}");
+        $end = Carbon::parse("{$date} {$endsAt}");
+        $now = Carbon::now();
+
+        return [
+            ...$entry,
+            'date' => $date,
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'starts_at_iso' => $start->toIso8601String(),
+            'ends_at_iso' => $end->toIso8601String(),
+            'is_now' => $now->betweenIncluded($start, $end),
+            'is_next' => $start->isFuture(),
+            'minutes_until' => $start->isFuture() ? $now->diffInMinutes($start) : null,
+            'session_type' => $entry['session_type'] ?? $entry['type'] ?? 'session',
+        ];
     }
 
     /** @return array<int, array{index: int, label: string, entries: array}> */

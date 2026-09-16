@@ -635,7 +635,7 @@ export interface TimetableEntry {
 }
 
 export interface TimetableWeek {
-  term: string;
+  term: { code: string; name: string; starts_at?: string | null; ends_at?: string | null } | null;
   week_start: string;
   dates: string[];
   entries: TimetableEntry[];

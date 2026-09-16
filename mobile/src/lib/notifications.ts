@@ -8,23 +8,37 @@
  */
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { accountApi } from './api';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+type NotificationsModule = typeof import('expo-notifications');
+
+function isExpoGo(): boolean {
+  return Constants.appOwnership === 'expo';
+}
+
+async function loadNotifications(): Promise<NotificationsModule | null> {
+  if (Platform.OS === 'web' || isExpoGo()) return null;
+
+  const notifications = await import('expo-notifications');
+  notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+  return notifications;
+}
 
 export async function registerForPush(): Promise<string | null> {
   try {
-    if (Platform.OS === 'web' || !Device.isDevice) return null;
+    if (!Device.isDevice) return null;
+
+    const Notifications = await loadNotifications();
+    if (!Notifications) return null;
 
     const existing = await Notifications.getPermissionsAsync();
     let status = existing.status;

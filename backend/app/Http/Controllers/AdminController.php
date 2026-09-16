@@ -161,34 +161,14 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
 
-        $roomUtilisation = QueueTicket::selectRaw('queue_id, count(*) as total, count(admitted_at) as admitted')
-            ->whereDate('created_at', '>=', now()->subDays(30))
-            ->groupBy('queue_id')
-            ->with('queue.room')
-            ->get()
-            ->map(fn($r) => [
-                'queue_id'  => $r->queue_id,
-                'room_code' => $r->queue?->room?->code,
-                'room_name' => $r->queue?->room?->name,
-                'total'     => $r->total,
-                'admitted'  => $r->admitted,
-            ]);
+        /*
+         * The analytics screen consumes the same complete overview contract as the admin
+         * dashboard. Keeping one server-side projection prevents cards from drifting apart
+         * when a metric is added or renamed.
+         */
+        $dashboard = $this->dashboard($request)->getData(true);
 
-        $officeDemand = OfficeTicket::selectRaw('office_id, count(*) as total, count(completed_at) as completed')
-            ->whereDate('created_at', '>=', now()->subDays(30))
-            ->groupBy('office_id')
-            ->get()
-            ->map(fn($r) => [
-                'office_id' => $r->office_id,
-                'total'     => $r->total,
-                'completed' => $r->completed,
-            ]);
-
-        return $this->ok([
-            'room_utilisation' => $roomUtilisation,
-            'office_demand'    => $officeDemand,
-            'period_days'      => 30,
-        ]);
+        return $this->ok($dashboard['data']['overview'] ?? []);
     }
 
     /* ─────────────────────────────────────── users */

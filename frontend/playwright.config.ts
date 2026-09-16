@@ -7,7 +7,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: process.env.RESPONSIVE_BASE_URL ?? 'http://127.0.0.1:3100',
+    baseURL: process.env.RESPONSIVE_BASE_URL ?? 'http://127.0.0.1:3000',
     headless: true,
     reducedMotion: 'reduce',
     screenshot: 'only-on-failure',

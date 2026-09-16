@@ -40,10 +40,12 @@ export default function TimetablePage() {
     [weekStart],
   );
   const data = !timetable.loading && !timetable.error ? timetable.data : null;
-  const entries = [...(data?.entries ?? [])].sort(
-    (a, b) =>
-      a.date.localeCompare(b.date) || a.starts_at.localeCompare(b.starts_at),
-  );
+  const entries = [...(data?.entries ?? [])]
+    .filter((entry) => typeof entry.date === "string" && typeof entry.starts_at === "string")
+    .sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) || a.starts_at.localeCompare(b.starts_at),
+    );
   const start = data?.week_start ?? weekStart;
   const dates = Array.from({ length: 7 }, (_, i) => dayOffset(start, i));
   const next = entries.find(
@@ -105,7 +107,7 @@ export default function TimetablePage() {
             )}
           </h2>
           <p className={s.muted}>
-            {data?.term ?? "Your enrolled courses"} · Read-only teaching
+            {data?.term?.name ?? data?.term?.code ?? "Your enrolled courses"} · Read-only teaching
             schedule
           </p>
         </div>

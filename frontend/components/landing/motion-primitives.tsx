@@ -31,11 +31,13 @@ export function Reveal({
   delay = 0,
   className,
   once = true,
+  eager = false,
 }: {
   children: ReactNode;
   delay?: number;
   className?: string;
   once?: boolean;
+  eager?: boolean;
 }) {
   const reduced = useReducedMotion();
   if (reduced) return <div className={className}>{children}</div>;
@@ -44,7 +46,8 @@ export function Reveal({
       className={className}
       variants={revealVariants}
       initial="hidden"
-      whileInView="show"
+      animate={eager ? 'show' : undefined}
+      whileInView={eager ? undefined : 'show'}
       viewport={{ once, amount: 0.2 }}
       transition={{ duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] }}
     >
@@ -58,11 +61,13 @@ export function Stagger({
   className,
   delayChildren = 0.05,
   step = 0.07,
+  eager = false,
 }: {
   children: ReactNode;
   className?: string;
   delayChildren?: number;
   step?: number;
+  eager?: boolean;
 }) {
   const reduced = useReducedMotion();
   if (reduced) return <div className={className}>{children}</div>;
@@ -70,7 +75,8 @@ export function Stagger({
     <motion.div
       className={className}
       initial="hidden"
-      whileInView="show"
+      animate={eager ? 'show' : undefined}
+      whileInView={eager ? undefined : 'show'}
       viewport={{ once: true, amount: 0.15 }}
       variants={{ show: { transition: { staggerChildren: step, delayChildren } } }}
     >

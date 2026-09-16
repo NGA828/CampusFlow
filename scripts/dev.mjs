@@ -4,7 +4,7 @@
  *
  * Starts the Laravel API and Next.js web client used by the project.
  *
- * The Laravel API runs on port 8000 and the Next.js development server runs on port 3100.
+ * The Laravel API runs on port 8001 and the Next.js development server runs on port 3000.
  * Web requests use Next's rewrite to reach Laravel, while mobile clients call Laravel
  * directly using EXPO_PUBLIC_API_URL.
  */
@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const apiPort = process.env.API_PORT ?? '8001';
-const webPort = process.env.WEB_DEV_PORT ?? '3100';
+const webPort = process.env.WEB_DEV_PORT ?? '3000';
 
 const COLORS = { api: '\u001b[36m', web: '\u001b[35m', reset: '\u001b[0m' };
 
