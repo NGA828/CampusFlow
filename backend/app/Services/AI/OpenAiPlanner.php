@@ -5,6 +5,8 @@ namespace App\Services\AI;
 use App\Exceptions\AiProviderException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 
 class OpenAiPlanner
 {
@@ -38,11 +40,17 @@ class OpenAiPlanner
         $model = (string) config('services.openai.model', 'gpt-4o-mini');
         $baseUrl = rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/');
 
-        $response = Http::baseUrl($baseUrl)
+        $request = Http::baseUrl($baseUrl)
             ->withToken((string) config('services.openai.key'))
             ->acceptJson()
-            ->timeout((int) config('services.openai.timeout', 20))
-            ->post('/chat/completions', [
+            ->timeout((int) config('services.openai.timeout', 20));
+        $caBundle = config('services.openai.ca_bundle');
+        if (is_string($caBundle) && trim($caBundle) !== '') {
+            $request = $request->withOptions(['verify' => $caBundle]);
+        }
+
+        try {
+            $response = $request->post('/chat/completions', [
                 'model' => $model,
                 'temperature' => 0,
                 'messages' => [
@@ -85,12 +93,35 @@ class OpenAiPlanner
                     'function' => ['name' => 'select_campus_tool'],
                 ],
             ]);
+        } catch (ConnectionException|RequestException $exception) {
+            Log::warning('OpenAI assistant connection failed.', [
+                'model' => $model,
+                'error' => $exception->getMessage(),
+            ]);
+
+            throw new AiProviderException;
+        }
 
         if (! $response->successful()) {
             Log::warning('OpenAI assistant request failed.', [
                 'status' => $response->status(),
                 'model' => $model,
             ]);
+
+            if (in_array($response->status(), [401, 403], true)) {
+                throw new AiProviderException(
+                    'The AI provider rejected the configured credentials. Check OPENAI_API_KEY and OPENAI_BASE_URL.',
+                    'AI_PROVIDER_AUTHENTICATION',
+                );
+            }
+
+            if ($response->status() === 429) {
+                throw new AiProviderException(
+                    'The AI provider rate limit was reached. Please try again shortly.',
+                    'AI_PROVIDER_RATE_LIMIT',
+                    429,
+                );
+            }
 
             throw new AiProviderException;
         }

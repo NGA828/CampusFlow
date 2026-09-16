@@ -23,6 +23,8 @@ class AiAssistantTest extends TestCase
     public function test_configured_openai_model_selects_an_authorized_backend_tool(): void
     {
         Config::set('services.openai.key', 'test-openai-key');
+        Config::set('services.openai.model', 'gpt-4o-mini');
+        Config::set('services.openai.base_url', 'https://api.openai.com/v1');
         Http::fake([
             'https://api.openai.com/v1/chat/completions' => Http::response([
                 'choices' => [[

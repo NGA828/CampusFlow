@@ -40,6 +40,9 @@ return [
         'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
         'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
         'timeout' => env('OPENAI_TIMEOUT_SECONDS', 20),
+        // Guzzle accepts a CA bundle path here. Keep TLS verification enabled; on Windows
+        // PHP often has no system CA path even when curl.exe does.
+        'ca_bundle' => env('OPENAI_CA_BUNDLE') ?: (getenv('CURL_CA_BUNDLE') ?: null),
     ],
 
 ];

@@ -88,6 +88,8 @@ OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_TIMEOUT_SECONDS=20
+# Optional when PHP cannot locate a trusted CA bundle on Windows:
+OPENAI_CA_BUNDLE=C:\path\to\cacert.pem
 ```
 
 Then clear cached Laravel configuration and restart the API:
@@ -99,3 +101,15 @@ php backend\artisan serve --host=0.0.0.0 --port=8001
 
 The assistant capabilities response reports `planner: openai` when the model is active. If the key is
 empty, it reports `planner: deterministic`.
+
+If the key was issued by OpenRouter (keys commonly use the `sk-or-v1` prefix), use its
+OpenAI-compatible endpoint instead of `api.openai.com`:
+
+```dotenv
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+OPENAI_MODEL=openai/gpt-4o-mini
+```
+
+For a native OpenAI key, keep the default OpenAI base URL. Never set TLS verification to `false`.
+If PHP still reports cURL error 60, set `curl.cainfo` and `openssl.cafile` in the active `php.ini`
+to the same trusted CA bundle, then restart the Laravel server.
