@@ -73,3 +73,29 @@ See [`mobile/README.md`](mobile/README.md) for the screen list and push-notifica
 Additional documents (architecture, API, database, navigation, queue system, administrative
 office, AI assistant, testing, deployment) are listed in `AGENTS.md`/`PROMPT.md`; they are written
 from the same source of truth as the code in `backend/` and `frontend/`.
+
+### Enable the AI model
+
+The Laravel assistant uses OpenAI `gpt-4o-mini` as an intent planner when an API key is configured.
+The model can only choose from tools already authorized for the signed-in role and platform; Laravel
+still reads the campus data and executes the tool. Without a key, the built-in deterministic planner
+remains available for local testing.
+
+Add these values to `backend/.env` (never commit the key):
+
+```dotenv
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_TIMEOUT_SECONDS=20
+```
+
+Then clear cached Laravel configuration and restart the API:
+
+```powershell
+php backend\artisan config:clear
+php backend\artisan serve --host=0.0.0.0 --port=8001
+```
+
+The assistant capabilities response reports `planner: openai` when the model is active. If the key is
+empty, it reports `planner: deterministic`.

@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureRole;
 use App\Exceptions\BusinessRuleException;
+use App\Exceptions\AiProviderException;
 use App\Http\Middleware\ResolveClientContext;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -46,5 +47,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 'message' => $e->getMessage(),
                 'code'    => $e->ruleCode,
             ], $e->context ? ['data' => $e->context] : []), $e->status);
+        });
+
+        $exceptions->render(function (AiProviderException $e, Request $request) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'code' => $e->errorCode,
+            ], $e->status);
         });
     })->create();

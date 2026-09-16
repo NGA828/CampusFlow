@@ -14,6 +14,7 @@ use App\Models\RoomQueue;
 use App\Support\Access\ClientContext;
 use App\Support\Access\Permissions;
 use App\Support\Access\Roles;
+use App\Services\AI\OpenAiPlanner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -43,6 +44,10 @@ class AiAssistantController extends Controller
 {
     use RespondsJson;
 
+    public function __construct(private readonly OpenAiPlanner $planner)
+    {
+    }
+
     public function chat(Request $request, ClientContext $context): JsonResponse
     {
         $validated = $request->validate([
@@ -67,15 +72,18 @@ class AiAssistantController extends Controller
             'tool_calls'      => $validated['context'] ?? null,
         ]);
 
-        $intent = $this->classify($prompt);
         $tools  = $this->availableTools($context);
+        $selection = $this->planner->select($prompt, $tools, (string) $context->role(), $context->platform);
+        $intent = $selection
+            ? ['tool' => $selection['tool'], 'argument' => $selection['room_code']]
+            : $this->classify($prompt);
 
         if (! in_array($intent['tool'], $tools, true)) {
             $reply = $this->refuse($intent, $context);
         } else {
             $reply = $this->run($intent['tool'], $prompt, $user, $context, [
                 'screen'   => $screen,
-                'room_hint' => $roomHint,
+                'room_hint' => $roomHint ?? $intent['argument'],
             ]);
         }
 
@@ -89,6 +97,9 @@ class AiAssistantController extends Controller
                 'platform'     => $context->platform,
                 'role'         => $context->role(),
                 'allowed_tools' => $tools,
+                'planner'      => $selection['provider'] ?? $this->planner->provider(),
+                'model'        => $selection['model'] ?? $this->planner->model(),
+                'argument'     => $intent['argument'],
             ],
             'tool_results'  => ['actions' => $reply['actions']],
         ]);
@@ -102,6 +113,8 @@ class AiAssistantController extends Controller
                 'message'           => $message->toApiArray(),
                 'suggested_actions' => $reply['actions'],
                 'context'           => $context->toArray(),
+                'planner'           => $selection['provider'] ?? $this->planner->provider(),
+                'model'             => $selection['model'] ?? $this->planner->model(),
             ],
         ]);
     }
@@ -132,6 +145,8 @@ class AiAssistantController extends Controller
             'tools'       => $tools,
             'tool_count'  => $tools->count(),
             'total_tools' => count($registry),
+            'planner'     => $this->planner->provider(),
+            'model'       => $this->planner->model(),
             'note'        => $context->isWeb()
                 ? 'Camera scanning and live navigation are not offered from the web client.'
                 : 'Configuration and management tools are not offered from the mobile client.',
