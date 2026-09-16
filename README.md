@@ -63,6 +63,10 @@ See [`mobile/README.md`](mobile/README.md) for the screen list and push-notifica
 
 ## Documentation
 
+- **[Setup, user & test guide (PDF)](docs/guides/guide.pdf)** — new-machine installation,
+  role-by-role web/mobile usage, a handover-call walkthrough, 95 acceptance-test scenarios,
+  troubleshooting and known limitations. [Editable source and rebuild instructions](docs/guides/README.md).
+
 - [`docs/design-research.md`](docs/design-research.md) — the blocking design-research gate: the
   references that were inspected, the weighted rubric, the per-screen decisions and the review
   scores.
