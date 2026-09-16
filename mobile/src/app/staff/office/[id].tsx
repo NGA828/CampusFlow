@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { Badge, Button, Card, EmptyState, ErrorNote, Eyebrow, H3, Loading, Screen, Small, Stat, Title } from '@/components/ui';
+import { AdaptiveRow, Badge, Button, Card, EmptyState, ErrorNote, Eyebrow, H3, Loading, Screen, Small, Stat, Title } from '@/components/ui';
 import { ApiError, staffApi } from '@/lib/api';
 import { useLoader } from '@/lib/auth';
 import { dayName, formatClock, spacing } from '@/lib/theme';
@@ -61,12 +61,12 @@ export default function StaffOfficeDeskScreen() {
               about {office.service_duration_minutes} minutes per visit ·{' '}
               {office.daily_capacity !== null ? `${office.daily_capacity} tickets a day` : 'no daily ticket ceiling'}
             </Small>
-            <View style={styles.stats}>
+            <AdaptiveRow style={styles.stats}>
               <Stat label="Waiting" value={counts.waiting} />
               <Stat label="Called" value={counts.called} tone={counts.called > 0 ? 'signal' : 'neutral'} />
               <Stat label="In service" value={counts.in_service} tone="brand" />
-            </View>
-            <View style={styles.actions}>
+            </AdaptiveRow>
+            <AdaptiveRow style={styles.actions}>
               <Button
                 label="Call next"
                 disabled={counts.waiting === 0}
@@ -74,7 +74,7 @@ export default function StaffOfficeDeskScreen() {
                 onPress={() => void run('next', () => staffApi.officeCallNext(office.id))}
                 style={{ flex: 1 }}
               />
-            </View>
+            </AdaptiveRow>
           </Card>
 
           <H3 style={{ marginTop: spacing.lg }}>Windows today</H3>
@@ -106,7 +106,7 @@ export default function StaffOfficeDeskScreen() {
                   {ticket.status.replace('_', ' ')}
                 </Badge>
               </View>
-              <View style={styles.actions}>
+              <AdaptiveRow style={styles.actions}>
                 {ticket.status === 'waiting' ? (
                   <Button label="Call" onPress={() => void run(`call-${ticket.id}`, () => staffApi.officeCallTicket(ticket.id))} style={{ flex: 1 }} />
                 ) : null}
@@ -131,7 +131,7 @@ export default function StaffOfficeDeskScreen() {
                 {ticket.status === 'called' ? (
                   <Button label="No-show" variant="ghost" onPress={() => void run(`ns-${ticket.id}`, () => staffApi.officeNoShow(ticket.id))} style={{ flex: 1 }} />
                 ) : null}
-              </View>
+              </AdaptiveRow>
             </Card>
           ))}
         </View>
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   padded: { paddingHorizontal: spacing.lg, marginTop: spacing.md, paddingBottom: spacing.xl },
   row: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
-  stats: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.md },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  stats: { marginTop: spacing.md },
+  actions: { marginTop: spacing.md },
   windowRow: { alignItems: 'center', backgroundColor: '#fff', borderRadius: 10, flexDirection: 'row', marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: 10 },
 });

@@ -45,6 +45,7 @@ export interface AuthContextValue {
   }) => Promise<User>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  saveProfile: (input: Parameters<typeof authApi.updateProfile>[0]) => Promise<User>;
   /**
    * Roles are compared exactly, never by rank. `isStaff` used to mean "staff or above", which is how an
    * administrator ended up inside a staff screen; a role is an identity, not a privilege level, and the
@@ -145,6 +146,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.replace('/login');
   }, [router]);
 
+  const saveProfile = useCallback<AuthContextValue['saveProfile']>(async (input) => {
+    const { user: updated } = await authApi.updateProfile(input);
+    if (!user || String(updated?.id) !== String(user.id) || typeof updated?.name !== 'string') {
+      throw new Error('The server did not confirm your profile. Please try again.');
+    }
+    // This self-service operation changes identity fields, never the authenticated grants/scopes.
+    setUser(current => current && String(current.id) === String(updated.id) ? {
+      ...current, name: updated.name, phone: updated.phone, department: updated.department, avatar_url: updated.avatar_url,
+    } : current);
+    return updated;
+  }, [user]);
+
   const value = useMemo<AuthContextValue>(() => {
     const role = user?.role_code;
     return {
@@ -155,13 +168,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       refresh: load,
+      saveProfile,
       isStudent: role === 'student',
       isStaff: role === 'staff',
       isAdmin: role === 'admin',
       home: role ? ROLE_HOME[role] : '/',
       can: (permission: string) => Boolean(user?.permissions?.includes(permission)),
     };
-  }, [user, assignments, loading, login, register, logout, load]);
+  }, [user, assignments, loading, login, register, logout, load, saveProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

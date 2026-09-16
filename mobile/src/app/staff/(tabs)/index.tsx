@@ -2,10 +2,11 @@ import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { Badge, Button, Card, EmptyState, ErrorNote, Eyebrow, H3, Loading, Screen, Small, Stat, Title } from '@/components/ui';
+import { AdaptiveRow, Badge, Button, Card, EmptyState, ErrorNote, Eyebrow, H3, Loading, Screen, Small, Stat, Title } from '@/components/ui';
+import { HeroPanel, IconTile, Notice, PageIntro } from '@/components/visual';
 import { ApiError, staffApi } from '@/lib/api';
 import { useAuth, useLoader } from '@/lib/auth';
-import { formatClock, spacing } from '@/lib/theme';
+import { colors, formatClock, spacing } from '@/lib/theme';
 import type { StaffMobileDashboard } from '@/lib/types';
 
 /**
@@ -18,7 +19,7 @@ import type { StaffMobileDashboard } from '@/lib/types';
  */
 export default function StaffLineHome() {
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { user } = useAuth();
   const dashboard = useLoader(() => staffApi.dashboard(), []);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -37,37 +38,31 @@ export default function StaffLineHome() {
     [dashboard],
   );
 
-  if (dashboard.loading && !dashboard.data) return <Loading label="Loading your lines…" />;
+
 
   const data: StaffMobileDashboard | undefined = dashboard.data ?? undefined;
   const queues = data?.queues ?? [];
   const offices = data?.offices ?? [];
 
   return (
-    <Screen onRefresh={dashboard.reload} refreshing={dashboard.loading}>
-      <View style={styles.header}>
-        <Eyebrow>Operations · mobile</Eyebrow>
-        <Title style={{ marginTop: 2 }}>My lines</Title>
-        <Small style={{ marginTop: 4 }}>
-          Call, check in and close. Anything you need to configure is on the web console.
-        </Small>
-      </View>
-
+    <Screen bottomSafeArea={false} onRefresh={dashboard.reload} refreshing={dashboard.loading}>
+      <PageIntro eyebrow="Staff · service operations" title="Keep campus moving." description={`Welcome, ${user?.name?.split(' ')[0] ?? 'there'}. Your assigned lines and desks, all in one place.`} icon="pulse-outline" />
+      {dashboard.loading && !dashboard.data ? <Loading label="Loading your lines…" /> : null}
       {dashboard.error ? (
         <View style={styles.padded}>
           <ErrorNote message={dashboard.error} onRetry={dashboard.reload} />
         </View>
       ) : null}
 
-      {data ? (
-        <View style={[styles.padded, styles.kpis]}>
-          <Stat label="Waiting now" value={data.kpis.waiting_now} tone={data.kpis.waiting_now > 0 ? 'signal' : 'neutral'} />
+      {data ? <View style={styles.padded}>
+        <HeroPanel eyebrow="Your service snapshot" title={`${data.kpis.waiting_now} people waiting`} description={`${data.kpis.served_today} served today. Every call keeps someone's campus day moving.`} icon="people-outline" />
+        <AdaptiveRow style={{ marginTop: 14 }}>
           <Stat label="Served today" value={data.kpis.served_today} tone="mint" />
           <Stat label="Desks open" value={data.kpis.offices_open} />
-        </View>
-      ) : null}
+        </AdaptiveRow>
+      </View> : null}
 
-      <View style={styles.padded}>
+      {data ? <View style={styles.padded}>
         <H3>Room queues</H3>
         {queues.length === 0 ? (
           <Card style={{ marginTop: spacing.sm }}>
@@ -77,6 +72,7 @@ export default function StaffLineHome() {
           queues.map((queue) => (
             <Card key={queue.queue_id} style={{ marginTop: spacing.md }}>
               <View style={styles.cardHead}>
+                <IconTile name="business-outline" tone="mint" />
                 <View style={{ flex: 1 }}>
                   <Title style={{ fontSize: 17 }}>{queue.room_code}</Title>
                   <Small>
@@ -89,8 +85,8 @@ export default function StaffLineHome() {
               {queue.current ? (
                 <View style={styles.current}>
                   <View style={{ flex: 1 }}>
-                    <Small>Now serving</Small>
-                    <Title style={{ fontSize: 15 }}>{queue.current.ticket_number}</Title>
+                    <Eyebrow>At the counter</Eyebrow>
+                    <Title style={{ fontSize: 28, color: colors.brand700, marginTop: 6 }}>{queue.current.ticket_number}</Title>
                     <Small>{queue.current.student_name}</Small>
                   </View>
                   {queue.current.check_in_deadline ? (
@@ -101,11 +97,11 @@ export default function StaffLineHome() {
                 <Small style={{ marginTop: spacing.sm }}>Nobody is at the counter.</Small>
               )}
 
-              <View style={styles.actions}>
+              <AdaptiveRow style={styles.actions}>
                 <Button
                   label="Call next"
                   loading={busy === `next-${queue.queue_id}`}
-                  disabled={!queue.is_active || queue.waiting === 0}
+                  disabled={busy !== null || !queue.is_active || queue.waiting === 0}
                   onPress={() => void act(`next-${queue.queue_id}`, () => staffApi.callNext(queue.queue_id))}
                   style={{ flex: 1 }}
                 />
@@ -115,7 +111,7 @@ export default function StaffLineHome() {
                   onPress={() => router.push(`/staff/line/${queue.queue_id}` as any)}
                   style={{ flex: 1 }}
                 />
-              </View>
+              </AdaptiveRow>
             </Card>
           ))
         )}
@@ -129,6 +125,7 @@ export default function StaffLineHome() {
           offices.map((office) => (
             <Card key={office.office_id} style={{ marginTop: spacing.md }}>
               <View style={styles.cardHead}>
+                <IconTile name="business-outline" tone="mint" />
                 <View style={{ flex: 1 }}>
                   <Title style={{ fontSize: 17 }}>{office.name}</Title>
                   <Small>
@@ -138,15 +135,16 @@ export default function StaffLineHome() {
                 </View>
                 <Badge tone={office.is_active ? 'mint' : 'coral'}>{office.is_active ? 'open' : 'closed'}</Badge>
               </View>
-              <View style={styles.actions}>
+              <AdaptiveRow style={styles.actions}>
                 <Button
                   label="Call next"
                   loading={busy === `office-${office.office_id}`}
+                  disabled={busy !== null || !office.is_active || office.waiting === 0}
                   onPress={() => void act(`office-${office.office_id}`, () => staffApi.officeCallNext(office.office_id))}
                   style={{ flex: 1 }}
                 />
                 <Button label="Desk view" variant="secondary" onPress={() => router.push(`/staff/office/${office.office_id}` as any)} style={{ flex: 1 }} />
-              </View>
+              </AdaptiveRow>
             </Card>
           ))
         )}
@@ -154,23 +152,23 @@ export default function StaffLineHome() {
         {queues.length === 0 && offices.length === 0 ? (
           <EmptyState title="Nothing to run" description="Your account is not attached to a room queue or a service desk yet." />
         ) : null}
-      </View>
+      </View> : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  padded: { paddingHorizontal: spacing.lg, marginTop: spacing.md },
-  kpis: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
-  cardHead: { alignItems: 'center', flexDirection: 'row' },
+  padded: { paddingHorizontal: 20, marginBottom: 22 },
+  kpis: { marginTop: spacing.md },
+  cardHead: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   current: {
     alignItems: 'center',
-    backgroundColor: '#f4f6ff',
-    borderRadius: 12,
+    backgroundColor: colors.brand50, borderLeftWidth: 3, borderLeftColor: colors.brand500,
+    borderRadius: 18,
     flexDirection: 'row',
     marginTop: spacing.md,
     padding: spacing.md,
   },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  actions: { marginTop: spacing.md },
 });

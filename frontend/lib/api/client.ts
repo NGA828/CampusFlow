@@ -8,7 +8,7 @@
  *   create two tickets.
  */
 
-export const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8001/api/v1').replace(/\/$/, '');
+export const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? '/api/v1').replace(/\/$/, '');
 
 export class ApiError extends Error {
   readonly status: number;

@@ -1,3 +1,4 @@
+import { useReducedMotion } from '@/components/motion';
 import { Stack } from 'expo-router';
 
 /**
@@ -8,8 +9,9 @@ import { Stack } from 'expo-router';
  * derived alert feed and the summary counts, plus a mute on a condition you are already handling.
  */
 export default function AdminLayout() {
+  const reduced = useReducedMotion();
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#f6f7fb' } }}>
+    <Stack screenOptions={{ animation: reduced ? 'none' : 'slide_from_right', headerShown: false, contentStyle: { backgroundColor: '#f6f7fb' } }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="alert/[key]" options={{ headerShown: true, title: 'Alert' }} />
     </Stack>

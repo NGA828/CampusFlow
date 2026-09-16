@@ -175,3 +175,37 @@
 .maplibregl-ctrl-attrib {
   display: none !important;
 }
+
+/* Shared reflow rules: constrain children, not the document's overflow. */
+@layer base {
+  img, video { max-width: 100%; height: auto; }
+  button, a, input, select, textarea { touch-action: manipulation; }
+}
+
+@layer components {
+  .app-content, .landing-page { overflow-wrap: anywhere; }
+  .app-content :where(.grid, .flex) > *,
+  .landing-page :where(.grid, .flex) > * { min-width: 0; }
+  .app-content > * { max-width: 100%; }
+}
+
+/* Touch laptops and tablets need the same targets as phones. Inline prose links
+   are intentionally excluded so adjacent lines do not acquire overlapping targets. */
+@media (any-pointer: coarse) {
+  button:not([role='switch']), [role='tab'], nav a, a[role='button'] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  input:not([type='checkbox']):not([type='radio']), select, textarea {
+    font-size: max(1rem, 16px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

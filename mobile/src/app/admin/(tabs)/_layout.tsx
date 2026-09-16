@@ -1,5 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
+import { TabIcon } from '@/components/visual';
+import { useReducedMotion } from '@/components/motion';
 import { Tabs } from 'expo-router';
+import { useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '@/lib/theme';
 
@@ -12,18 +15,24 @@ import { colors } from '@/lib/theme';
  * API refuses those verbs from this client regardless of what is added here.
  */
 export default function AdminTabsLayout() {
+  const reduced = useReducedMotion();
+  const { fontScale } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        animation: reduced ? 'none' : 'fade',
         tabBarActiveTintColor: colors.brand600,
-        tabBarInactiveTintColor: colors.ink400,
-        tabBarStyle: { backgroundColor: colors.white, borderTopColor: colors.ink100 },
+        tabBarInactiveTintColor: colors.ink500,
+        tabBarHideOnKeyboard: true,
+        tabBarLabelPosition: 'below-icon',
+        tabBarStyle: { height: 68 + Math.max(0, fontScale - 1) * 16 + insets.bottom, paddingTop: 6, paddingBottom: insets.bottom + 4, backgroundColor: colors.white, borderTopColor: colors.ink100 },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Monitoring', tabBarIcon: ({ color, size }) => <Ionicons name="pulse-outline" color={color} size={size} /> }} />
-      <Tabs.Screen name="alerts" options={{ title: 'Alerts', tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" color={color} size={size} /> }} />
+      <Tabs.Screen name="index" options={{ title: 'Monitoring', tabBarIcon: ({ color, focused }) => <TabIcon name="pulse-outline" color={color} focused={focused} /> }} />
+      <Tabs.Screen name="alerts" options={{ title: 'Alerts', tabBarIcon: ({ color, focused }) => <TabIcon name="notifications-outline" color={color} focused={focused} /> }} />
     </Tabs>
   );
 }

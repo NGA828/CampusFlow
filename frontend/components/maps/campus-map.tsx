@@ -126,9 +126,6 @@ export function CampusMap({
 
         <rect x={geometry.minX} y={geometry.minY} width={geometry.width} height={geometry.height} fill="url(#cf-grid)" />
 
-        {/* Open spaces: a soft ring around the plaza keep the plan readable. */}
-        <circle cx={0} cy={0} r={26} fill="#e6ebf7" stroke="#d3daf0" strokeWidth="1" />
-
         {buildings.map((building) => {
           const footprint = building.footprint;
           const center = toSvg(building.lat, building.lng);
@@ -140,6 +137,10 @@ export function CampusMap({
           return (
             <g
               key={building.id}
+              role={onSelectBuilding ? 'button' : undefined}
+              tabIndex={onSelectBuilding ? 0 : undefined}
+              aria-label={`Explore ${building.name}`}
+              onKeyDown={(event) => { if (onSelectBuilding && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onSelectBuilding(building.id); } }}
               onMouseEnter={() => setHovered(building.id)}
               onMouseLeave={() => setHovered(null)}
               onClick={() => onSelectBuilding?.(building.id)}
@@ -175,7 +176,7 @@ export function CampusMap({
         {markersWithTones.map((marker, index) => {
           const point = toSvg(marker.lat, marker.lng);
           return (
-            <g key={`${marker.label}-${index}`}>
+            <g key={`${marker.label}-${index}`} role="img" aria-label={marker.label}><title>{marker.label}</title>
               <circle cx={point.x} cy={point.y} r={4.5} className={toneClasses[marker.tone ?? 'qr']} />
               <circle cx={point.x} cy={point.y} r={8} fill="none" className={toneClasses[marker.tone ?? 'qr']} opacity={0.25} />
             </g>
@@ -204,7 +205,7 @@ export function CampusMap({
 
       <div className="absolute bottom-3 left-3 flex flex-wrap items-center gap-3 rounded-[10px] border border-ink-100 bg-white/92 px-3 py-1.5 text-[11px] text-ink-600">
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-brand-600" /> You are here
+          <span className="h-2.5 w-2.5 rounded-full bg-brand-600" /> {markersWithTones.find(marker => marker.tone === 'user')?.label ?? 'Position marker'}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-coral-500" /> Destination

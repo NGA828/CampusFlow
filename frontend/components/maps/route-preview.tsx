@@ -38,7 +38,7 @@ export function RoutePreview({ route, walking }: RoutePreviewProps) {
 }
 
 function RoutePreviewContent({ route, walking }: RoutePreviewProps) {
-  const [mode, setMode] = useState<'campus' | 'indoor'>('indoor');
+  const [mode, setMode] = useState<'campus' | 'indoor'>(() => route.legs.some((leg) => leg.floor_id) ? 'indoor' : 'campus');
 
   const buildings = useAsync(() => campusApi.buildings(), []);
 

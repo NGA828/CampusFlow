@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Alert, StyleSheet, TextInput, View } from 'react-native';
 
-import { Badge, Button, Card, EmptyState, ErrorNote, Eyebrow, H3, KeyValue, Loading, Screen, Small, Title } from '@/components/ui';
+import { AdaptiveRow, Badge, Button, Card, EmptyState, ErrorNote, Eyebrow, H3, KeyValue, Loading, Screen, Small, Title } from '@/components/ui';
+import { IconTile, Notice, PageIntro } from '@/components/visual';
 import { ApiError, staffApi } from '@/lib/api';
 import { useLoader } from '@/lib/auth';
 import { colors, formatClock, radius, spacing } from '@/lib/theme';
@@ -54,17 +55,14 @@ export default function StaffDeskScreen() {
   };
 
   return (
-    <Screen onRefresh={dashboard.reload} refreshing={dashboard.loading}>
-      <View style={styles.header}>
-        <Eyebrow>Service desk</Eyebrow>
-        <Title style={{ marginTop: 2 }}>Verify & clear</Title>
-      </View>
-
+    <Screen bottomSafeArea={false} onRefresh={dashboard.reload} refreshing={dashboard.loading}>
+      <PageIntro eyebrow="Staff · service desk" title="A smoother handover." description="Verify the person in front of you. Take the next step on their ticket." icon="id-card-outline" />
       <View style={styles.padded}>
         <Card>
-          <H3>Verify a student</H3>
+          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 12 }}><IconTile name="id-card-outline" tone="mint" /><View style={{ flex: 1 }}><Eyebrow>Identity check</Eyebrow><H3 style={{ marginTop: 4 }}>Verify a student</H3></View></View>
           <Small>Check the registration number a student gives you before anything is signed or released.</Small>
           <TextInput
+            accessibilityLabel="Student registration number"
             value={registration}
             onChangeText={setRegistration}
             onSubmitEditing={() => void search()}
@@ -74,12 +72,13 @@ export default function StaffDeskScreen() {
             placeholderTextColor={colors.ink400}
             style={styles.input}
           />
-          <Button label="Look up" loading={busy && !lookup && !error} onPress={() => void search()} style={{ marginTop: spacing.sm }} />
+          <Button label="Look up" disabled={busy || !registration.trim()} loading={busy && !lookup && !error} onPress={() => void search()} style={{ marginTop: spacing.sm }} />
 
           {error ? <ErrorNote message={error} /> : null}
 
           {lookup ? (
             <View style={{ marginTop: spacing.md }}>
+              <Notice icon="person-circle-outline" title={lookup.student.name} tone={lookup.student.status === 'active' ? 'mint' : 'signal'}>Campus record found · {lookup.student.status ?? 'status unknown'}</Notice>
               <KeyValue label="Name" value={lookup.student.name} />
               <KeyValue label="Number" value={lookup.student.registration_no ?? '—'} />
               <KeyValue label="Programme" value={lookup.student.program ?? '—'} />
@@ -110,13 +109,14 @@ export default function StaffDeskScreen() {
         {dashboard.loading && !dashboard.data ? <Loading label="Loading the desk…" /> : null}
         {dashboard.error ? <ErrorNote message={dashboard.error} onRetry={dashboard.reload} /> : null}
 
-        {queueActions.length === 0 && officeActions.length === 0 ? (
+        {dashboard.data && !dashboard.error && queueActions.length === 0 && officeActions.length === 0 ? (
           <EmptyState title="Nothing is waiting on you" description="Called and checked-in tickets appear here so you can admit, complete or mark a no-show without opening a laptop." />
         ) : null}
 
         {queueActions.map((action) => (
           <Card key={action.id} style={{ marginTop: spacing.md }}>
             <View style={styles.row}>
+              <IconTile name="ticket-outline" size={40} />
               <View style={{ flex: 1 }}>
                 <Title style={{ fontSize: 16 }}>{action.ticket_number}</Title>
                 <Small>
@@ -128,31 +128,32 @@ export default function StaffDeskScreen() {
             <Small style={{ marginTop: spacing.xs }}>
               {action.check_in_deadline ? `Check-in due ${formatClock(action.check_in_deadline)}` : 'No check-in deadline on this ticket'}
             </Small>
-            <View style={styles.actions}>
+            <AdaptiveRow style={styles.actions}>
               {action.status === 'called' ? (
-                <Button label="Check in" variant="secondary" onPress={() => void act(action.id, () => staffApi.checkInTicket(action.id))} style={{ flex: 1 }} />
+                <Button label="Check in" disabled={busy} variant="secondary" onPress={() => void act(action.id, () => staffApi.checkInTicket(action.id))} style={{ flex: 1 }} />
               ) : null}
-              <Button label="Admit" onPress={() => void act(`admit-${action.id}`, () => staffApi.admitTicket(action.id))} style={{ flex: 1 }} />
-              <Button label="No-show" variant="ghost" onPress={() => void act(`ns-${action.id}`, () => staffApi.noShowTicket(action.id))} style={{ flex: 1 }} />
-            </View>
+              <Button label="Admit" disabled={busy} onPress={() => void act(`admit-${action.id}`, () => staffApi.admitTicket(action.id))} style={{ flex: 1 }} />
+              <Button label="No-show" disabled={busy} variant="ghost" onPress={() => void act(`ns-${action.id}`, () => staffApi.noShowTicket(action.id))} style={{ flex: 1 }} />
+            </AdaptiveRow>
           </Card>
         ))}
 
         {officeActions.map((action) => (
           <Card key={action.id} style={{ marginTop: spacing.md }}>
             <View style={styles.row}>
+              <IconTile name="ticket-outline" size={40} />
               <View style={{ flex: 1 }}>
                 <Title style={{ fontSize: 16 }}>{action.ticket_number}</Title>
                 <Small>{action.subject ?? 'Service request'}</Small>
               </View>
               <Badge tone={action.status === 'in_service' ? 'brand' : 'signal'}>{action.status.replace('_', ' ')}</Badge>
             </View>
-            <View style={styles.actions}>
+            <AdaptiveRow style={styles.actions}>
               {action.status !== 'in_service' ? (
-                <Button label="Start" variant="secondary" onPress={() => void act(`st-${action.id}`, () => staffApi.officeStartService(action.id))} style={{ flex: 1 }} />
+                <Button label="Start" disabled={busy} variant="secondary" onPress={() => void act(`st-${action.id}`, () => staffApi.officeStartService(action.id))} style={{ flex: 1 }} />
               ) : null}
-              <Button label="Complete" onPress={() => void act(`cp-${action.id}`, () => staffApi.officeComplete(action.id))} style={{ flex: 1 }} />
-            </View>
+              <Button label="Complete" disabled={busy} onPress={() => void act(`cp-${action.id}`, () => staffApi.officeComplete(action.id))} style={{ flex: 1 }} />
+            </AdaptiveRow>
           </Card>
         ))}
       </View>
@@ -162,9 +163,11 @@ export default function StaffDeskScreen() {
 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  padded: { paddingHorizontal: spacing.lg, marginTop: spacing.md, paddingBottom: spacing.xl },
+  padded: { paddingHorizontal: 20, marginTop: 4, paddingBottom: spacing.xl },
   input: {
-    backgroundColor: colors.white,
+    minHeight: 54,
+    fontSize: 16,
+    backgroundColor: colors.ink50,
     borderColor: colors.ink200,
     borderRadius: radius.control,
     borderWidth: 1,
@@ -173,6 +176,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     color: colors.ink800,
   },
-  row: { alignItems: 'center', flexDirection: 'row' },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  row: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  actions: { marginTop: spacing.md },
 });

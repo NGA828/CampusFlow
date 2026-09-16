@@ -1,301 +1,159 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { useAsync, useCountdown, formatClock, formatDuration, relativeTime, statusLabel, STATUS_TONES } from '@/lib/hooks';
+import { useAsync } from '@/lib/hooks';
 import { queueApi, studentApi } from '@/lib/api/endpoints';
-import { ApiError } from '@/lib/api/client';
-import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, Progress, SectionHeading } from '@/components/ui/kit';
-import { PageHeader } from '@/components/layout/app-shell';
-import { useToast } from '@/components/ui/toast';
-import { useRealtimeEvent } from '@/lib/realtime/realtime-context';
+import { ApiError, newIdempotencyKey } from '@/lib/api/client';
 import type { QueueListItem, QueueTicketView } from '@/lib/api/types';
+import { useRealtime, useRealtimeEvent } from '@/lib/realtime/realtime-context';
+import { Button, CardSkeleton, Input } from '@/components/ui/kit';
+import { WorkspaceIcon } from '@/components/layout/workspace-visual';
+import { CompanionHeading, Empty, Feedback, ReadError, errorMessage, momentLabel } from '@/components/layout/student-companion';
+import s from '@/components/layout/student-companion.module.css';
+
+const ACTIVE = new Set(['waiting', 'called', 'navigating', 'checked_in', 'admitted']);
+const TERMINAL = new Set(['completed', 'cancelled', 'no_show']);
+const GUIDANCE: Record<string, [string, string]> = {
+  waiting: ['Waiting for your turn.', 'Keep your ticket number handy. The campus team will call your number when they are ready.'],
+  called: ['Your number has been called.', 'Go to the room and follow the arrival instructions. Check the deadline below, if one is provided.'],
+  navigating: ['You’re on your way.', 'Head to the room. Your arrival still needs to be confirmed.'],
+  checked_in: ['Your arrival is confirmed.', 'Wait for the campus team to admit you. Check-in is not admission.'],
+  admitted: ['You have been admitted.', 'The campus team will update this ticket when your visit is complete.'],
+  completed: ['Your visit is complete.', 'This ticket is now a record of your visit. You can browse other queues below.'],
+  cancelled: ['This ticket was cancelled.', 'It no longer holds a place in the line. You can join an available queue again.'],
+  no_show: ['Your visit was missed.', 'This ticket no longer holds a place. Check room availability before joining again.'],
+};
+function locationFix(): Promise<Record<string, unknown>> {
+  if (!navigator.geolocation) return Promise.reject(new Error('Location is not available in this browser. Use the campus mobile app at the room.'));
+  return new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(
+    position => resolve({ lat: position.coords.latitude, lng: position.coords.longitude, accuracy_m: position.coords.accuracy, source: 'gps' }),
+    () => reject(new Error('Location could not be obtained. Allow location access while at the room, then try again. No ticket action was sent.')),
+    { timeout: 8000, maximumAge: 30_000, enableHighAccuracy: true },
+  ));
+}
+function validView(value: QueueTicketView, id?: string) {
+  if (!value?.ticket?.id || !value.queue?.id || (id && String(value.ticket.id) !== String(id))) throw new Error('The server did not confirm this ticket. Refresh to check its status.');
+  return value;
+}
+const countLabel = (value?: number | null) => typeof value === 'number' && Number.isFinite(value) ? value : '—';
 
 export default function QueuePage() {
-  const toast = useToast();
-  // The board and the active ticket both come from /student/*: this screen is the student's own
-  // position in a line, never the operator's view of the whole queue.
-  const queues = useAsync(() => studentApi.queueBoard(), []);
-  const active = useAsync(() => studentApi.activeQueueTicket(), []);
-
-  const [ticket, setTicket] = useState<QueueTicketView | null>(null);
+  const { connected } = useRealtime();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<QueueTicketView | undefined>(undefined);
+  const [search, setSearch] = useState('');
+  const [openOnly, setOpenOnly] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [feedback, setFeedback] = useState<{ error?: boolean; message: string } | null>(null);
+  const lock = useRef(false);
+  const joinKeys = useRef(new Map<string, string>());
+  const queues = useAsync(() => studentApi.queueBoard(), []);
+  const active = useAsync(async () => selectedId ? { ticket: validView(await queueApi.ticket(selectedId), selectedId) } : studentApi.activeQueueTicket(), [selectedId]);
+  // A confirmed mutation wins over a previously-started read until an explicit subsequent refresh.
+  const view = confirmed ?? active.data?.ticket;
+  const ticketId = view?.ticket.id;
+  const history = useAsync(() => ticketId ? queueApi.history(ticketId) : Promise.resolve({ events: [] }), [ticketId]);
+  function refreshTicket() {
+    if (lock.current) return;
+    if (view?.ticket.id) setSelectedId(view.ticket.id);
+    setConfirmed(undefined); active.reload(); history.reload();
+  }
+  function refreshBoard() { if (!lock.current) queues.reload(); }
+  useRealtimeEvent('queue:*', () => { refreshBoard(); refreshTicket(); });
+  const state = view?.ticket.status.toLowerCase() ?? '';
+  const isLive = ACTIVE.has(state);
+  const terminal = TERMINAL.has(state);
+  const guidance = GUIDANCE[state] ?? ['Check the latest ticket state.', 'Refresh this ticket or ask the campus team for help with its current status.'];
+  const rows = (queues.data?.queues ?? []).filter(queue => (!openOnly || queue.is_active) && `${queue.room_code} ${queue.room_name} ${queue.building_name ?? ''}`.toLowerCase().includes(search.trim().toLowerCase()));
 
-  useEffect(() => {
-    const nextTicket = active.data?.ticket;
-    if (!nextTicket) return;
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      if (!cancelled) setTicket(nextTicket);
-    }, 0);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [active.data]);
-
-  const ticketId = ticket?.ticket.id ?? null;
-
-  useRealtimeEvent(ticketId ? `queue:${ticket?.ticket.queue_id}` : null, () => {
-    if (!ticketId) return;
-    queueApi
-      .ticket(ticketId)
-      .then(setTicket)
-      .catch(() => {});
-  });
-
-  const deadline = useCountdown(ticket?.check_in_deadline ?? null);
-
-  const join = async (queue: QueueListItem) => {
-    setBusy(queue.id);
-    setError(null);
+  async function join(queue: QueueListItem) {
+    if (lock.current) return;
+    lock.current = true; setBusy(`join:${queue.id}`); setFeedback(null);
     try {
-      // Joining is idempotent server-side; the API client adds an idempotency key.
-      const response = await queueApi.join(queue.id, {});
-      setTicket(response.ticket);
-      toast.success(`Ticket ${response.ticket.ticket.ticket_number}`, `Position ${response.ticket.ticket.position} for ${queue.room_name}.`);
-      queues.reload();
-    } catch (caught) {
-      const message = caught instanceof ApiError ? (caught.firstError ?? caught.message) : 'Could not join that queue.';
-      setError(message);
-      toast.error('Could not join the queue', message);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const act = async (kind: 'check-in' | 'cancel' | 'navigating') => {
-    if (!ticket) return;
-    setBusy(kind);
-    setError(null);
+      let key = joinKeys.current.get(queue.id);
+      if (!key) { key = newIdempotencyKey('join'); joinKeys.current.set(queue.id, key); }
+      const body = queue.requires_proximity_to_join ? { fix: await locationFix() } : {};
+      const { ticket } = await queueApi.join(queue.id, body, key);
+      const next = validView(ticket);
+      if (String(next.queue.id) !== String(queue.id)) throw new Error('The returned ticket belongs to another queue. Refresh before retrying.');
+      setSelectedId(next.ticket.id); setConfirmed(next); setConfirmCancel(false);
+      joinKeys.current.delete(queue.id);
+      setFeedback({ message: 'Your ticket is confirmed. Its latest state is shown in Your ticket.' });
+      queues.reload(); history.reload();
+    } catch (error) {
+      if (error instanceof ApiError && error.status >= 400 && error.status < 500) joinKeys.current.delete(queue.id);
+      setFeedback({ error: true, message: errorMessage(error, 'Your ticket could not be confirmed. Refresh before retrying.') });
+    } finally { lock.current = false; setBusy(null); }
+  }
+  async function selectTicket(id: string) {
+    if (lock.current) return;
+    lock.current = true; setBusy('open'); setFeedback(null);
+    try { const next = validView(await queueApi.ticket(id), id); setSelectedId(id); setConfirmed(next); setConfirmCancel(false); }
+    catch (error) { setFeedback({ error: true, message: errorMessage(error, 'That ticket could not be opened.') }); }
+    finally { lock.current = false; setBusy(null); }
+  }
+  async function act(action: 'cancel' | 'checkIn' | 'navigating') {
+    if (!view || lock.current) return;
+    lock.current = true; setBusy(action); setFeedback(null);
     try {
-      if (kind === 'check-in') {
-        const payload = await queueApi.checkIn(ticket.ticket.id, {});
-        setTicket(payload);
-        toast.success('Checked in', 'Wait near the room until staff admit you.');
-      } else if (kind === 'navigating') {
-        const payload = await queueApi.navigating(ticket.ticket.id);
-        setTicket(payload);
-        toast.info('The room is expecting you', 'Head over now.');
-      } else {
-        const payload = await queueApi.cancel(ticket.ticket.id);
-        setTicket(payload);
-        toast.info('Ticket cancelled');
-      }
-      queues.reload();
-    } catch (caught) {
-      const message = caught instanceof ApiError ? (caught.firstError ?? caught.message) : 'That action failed.';
-      setError(message);
-      toast.error('Action failed', message);
-    } finally {
-      setBusy(null);
-    }
-  };
+      const body = action === 'checkIn' && view.queue.requires_proximity_to_join ? { fix: await locationFix() } : {};
+      const next = validView(await (action === 'checkIn' ? queueApi.checkIn(view.ticket.id, body) : queueApi[action](view.ticket.id)), view.ticket.id);
+      setConfirmed(next); setSelectedId(next.ticket.id); setConfirmCancel(false);
+      setFeedback({ message: action === 'cancel' ? 'Your ticket was cancelled.' : action === 'checkIn' ? 'Your arrival was confirmed.' : 'The campus team knows you’re on your way.' });
+      queues.reload(); history.reload();
+    } catch (error) { setFeedback({ error: true, message: errorMessage(error, 'The ticket action could not be confirmed. Please try again.') }); }
+    finally { lock.current = false; setBusy(null); }
+  }
 
-  const sortedQueues = useMemo(
-    () => [...(queues.data?.queues ?? [])].sort((a, b) => Number(b.is_active) - Number(a.is_active) || b.waiting - a.waiting),
-    [queues.data],
-  );
-
-  const counts = ticket?.counts;
-
-  return (
-    <div>
-      <PageHeader
-        title="Room queues"
-        description="Some rooms limit how many people may be inside at once. Take a ticket, watch your position, and check in when you arrive."
-        actions={
-          <Link href="/student/campus/rooms">
-            <Button variant="secondary" size="sm">
-              Find a room
-            </Button>
-          </Link>
-        }
-      />
-
-      {error ? (
-        <div className="mb-4 rounded-[12px] border border-coral-200 bg-coral-50 px-4 py-2.5 text-[13px] text-coral-700">{error}</div>
-      ) : null}
-
-      <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
-        <div className="space-y-4">
-          {queues.error ? <ErrorState message={queues.error} onRetry={queues.reload} /> : null}
-          {queues.loading ? (
-            <CardSkeleton rows={5} />
-          ) : sortedQueues.length === 0 ? (
-            <EmptyState title="No queues are open" description="Admission-controlled rooms appear here whenever their queue is active." />
-          ) : (
-            sortedQueues.map((queue) => {
-              const mine = ticket?.ticket.queue_id === queue.id;
-              const load = queue.admission_capacity > 0 ? (queue.serving / queue.admission_capacity) * 100 : 0;
-              return (
-                <Card key={queue.id}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-[15px] font-semibold text-ink-900">
-                          {queue.room_code} · {queue.room_name}
-                        </p>
-                        {!queue.is_active ? <Badge tone="neutral">Closed</Badge> : null}
-                        {queue.is_active && queue.waiting > 0 ? <Badge tone="warning">Busy</Badge> : null}
-                      </div>
-                      <p className="mt-0.5 text-[12.5px] text-ink-500">
-                        {queue.building_code} · {queue.floor_name} · capacity {queue.room_capacity}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="tnum text-[20px] font-semibold text-ink-900">{queue.waiting}</p>
-                      <p className="text-[11.5px] text-ink-500">in line</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between text-[12px] text-ink-500">
-                      <span>
-{queue.serving} inside · {queue.admission_capacity} allowed · {queue.waiting} waiting
-                      </span>
-                      <span className="tnum">
-                        {queue.opens_at ? `${queue.opens_at.slice(0, 5)}–${queue.closes_at?.slice(0, 5)}` : 'Always open'}
-                      </span>
-                    </div>
-                    <div className="mt-1.5">
-                      <Progress value={load} tone={load > 85 ? 'signal' : 'brand'} />
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-[12.5px] text-ink-500">
-                    <span>Average service {Math.round(queue.avg_service_seconds / 60)} min</span>
-                    {queue.waiting > 0 ? <span>· ≈ {formatDuration(queue.waiting * queue.avg_service_seconds)} wait</span> : null}
-                    {queue.requires_proximity_to_join ? <span>· proximity check required to join</span> : null}
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {mine && ticket ? (
-                      <Badge tone={STATUS_TONES[ticket.ticket.status] ?? 'brand'}>
-                        Your ticket {ticket.ticket.ticket_number} · {statusLabel(ticket.ticket.status)}
-                      </Badge>
-                    ) : (
-                      <Button
-                        size="sm"
-                        disabled={!queue.is_active || ticket !== null}
-                        loading={busy === queue.id}
-                        onClick={() => void join(queue)}
-                      >
-                        {ticket ? 'You already hold a ticket' : queue.is_active ? 'Take a ticket' : 'Queue closed'}
-                      </Button>
-                    )}
-                    <Link href={`/student/campus/rooms/${queue.room_code}`}>
-                      <Button size="sm" variant="secondary">
-                        Room details
-                      </Button>
-                    </Link>
-                    <Link href={`/student/campus/map?route=${encodeURIComponent(queue.room_code)}`}>
-                      <Button size="sm" variant="ghost">
-                        Navigate
-                      </Button>
-                    </Link>
-                  </div>
-                </Card>
-              );
-            })
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <Card>
-            <SectionHeading title="Your ticket" description={ticket ? undefined : 'No active ticket'} />
-            {!ticket ? (
-              <EmptyState title="Nothing in the line" description="Take a ticket from a room on the left and it will appear here with live position updates." />
-            ) : (
-              <div>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-mono text-2xl font-semibold tracking-wide text-ink-900">{ticket.ticket.ticket_number}</p>
-                    <p className="mt-0.5 text-[12.5px] text-ink-500">
-                      {ticket.queue.room_code} · {ticket.queue.room_name}
-                    </p>
-                  </div>
-                  <Badge tone={STATUS_TONES[ticket.ticket.status] ?? 'brand'}>{statusLabel(ticket.ticket.status)}</Badge>
-                </div>
-
-                <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-                  <div className="rounded-[10px] bg-ink-50 px-2 py-2.5">
-                    <p className="tnum text-[18px] font-semibold text-ink-900">{ticket.people_ahead}</p>
-                    <p className="text-[11px] text-ink-500">people ahead</p>
-                  </div>
-                  <div className="rounded-[10px] bg-ink-50 px-2 py-2.5">
-                    <p className="tnum text-[18px] font-semibold text-ink-900">{ticket.ticket.position}</p>
-                    <p className="text-[11px] text-ink-500">your position</p>
-                  </div>
-                  <div className="rounded-[10px] bg-ink-50 px-2 py-2.5">
-                    <p className="tnum text-[18px] font-semibold text-ink-900">{counts?.serving ?? counts?.occupying ?? 0}</p>
-                    <p className="text-[11px] text-ink-500">inside now</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-[10px] border border-ink-100 px-3 py-2.5 text-[12.5px]">
-                  <p className="text-ink-500">Estimated wait</p>
-                  <p className="tnum font-medium text-ink-800">
-                    {formatDuration(ticket.eta_seconds)}
-                    {ticket.expected_service_at ? ` · around ${formatClock(ticket.expected_service_at)}` : ''}
-                  </p>
-                </div>
-
-                {ticket.check_in_deadline && ticket.seconds_until_deadline !== null && ticket.can_check_in ? (
-                  <div className="mt-3 rounded-[10px] border border-signal-200 bg-signal-50 px-3 py-2.5 text-[12.5px] text-signal-700">
-                    Check in by {formatClock(ticket.check_in_deadline)}
-                    {deadline !== null ? ` · ${formatDuration(Math.max(0, deadline))} left` : ''}
-                  </div>
-                ) : null}
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {ticket.can_check_in ? (
-                    <Button className="flex-1" loading={busy === 'check-in'} onClick={() => void act('check-in')}>
-                      Check in now
-                    </Button>
-                  ) : null}
-                  {ticket.ticket.status === 'CALLED' || ticket.ticket.status === 'APPROACHING' ? (
-                    <Button variant="signal" className="flex-1" loading={busy === 'navigating'} onClick={() => void act('navigating')}>
-                      I am on my way
-                    </Button>
-                  ) : null}
-                  {ticket.can_cancel ? (
-                    <Button variant="secondary" onClick={() => void act('cancel')} loading={busy === 'cancel'}>
-                      Cancel
-                    </Button>
-                  ) : null}
-                </div>
-
-                <p className="mt-3 text-[11.5px] text-ink-400">
-                  Issued {relativeTime(ticket.ticket.issued_at)} · the server reserves your position until you leave the line.
-                </p>
+  return <div className={s.page}>
+    <CompanionHeading eyebrow="Student services · room access" title="Room queues" description="Choose a room, check the line and keep your ticket close." actions={<Link href="/student/campus/rooms" className={s.link}>Browse all rooms <WorkspaceIcon name="arrow" size={17} /></Link>} />
+    {feedback && <Feedback error={feedback.error}>{feedback.message}</Feedback>}
+    <div className={s.queueLayout}>
+      <aside className={s.ticketRail} aria-label="Your ticket" aria-busy={!confirmed && active.loading}>
+        <div className={s.sectionHead}><h2>Your ticket</h2><Button variant="secondary" size="sm" disabled={!!busy || active.loading} onClick={refreshTicket}>Refresh ticket</Button></div>
+        {!confirmed && active.loading ? <CardSkeleton rows={7} /> : !confirmed && active.error ? <ReadError message={active.error} retry={refreshTicket} /> : view ? <>
+          <article className={s.ticket}>
+            <div className={s.ticketTop}>
+              <div className={s.sectionHead}><p className={s.eyebrow}>{terminal ? 'Ticket receipt' : 'Your room ticket'}</p><span className={s.status}>{state.replaceAll('_', ' ')}</span></div>
+              <h2>{view.queue.room_name}</h2><p className={s.muted} style={{ color: '#d8e7de' }}>Room {view.queue.room_code} · {view.queue.floor_name ?? 'Floor not provided'}</p>
+              <strong className={s.ticketNumber}>{view.ticket.ticket_number}</strong><p>Ticket number · issued {momentLabel(view.ticket.issued_at)}</p>
+            </div>
+            <div className={s.ticketBody}>
+              {isLive && state !== 'admitted' && <dl className={s.facts}><div><dt>People ahead</dt><dd>{countLabel(view.people_ahead)}</dd></div><div><dt>Estimated wait</dt><dd>{Number.isFinite(view.eta_seconds) ? `${Math.ceil(view.eta_seconds / 60)} min` : 'Unavailable'}</dd></div></dl>}
+              <h3>{guidance[0]}</h3><p className={s.muted}>{guidance[1]}</p>
+              {isLive && <p className={s.connection}>Estimates can change; admission is not guaranteed.</p>}
+              {isLive && view.check_in_deadline && <p className={s.feedback}>Arrival deadline: {momentLabel(view.check_in_deadline)}</p>}
+              {!terminal && !view.can_check_in && ['waiting', 'called', 'navigating'].includes(state) && <p className={s.connection}>Web check-in is unavailable. Use the mobile app if required at the room.</p>}
+              <div className={s.actions}>
+                {view.can_check_in && ['waiting', 'called', 'navigating'].includes(state) && <Button disabled={!!busy || confirmCancel} loading={busy === 'checkIn'} onClick={() => void act('checkIn')}>{view.queue.requires_proximity_to_join ? 'Use location & check in' : 'Check in'}</Button>}
+                {view.can_navigate && state === 'called' && <Button variant="secondary" disabled={!!busy || confirmCancel} loading={busy === 'navigating'} onClick={() => void act('navigating')}>I’m on my way</Button>}
+                {view.can_cancel && !terminal && !confirmCancel && <Button variant="secondary" disabled={!!busy} onClick={() => setConfirmCancel(true)}>Cancel ticket</Button>}
               </div>
-            )}
-          </Card>
-
-          <Card>
-            <SectionHeading title="How the queue protects your place" />
-            <ul className="space-y-2 text-[12.5px] leading-relaxed text-ink-600">
-              <li>• One active ticket per student per queue — taking two is rejected, not silently merged.</li>
-              <li>• Positions are locked in the database, so two people can never hold the same place.</li>
-              <li>• If you are called and do not check in within the window, the ticket expires and the next person moves up.</li>
-              <li>• Ghost tickets are released automatically, and the line is renumbered without gaps.</li>
-            </ul>
-          </Card>
-
-          {ticket ? (
-            <Card>
-              <SectionHeading title="People in front" description={`${ticket.counts.waiting} waiting`} />
-              <p className="text-[12.5px] text-ink-500">
-                {ticket.people_ahead > 0
-                  ? `${ticket.people_ahead} ${ticket.people_ahead === 1 ? 'person is' : 'people are'} ahead of you.`
-                  : 'You are next — stay close to the room.'}
-              </p>
-            </Card>
-          ) : null}
-        </div>
-      </div>
+              {confirmCancel && <div className={s.confirm}><p>Cancel ticket {view.ticket.ticket_number}? This releases your place in the line.</p><div className={s.actions}><Button variant="danger" disabled={!!busy} loading={busy === 'cancel'} onClick={() => void act('cancel')}>Confirm cancellation</Button><Button variant="secondary" disabled={!!busy} onClick={() => setConfirmCancel(false)}>Keep ticket</Button></div></div>}
+            </div>
+          </article>
+          <Link className={s.link} href={`/student/campus/rooms/${encodeURIComponent(view.queue.room_code)}`}>Room details <WorkspaceIcon name="arrow" size={16} /></Link>
+          <details className={s.details}><summary>Ticket history</summary>{history.loading ? <CardSkeleton rows={3} /> : history.error ? <ReadError message={history.error} retry={history.reload} /> : history.data?.events.length ? <dl>{history.data.events.map((event, index) => <div key={`${event.type}-${event.created_at}-${index}`}><dt>{momentLabel(event.created_at)}</dt><dd>{event.type.replaceAll('_', ' ')}</dd></div>)}</dl> : <p className={s.muted}>No history events were returned for this ticket.</p>}</details>
+        </> : <Empty title="No active room ticket">Choose an available queue below. A ticket is confirmed only after the campus system accepts your request.</Empty>}
+        <p className={s.connection}>{connected ? 'Connected to campus updates. Refresh to confirm the latest ticket state.' : 'Live connection unavailable. Refresh your ticket to check for changes.'}</p>
+      </aside>
+      <section className={s.board} aria-label="Room queue board" aria-busy={queues.loading}>
+        <div className={s.sectionHead}><h2>Find your room</h2><Button variant="secondary" size="sm" disabled={!!busy || queues.loading} onClick={refreshBoard}>Refresh board</Button></div>
+        <div className={s.queueTools}><Input aria-label="Search room queues" placeholder="Search a room or building…" value={search} onChange={e => setSearch(e.target.value)} /><div><label className={s.muted}><input type="checkbox" checked={openOnly} onChange={e => setOpenOnly(e.target.checked)} /> Open queues only</label><span className={s.muted}>{queues.loading || queues.error ? 'Checking availability' : `${rows.length} ${rows.length === 1 ? 'queue' : 'queues'} shown`}</span></div></div>
+        {queues.loading ? <CardSkeleton rows={8} /> : queues.error ? <ReadError message={queues.error} retry={refreshBoard} /> : rows.length ? <div className={s.queueList}>{rows.map(queue => {
+          const isSelected = view?.queue.id === queue.id;
+          const ownId = isSelected ? isLive ? view?.ticket.id : null : queue.my_ticket_id;
+          const max = queue.max_capacity ?? queue.max_size;
+          const full = max > 0 && queue.waiting + queue.serving >= max;
+          return <article key={queue.id} className={s.queueRow}>
+            <div className={s.queueIdentity}><span className={s.roomCode}><WorkspaceIcon name="room" size={22} /></span><div><h3>{queue.room_name}</h3><p>Room {queue.room_code} · {queue.building_name ?? queue.building_code} · {queue.floor_name}</p></div><span className={s.status} data-tone={!queue.is_active ? 'quiet' : full ? 'attention' : undefined}>{!queue.is_active ? 'Closed' : full ? 'Line at limit' : 'Open'}</span></div>
+            <dl className={s.facts}><div><dt>Waiting</dt><dd>{countLabel(queue.waiting)}</dd></div><div><dt>Called / in service</dt><dd>{countLabel(queue.serving)}</dd></div><div><dt>Admission limit</dt><dd>{countLabel(queue.admission_capacity)}</dd></div></dl>
+            <div className={s.queueFoot}><p>{queue.requires_proximity_to_join ? 'Location is required. Join while you’re near this room.' : 'You can request a ticket from here. Arrival requirements still apply.'}</p>{ownId ? <Button variant="secondary" disabled={!!busy} onClick={() => void selectTicket(ownId)}>View ticket · {queue.room_code}</Button> : <Button disabled={!!busy || !queue.is_active || full} loading={busy === `join:${queue.id}`} onClick={() => void join(queue)}>{queue.requires_proximity_to_join ? 'Use location & join' : 'Join queue'} · {queue.room_code}</Button>}</div>
+          </article>;
+        })}</div> : <Empty title={search || openOnly ? 'No queues match your filters' : 'No room queues available'}>{search || openOnly ? 'Try a different room name or show closed queues.' : 'Check back later or browse the room directory for more information.'}</Empty>}
+      </section>
     </div>
-  );
+  </div>;
 }

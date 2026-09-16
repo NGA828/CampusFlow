@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Link, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Badge, Body, Button, Card, Eyebrow, ErrorNote, H2, H3, KeyValue, Loading, Screen, SectionTitle, Small, Stat, Title } from '@/components/ui';
+import { AdaptiveRow, Badge, Body, Button, Card, Eyebrow, ErrorNote, H2, H3, KeyValue, Loading, Screen, SectionTitle, Small, Stat, Title } from '@/components/ui';
+import { CampusMoment, FeatureLink, HeroPanel, IconTile, visual } from '@/components/visual';
 import { studentApi } from '@/lib/api';
 import { useAuth, useLoader } from '@/lib/auth';
 import { colors, countdown, formatClock, relativeTime, spacing } from '@/lib/theme';
@@ -16,14 +17,13 @@ export default function HomeScreen() {
   const firstName = (user?.name ?? data?.user.name ?? 'there').split(' ')[0];
 
   return (
-    <Screen onRefresh={dashboard.reload} refreshing={dashboard.loading}>
+    <Screen style={visual.page} bottomSafeArea={false} onRefresh={dashboard.reload} refreshing={dashboard.loading}>
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Eyebrow>{new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}</Eyebrow>
-          <Title style={{ marginTop: 2 }}>Hi {firstName}</Title>
+          <Title style={{ marginTop: 6 }}>Hey, {firstName}.</Title>
           <Small style={{ marginTop: 4 }}>
-            {user?.role_code ? `${user.role_code} account` : 'student account'}
-            {user?.registration_no ? ` · ${user.registration_no}` : ''}
+            Let's make today a little easier.
           </Small>
         </View>
         <Pressable
@@ -41,36 +41,24 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
+      <CampusMoment />
       {dashboard.error ? <ErrorNote message={dashboard.error} onRetry={dashboard.reload} /> : null}
       {dashboard.loading && !data ? <Loading label="Loading your campus day…" /> : null}
 
       {data ? (
         <>
           {data.next_class ? (
-            <Card style={{ backgroundColor: colors.brand600, borderColor: colors.brand600 }}>
-              <Small style={{ color: '#dfe4ff', fontWeight: '700', textTransform: 'uppercase' }}>
-                {data.next_class.is_now
-                  ? 'In progress'
-                  : `Next class · ${data.next_class.minutes_until === null ? 'soon' : `in ${data.next_class.minutes_until} min`}`}
-              </Small>
-              <H2 style={{ color: colors.white, marginTop: 4 }}>{data.next_class.course_title}</H2>
-              <Small style={{ color: '#dfe4ff', marginTop: 4 }}>
-                {formatClock(data.next_class.starts_at_iso)}–{formatClock(data.next_class.ends_at_iso)}
-                {data.next_class.room_code ? ` · ${data.next_class.building_code ?? ''} ${data.next_class.room_code}` : ''}
-                {data.next_class.lecturer ? ` · ${data.next_class.lecturer}` : ''}
-              </Small>
-              <View style={styles.row}>
-                {data.next_class.room_code ? (
-                  <Button
-                    label="Navigate"
-                    variant="secondary"
-                    style={{ flex: 1 }}
-                    onPress={() => router.push(`/student/navigate/${encodeURIComponent(data.next_class?.room_code ?? '')}` as any)}
-                  />
-                ) : null}
-                <Button label="Timetable" variant="ghost" style={{ flex: 1 }} onPress={() => router.push('/student/timetable' as any)} />
-              </View>
-            </Card>
+            <HeroPanel
+              eyebrow={data.next_class.is_now ? 'Happening now' : `Up next · ${data.next_class.minutes_until == null ? 'your next class' : `in ${data.next_class.minutes_until} min`}`}
+              title={data.next_class.course_title}
+              description={`${formatClock(data.next_class.starts_at_iso)} – ${formatClock(data.next_class.ends_at_iso)}${data.next_class.room_code ? `  ·  ${data.next_class.room_code}` : ''}${data.next_class.lecturer ? `\n${data.next_class.lecturer}` : ''}`}
+              icon="school-outline"
+            >
+              <AdaptiveRow>
+                {data.next_class.room_code ? <Button label="Navigate" variant="secondary" onPress={() => router.push(`/student/navigate/${encodeURIComponent(data.next_class?.room_code ?? '')}` as any)} /> : null}
+                <Button label="Timetable" variant="secondary" onPress={() => router.push('/student/timetable' as any)} />
+              </AdaptiveRow>
+            </HeroPanel>
           ) : (
             <Card>
               <H3>No class scheduled today</H3>
@@ -78,10 +66,15 @@ export default function HomeScreen() {
             </Card>
           )}
 
-          <View style={styles.stats}>
+          <AdaptiveRow style={styles.stats}>
             <Stat label="Classes today" value={data.today.entries.length} />
             <Stat label="Unread" value={data.unread_notifications} tone={data.unread_notifications > 0 ? 'signal' : 'neutral'} />
-          </View>
+          </AdaptiveRow>
+
+          <AdaptiveRow>
+            <FeatureLink icon="qr-code-outline" title="Scan & go" hint="Find your indoor position" onPress={() => router.push('/student/scan' as any)} />
+            <FeatureLink icon="map-outline" title="Explore campus" hint="Your next place, found" tone="mint" onPress={() => router.push('/student/map' as any)} />
+          </AdaptiveRow>
 
           {data.queue_ticket ? (
             <Card>
@@ -133,7 +126,7 @@ export default function HomeScreen() {
 
           {data.today.entries.length > 0 ? (
             <Card>
-              <SectionTitle title="Today" />
+              <SectionTitle title="Your day, at a glance" action={<IconTile name="calendar-outline" size={32} />} />
               {data.today.entries.map((entry) => (
                 <View key={entry.id} style={styles.line}>
                   <Small style={styles.lineTime}>{formatClock(entry.starts_at_iso)}</Small>
@@ -193,11 +186,11 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', padding: spacing.lg, gap: spacing.md },
+  header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 12, gap: spacing.md },
   headerText: { flex: 1 },
   bell: {
-    width: 42,
-    height: 42,
+    width: 48,
+    height: 48,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.ink100,
@@ -217,11 +210,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  row: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  stats: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, marginBottom: spacing.md },
-  ticketRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  ticketNumber: { letterSpacing: 0.5 },
+  row: { marginTop: spacing.md },
+  stats: {},
+  ticketRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'baseline', justifyContent: 'space-between' },
+  ticketNumber: { letterSpacing: -0.5, fontSize: 30 },
   line: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-  lineTime: { width: 46 },
+  lineTime: { width: 58, color: colors.brand700, fontWeight: '700', borderLeftWidth: 3, borderLeftColor: colors.brand300, paddingLeft: 10 },
   lineTitle: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 });

@@ -6,9 +6,11 @@
  * Small, dependency-free primitives used by every screen so that spacing, colour and
  * interaction behaviour stay identical across the app.
  */
+import { createPortal } from 'react-dom';
 import {
   forwardRef,
   useEffect,
+  useEffectEvent,
   useId,
   useRef,
   type ButtonHTMLAttributes,
@@ -36,12 +38,10 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
 };
 
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  // Small buttons are the norm inside dense admin tables; on touch screens they grow to a
-  // comfortable 40px target so table row actions stay tappable on a phone.
-  sm: 'h-8 max-sm:h-10 px-3 text-[13px] gap-1.5',
-  md: 'h-10 px-4 text-sm gap-2',
-  lg: 'h-12 px-5 text-[15px] gap-2',
-  icon: 'h-10 w-10 justify-center',
+  sm: 'min-h-11 px-3 py-2 text-[13px] gap-1.5',
+  md: 'min-h-11 px-4 py-2 text-sm gap-2',
+  lg: 'min-h-12 px-5 py-3 text-[15px] gap-2',
+  icon: 'min-h-11 min-w-11 shrink-0 justify-center',
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -58,9 +58,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   return (
     <button
       ref={ref}
+      data-ui="button"
       disabled={disabled || loading}
       className={cx(
-        'inline-flex items-center rounded-[var(--radius-control)] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-70',
+        'inline-flex max-w-full justify-center items-center text-center whitespace-normal rounded-[var(--radius-control)] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-70',
         BUTTON_VARIANTS[variant],
         BUTTON_SIZES[size],
         className,
@@ -85,7 +86,7 @@ export function Spinner({ className }: { className?: string }) {
 /* ---------------------------------------------------------------- containers */
 
 export function Card({ className, children, as: Tag = 'div' }: { className?: string; children: ReactNode; as?: 'div' | 'section' | 'article' | 'li' }) {
-  return <Tag className={cx('surface p-5', className)}>{children}</Tag>;
+  return <Tag data-ui="card" className={cx('surface min-w-0 p-4 sm:p-5', className)}>{children}</Tag>;
 }
 
 export function SectionHeading({
@@ -100,7 +101,7 @@ export function SectionHeading({
   icon?: ReactNode;
 }) {
   return (
-    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <div data-ui="section-heading" className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div className="flex items-start gap-3">
         {icon ? <span className="mt-0.5 grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-600">{icon}</span> : null}
         <div>
@@ -156,7 +157,7 @@ export function Stat({
     danger: 'text-coral-600',
   } as const;
   return (
-    <div className="surface p-4">
+    <div data-ui="stat" data-tone={tone} className="surface p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[12px] font-medium tracking-wide text-ink-500 uppercase">{label}</p>
         {icon ? <span className="text-ink-400">{icon}</span> : null}
@@ -194,7 +195,7 @@ export function Field({ label, hint, error, children, htmlFor }: { label: string
 }
 
 const CONTROL =
-  'w-full rounded-[var(--radius-control)] border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 placeholder:text-ink-400 transition-colors focus:border-brand-500 focus:outline-none disabled:bg-ink-50';
+  'min-w-0 min-h-11 w-full rounded-[var(--radius-control)] border border-ink-200 bg-white px-3 py-2 text-base sm:text-sm text-ink-800 placeholder:text-ink-400 transition-colors focus:border-brand-500 focus:outline-none disabled:bg-ink-50';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
   return <input ref={ref} className={cx(CONTROL, className)} {...rest} />;
@@ -229,11 +230,11 @@ export function Toggle({ checked, onChange, label, description }: { checked: boo
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={cx(
-          'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-          checked ? 'bg-brand-600' : 'bg-ink-200',
+          'relative h-11 w-11 shrink-0 rounded-full',
         )}
       >
-        <span className={cx('absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all', checked ? 'left-[22px]' : 'left-0.5')} />
+        <span className={cx('absolute inset-x-0 top-2.5 h-6 rounded-full transition-colors', checked ? 'bg-brand-600' : 'bg-ink-200')} />
+        <span className={cx('absolute top-3 h-5 w-5 rounded-full bg-white shadow transition-all', checked ? 'left-[22px]' : 'left-0.5')} />
       </button>
     </div>
   );
@@ -261,7 +262,7 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(option.value)}
             aria-pressed={active}
             className={cx(
-              'rounded-[9px] font-medium transition-colors',
+              'min-h-11 rounded-[9px] font-medium transition-colors',
               size === 'sm' ? 'px-2.5 py-1 text-[12px]' : 'px-3 py-1.5 text-[13px]',
               active ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700',
             )}
@@ -288,7 +289,7 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { valu
             type="button"
             onClick={() => onChange(tab.value)}
             className={cx(
-              'relative whitespace-nowrap px-3.5 py-2 text-[13px] font-medium transition-colors',
+              'relative min-h-11 whitespace-nowrap px-3.5 py-2 text-[13px] font-medium transition-colors',
               active ? 'text-brand-700' : 'text-ink-500 hover:text-ink-700',
             )}
           >
@@ -322,11 +323,25 @@ export function Modal({
   size?: 'sm' | 'md' | 'lg';
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const closeFromKeyboard = useEffectEvent(onClose);
 
   useEffect(() => {
     if (!open) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') closeFromKeyboard();
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(ref.current?.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
+      ) ?? []).filter((element) => element.getClientRects().length > 0);
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) { event.preventDefault(); return; }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === ref.current)) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === ref.current)) {
+        event.preventDefault(); first.focus();
+      }
     };
     document.addEventListener('keydown', onKey);
     const previousOverflow = document.body.style.overflow;
@@ -335,13 +350,14 @@ export function Modal({
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
-  if (!open) return null;
+  if (!open || typeof document === 'undefined') return null;
   const widths = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl' } as const;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" role="presentation" onClick={onClose}>
       <div
         ref={ref}
@@ -349,11 +365,11 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={cx('animate-rise w-full rounded-t-2xl bg-white shadow-[var(--shadow-pop)] outline-none sm:rounded-2xl', widths[size])}
+        className={cx('[overflow-wrap:anywhere] animate-rise flex max-h-[100dvh] min-w-0 flex-col w-full rounded-t-2xl bg-white shadow-[var(--shadow-pop)] outline-none sm:max-h-[calc(100dvh-3rem)] sm:rounded-2xl', widths[size])}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-ink-100 px-5 py-4">
-          <div>
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-ink-100 px-4 py-3 sm:px-5 sm:py-4">
+          <div className="min-w-0">
             <h2 className="text-[16px] font-semibold text-ink-900">{title}</h2>
             {description ? <p className="mt-0.5 text-[13px] text-ink-500">{description}</p> : null}
           </div>
@@ -363,10 +379,11 @@ export function Modal({
             </svg>
           </Button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
-        {footer ? <div className="flex justify-end gap-2 border-t border-ink-100 px-5 py-3.5">{footer}</div> : null}
+        <div className="min-h-0 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">{children}</div>
+        {footer ? <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-ink-100 px-4 pt-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:px-5">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

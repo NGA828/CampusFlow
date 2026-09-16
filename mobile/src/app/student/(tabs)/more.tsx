@@ -1,63 +1,37 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
-
-import { Badge, Button, Card, Eyebrow, H3, ListRow, Screen, Small, Title } from '@/components/ui';
-import { API_BASE } from '@/lib/api';
+import { View } from 'react-native';
+import { Button, Card, H3, ListRow, Screen, SectionTitle, Small } from '@/components/ui';
+import { HeroPanel, IconTile, PageIntro, ProfileCard, type IconName } from '@/components/visual';
 import { useAuth } from '@/lib/auth';
-import { colors, spacing } from '@/lib/theme';
+import { colors } from '@/lib/theme';
 
-const LINKS = [
-  { href: '/student/offices', label: 'Administrative offices', hint: "Principal's Office, Student Affairs, Registrar…", icon: 'business-outline' },
-  { href: '/student/scan', label: 'Scan a QR anchor', hint: 'Fix your indoor position or check in', icon: 'qr-code-outline' },
-  { href: '/student/assistant', label: 'Campus assistant', hint: 'Ask for a room, route or the shortest queue', icon: 'sparkles-outline' },
-  { href: '/student/notifications', label: 'Notifications', hint: 'Class reminders, ticket calls, announcements', icon: 'notifications-outline' },
-  { href: '/student/profile', label: 'Profile & settings', hint: 'Your details, device and session', icon: 'person-outline' },
-] as const;
+const GROUPS: { title: string; links: { href: string; label: string; hint: string; icon: IconName }[] }[] = [
+  { title: 'Campus essentials', links: [
+    { href: '/student/offices', label: 'Administrative offices', hint: 'Find a desk and request a visit', icon: 'business-outline' },
+    { href: '/student/scan', label: 'Scan a QR anchor', hint: 'Find your indoor starting point', icon: 'qr-code-outline' },
+  ] },
+  { title: 'Your space', links: [
+    { href: '/student/notifications', label: 'Notifications', hint: 'The updates that matter to you', icon: 'notifications-outline' },
+    { href: '/student/profile', label: 'Profile & settings', hint: 'Your details, devices and session', icon: 'person-outline' },
+  ] },
+];
 
 export default function MoreScreen() {
   const router = useRouter();
   const { user, signOut } = useAuth();
-
-  return (
-    <Screen>
-      <View style={styles.header}>
-        <Eyebrow>More</Eyebrow>
-        <Title style={{ marginTop: 2 }}>{user?.name ?? 'Your account'}</Title>
-        <Small style={{ marginTop: 4 }}>{user?.email ?? ''}</Small>
-        {user?.role_code ? <Badge tone={user.role_code === 'admin' ? 'coral' : user.role_code === 'staff' ? 'brand' : 'mint'}>{user.role_code}</Badge> : null}
-      </View>
-
-      <View style={styles.padded}>
-        <Card>
-          {LINKS.map((link) => (
-            <ListRow key={link.href} onPress={() => router.push(link.href as any)}>
-              <View style={styles.rowLeft}>
-                <Ionicons name={link.icon} size={19} color={colors.brand700} />
-                <View style={{ flex: 1 }}>
-                  <Small style={{ color: colors.ink800, fontWeight: '600' }}>{link.label}</Small>
-                  <Small style={{ marginTop: 2 }}>{link.hint}</Small>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.ink400} />
-            </ListRow>
-          ))}
-        </Card>
-
-        <Card style={{ marginTop: spacing.lg }}>
-          <H3>About this build</H3>
-          <Small style={{ marginTop: 4 }}>
-            CampusFlow mobile · Expo SDK 57. The API base is {API_BASE}. Sessions are stored in the device keychain and validated against the API on every launch.
-          </Small>
-          <Button label="Sign out" variant="danger" onPress={() => void signOut()} style={{ marginTop: spacing.lg }} />
-        </Card>
-      </View>
-    </Screen>
-  );
+  return <Screen bottomSafeArea={false}>
+    <PageIntro eyebrow="Made for your campus day" title="A little more, for you." icon="grid-outline" />
+    <View style={{ paddingHorizontal: 20, gap: 22 }}>
+      <ProfileCard name={user?.name ?? 'Your account'} email={user?.email ?? ''} role="student" />
+      <HeroPanel eyebrow="Meet your campus companion" title="A question? Start here." description="Rooms, routes or your next class. Ask CampusFlow in your own words." icon="sparkles-outline" style={{ backgroundColor: colors.brand700, borderColor: colors.brand700 }}>
+        <Button label="Ask the campus assistant" variant="secondary" onPress={() => router.push('/student/assistant' as any)} />
+      </HeroPanel>
+      {GROUPS.map((group) => <View key={group.title}><SectionTitle title={group.title} /><Card style={{ paddingVertical: 4 }}>{group.links.map((link) => <ListRow key={link.href} onPress={() => router.push(link.href as any)} style={{ paddingVertical: 18 }}>
+        <IconTile name={link.icon} tone={group.title === 'Your space' ? 'mint' : 'brand'} /><View style={{ flex: 1 }}><H3>{link.label}</H3><Small style={{ marginTop: 4 }}>{link.hint}</Small></View><Ionicons name="chevron-forward" size={18} color={colors.ink400} />
+      </ListRow>)}</Card></View>)}
+      <Button label="Sign out" variant="secondary" onPress={() => void signOut()} />
+      <Small style={{ textAlign: 'center', color: colors.ink500 }}>CampusFlow · Navigate. Learn. Connect.</Small>
+    </View>
+  </Screen>;
 }
-
-const styles = StyleSheet.create({
-  header: { padding: spacing.lg },
-  padded: { paddingHorizontal: spacing.lg },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
-});

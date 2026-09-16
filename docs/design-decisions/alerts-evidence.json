@@ -1,0 +1,203 @@
+{
+  "date": "2026-09-16",
+  "page": "/admin/alerts",
+  "canonicalProgress": {
+    "completed": 25,
+    "total": 31,
+    "pending": [
+      "/admin/campus",
+      "/admin/services",
+      "/admin/academics",
+      "/admin/analytics",
+      "/admin/settings",
+      "/admin/spatial"
+    ],
+    "loginFinalAudit": "pending"
+  },
+  "tests": {
+    "uniquePassed": 334,
+    "prior": 302,
+    "newAlertCases": 32,
+    "fullRunDuration": "6.4m",
+    "finalRepeatedPassed": 58,
+    "finalRepeatedComposition": "32 alerts + 21 layout + 5 discovery states",
+    "finalDuration": "1.9m"
+  },
+  "checks": {
+    "phpStatic": {
+      "parsed": 125,
+      "errors": 0
+    },
+    "routes": 199,
+    "webCalls": 185,
+    "mobileCalls": 82,
+    "testCalls": 101,
+    "rolePermissionPairs": 62,
+    "orphans": 0,
+    "problems": 0,
+    "webAndMobileTypecheck": "pass",
+    "lint": "pass",
+    "productionBuild": "pass",
+    "gitDiffCheck": "pass"
+  },
+  "backendRuntime": {
+    "available": false,
+    "reason": "PHP/Composer unavailable; previous installer failed",
+    "newLaravelTests": 3,
+    "executed": 0
+  },
+  "screenshots": [
+    {
+      "file": ".cache/alerts-pass/screens/triage-320.png",
+      "width": 320,
+      "height": 3029,
+      "sha256": "9fd330b936ec9d8d25f3c1bef945b9c0dc299bea6ffcc28e08bd9d45915583da"
+    },
+    {
+      "file": ".cache/alerts-pass/screens/triage-768.png",
+      "width": 768,
+      "height": 2473,
+      "sha256": "737b7fef29b49571ec15261b17099fbb4c487a5db2f2d17386f22be37be66bc1"
+    },
+    {
+      "file": ".cache/alerts-pass/screens/triage-1440.png",
+      "width": 1440,
+      "height": 1603,
+      "sha256": "edda0279c348cad7b5226488d25b42e8333fa3c043b9c626645e2a5539dd937a"
+    },
+    {
+      "file": ".cache/alerts-pass/screens/empty-320.png",
+      "width": 320,
+      "height": 1541,
+      "sha256": "92b0bcefd7dbd56d0e561dd1f3847e5a4b7b1f71508e8b7000eff9252dce9ed4"
+    },
+    {
+      "file": ".cache/alerts-pass/screens/empty-768.png",
+      "width": 768,
+      "height": 1216,
+      "sha256": "3999d6d9fd884c8b2fb9b9a0599ad0983119ce36c1f30c710bdff6d7e1274aeb"
+    },
+    {
+      "file": ".cache/alerts-pass/screens/empty-1440.png",
+      "width": 1440,
+      "height": 1071,
+      "sha256": "64f36ed83c093964276c98c7f5af0e0f55cfcd76e4c5d2ebb7da36269d0b4bfd"
+    },
+    {
+      "file": ".cache/alerts-pass/screens/error-320.png",
+      "width": 320,
+      "height": 1363,
+      "sha256": "2d0a229a4787ad6c527dc93e39c91c8f5b83e05d661dab1ea93165a44b7c1202"
+    },
+    {
+      "file": ".cache/alerts-pass/screens/error-768.png",
+      "width": 768,
+      "height": 1092,
+      "sha256": "b47e97a502fa83772742e0db802edc8ce7778e601261dad917a89c396be072e3"
+    },
+    {
+      "file": ".cache/alerts-pass/screens/error-1440.png",
+      "width": 1440,
+      "height": 947,
+      "sha256": "8ee83242d804d118ede9141e4b41d069b81a796f393d8976c1656957367787af"
+    }
+  ],
+  "gallery": {
+    "path": "docs/design-decisions/alerts-review.html",
+    "embeddedImages": 9,
+    "bytes": 733522,
+    "verification": {
+      "imagesDecoded": 9,
+      "visibleFiguresPerViewport": 3,
+      "narrow320OverflowPixels": 0,
+      "previewVisuallyInspected": true
+    }
+  },
+  "landing": {
+    "date": "2026-09-16",
+    "baseline": "Previously delivered working tree, not git HEAD",
+    "before": {
+      "frontend/app/page.tsx": "71294bbd3a1e9dc137f6aba5671cb0121669c35be9b111ea07243d72e8ad95b3",
+      "frontend/app/layout.tsx": "7add19465b404d8a02f2a02fd02dea4ac5427c04601a8e7f55c8850891ecc922",
+      "frontend/app/globals.css": "835474643809b648395a15e7178480c02f71957b5cb4a22246d32a01d4a6c5f0",
+      "frontend/components/landing/hero-art.tsx": "97d8bef9fa73c0274d00ce729aa025f520ffa01f4f1abbe54c1710159227aaac",
+      "frontend/components/landing/motion-primitives.tsx": "80d3f161fc59475ce809387117982ccf215fa825cd513d9dcae4a442266963f3",
+      "frontend/components/landing/phone-showcase.tsx": "e069e7b1cb1dce8f7c2b00e7e357321a3014272afe9937e2ad4329d518aaf09a",
+      "frontend/components/landing/site-header.tsx": "53b126b4f52217ca82c89512e6ac6c808f80627512292f956114af63bf8fc023"
+    },
+    "after": {
+      "frontend/app/page.tsx": "71294bbd3a1e9dc137f6aba5671cb0121669c35be9b111ea07243d72e8ad95b3",
+      "frontend/app/layout.tsx": "7add19465b404d8a02f2a02fd02dea4ac5427c04601a8e7f55c8850891ecc922",
+      "frontend/app/globals.css": "835474643809b648395a15e7178480c02f71957b5cb4a22246d32a01d4a6c5f0",
+      "frontend/components/landing/hero-art.tsx": "97d8bef9fa73c0274d00ce729aa025f520ffa01f4f1abbe54c1710159227aaac",
+      "frontend/components/landing/motion-primitives.tsx": "80d3f161fc59475ce809387117982ccf215fa825cd513d9dcae4a442266963f3",
+      "frontend/components/landing/phone-showcase.tsx": "e069e7b1cb1dce8f7c2b00e7e357321a3014272afe9937e2ad4329d518aaf09a",
+      "frontend/components/landing/site-header.tsx": "53b126b4f52217ca82c89512e6ac6c808f80627512292f956114af63bf8fc023"
+    },
+    "allSevenUnchanged": true,
+    "preEditToCurrent": {
+      "width": 1440,
+      "height": 5065,
+      "differingChannels": 0,
+      "renderer": "Identical default Chromium launch flags"
+    },
+    "clientReturn": {
+      "date": "2026-09-16",
+      "comparison": "Current cold landing vs landing after client navigation through discovery, timetable, companion, campus operations, staff services, coordination (staff dashboard), admin alerts and logout",
+      "width": 1440,
+      "height": 5065,
+      "differingChannels": 0
+    },
+    "criteria": "Three identical full-page captures per state. No masks or tolerance. Different renderer flags are not compared as valid evidence."
+  },
+  "review": {
+    "mean": 8.4,
+    "subjective": true
+  },
+  "initialIssues": [
+    "One ambiguous complementary-region test locator corrected to the named review region",
+    "401 test corrected to existing centralized login redirect",
+    "Initial strict client-return mismatch: 97484 channels; unchanged strict standalone, full regression and final repeated runs then passed",
+    "Invalid cross-renderer diagnostic: 5119317 channels; matched-renderer pre-edit/current comparison is zero"
+  ],
+  "logs": [
+    {
+      "path": ".cache/alerts-pass/tests-initial.log",
+      "sha256": "143bad67a2d1dba7bf7ec80571cce51702f9a6ea78b9b487bf15c331819b9f37"
+    },
+    {
+      "path": ".cache/alerts-pass/tests-second.log",
+      "sha256": "a6561f955e20c94eb95fbfc6c3e27bca82629ddb0689b0fb7066d2528d8d833e"
+    },
+    {
+      "path": ".cache/alerts-pass/tests-landing-repeat.log",
+      "sha256": "57fe124a0e209b25b3375f013de521738bf9a362edf4f227db7e7e971bb9521f"
+    },
+    {
+      "path": ".cache/alerts-pass/tests-full.log",
+      "sha256": "d111654db73f22cc69792f6508dad2aff92c15be1c989d66568b9e64f3ae6bc2"
+    },
+    {
+      "path": ".cache/alerts-pass/tests-final.log",
+      "sha256": "ad4e2dfc964b0b4546d3ca8e5ea0eea159fbf1f9c7820d9db54a7f42bf3342e5"
+    },
+    {
+      "path": ".cache/alerts-pass/check.log",
+      "sha256": "e8fc1d615440b584eef380ec2dc1fbce5c99de374d82f0bdfe34072c3b15aab7"
+    },
+    {
+      "path": ".cache/alerts-pass/lint.log",
+      "sha256": "596cb56788cfc0dfab4886fb07703457a292cd1e556aca9d7ab6a3620fa71873"
+    },
+    {
+      "path": ".cache/alerts-pass/build.log",
+      "sha256": "41f5e0b45cb7bd9034a3bf59f416c336f5485b057ff2996a1b32a42e57cfd2b4"
+    }
+  ],
+  "limitations": [
+    "Fixture checks are not deployed Laravel auth/database/concurrency certification",
+    "No real devices, native app, live transport or assistive technology certified",
+    "Old-format fingerprints may require one re-review; same fingerprint can remain muted",
+    "The three configuration pages were audited, not redesigned in this delivery"
+  ]
+}

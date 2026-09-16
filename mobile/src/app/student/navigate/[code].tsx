@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { Badge, Button, Card, ErrorNote, Eyebrow, H2, H3, KeyValue, Loading, ProgressBar, Screen, SectionTitle, Small, Stat, Title } from '@/components/ui';
+import { AdaptiveRow, Badge, Button, Card, ErrorNote, Eyebrow, H2, H3, KeyValue, Loading, ProgressBar, Screen, SectionTitle, Small, Stat, Title } from '@/components/ui';
 import { ApiError, navigationApi, type MobileRoute, type NavigationProgress, type NavigationSessionState } from '@/lib/api';
 import { colors, countdown, spacing } from '@/lib/theme';
 
@@ -165,11 +165,11 @@ export default function NavigateScreen() {
               <View style={{ marginTop: spacing.md }}>
                 <ProgressBar value={progress ? progress.navigation.progress : 0} tone="mint" />
               </View>
-              <View style={styles.stats}>
+              <AdaptiveRow style={styles.stats}>
                 <Stat label="Remaining" value={progress ? `${Math.round(progress.navigation.remaining_m)} m` : `${Math.round(route.distance_m)} m`} />
                 <Stat label="From route" value={progress ? `${Math.round(progress.navigation.distance_from_route_m)} m` : '—'} tone={progress?.navigation.off_route ? 'signal' : 'neutral'} />
                 <Stat label="Grace" value={progress?.navigation.grace_seconds_remaining ? countdown(progress.navigation.grace_seconds_remaining) : '—'} />
-              </View>
+              </AdaptiveRow>
 
               {progress?.navigation.off_route ? (
                 <Card style={{ marginTop: spacing.md, backgroundColor: colors.signal100, borderColor: colors.signal100 }}>
@@ -184,7 +184,7 @@ export default function NavigateScreen() {
                 <Small style={{ marginTop: spacing.md, color: colors.brand700, fontWeight: '700' }}>Route recalculated from your nearest point.</Small>
               ) : null}
 
-              <View style={styles.actions}>
+              <AdaptiveRow style={styles.actions}>
                 {tracking ? (
                   <Button
                     label="Pause walk"
@@ -206,7 +206,7 @@ export default function NavigateScreen() {
                   />
                 )}
                 <Button label="Finish" variant="ghost" onPress={() => void complete()} style={{ flex: 1 }} />
-              </View>
+              </AdaptiveRow>
             </Card>
 
             <Card style={{ marginTop: spacing.lg }}>
@@ -243,8 +243,8 @@ const styles = StyleSheet.create({
   header: { padding: spacing.lg },
   padded: { paddingHorizontal: spacing.lg },
   toggleRow: { flexDirection: 'row', marginTop: spacing.md },
-  stats: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  stats: { marginTop: spacing.md },
+  actions: { marginTop: spacing.lg },
   step: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: 10 },
   stepActive: { backgroundColor: colors.brand50 },
 });

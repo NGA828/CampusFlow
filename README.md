@@ -67,6 +67,9 @@ See [`mobile/README.md`](mobile/README.md) for the screen list and push-notifica
   references that were inspected, the weighted rubric, the per-screen decisions and the review
   scores.
 
+- [`docs/responsive.md`](docs/responsive.md) — responsive web/native patterns, framework and image
+  recommendations, automated layout checks, and the remaining physical-device QA checklist.
+
 Additional documents (architecture, API, database, navigation, queue system, administrative
 office, AI assistant, testing, deployment) are listed in `AGENTS.md`/`PROMPT.md`; they are written
 from the same source of truth as the code in `backend/` and `frontend/`.

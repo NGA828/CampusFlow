@@ -1,3 +1,5 @@
+import { alertSnapshot, confirmedAcknowledgement } from './alerts';
+import { peoplePage, personResult, scopeDirectory, staffOverview, adminOverview } from './coordination';
 /**
  * Typed API surface, organised the same way the backend is: by **domain**, and inside each
  * domain by **role workspace**.
@@ -13,14 +15,14 @@
  * Every screen imports from here — no component talks to `fetch` directly, and no URL is written twice.
  */
 import { api, ApiError, newIdempotencyKey, request } from './client';
+import { desksProjection, deskLineProjection, managedRoomsProjection, teachingProjection, teachingEntry } from './staff-services';
+import { dashboardProjection, operationQueues, operationLine } from './operations';
 import type {
-  AdminAlert,
   AdminDashboard,
   AdminMonitoring,
   AdminOfficeRow,
   AdminRoleRegistry,
   Role,
-  AdminUser,
   AiConversation,
   AiMessage,
   AiReply,
@@ -43,6 +45,7 @@ import type {
   Office,
   OfficeLineRow,
   OfficeSummary,
+  OfficeTicket,
   OfficeTicketView,
   PageMeta,
   Paginated,
@@ -52,6 +55,7 @@ import type {
   QueueListItem,
   QueueSnapshot,
   QueueTicketView,
+  QueueTicket,
   Room,
   RoomDetail,
   RoomQueueConfig,
@@ -61,13 +65,8 @@ import type {
   Setting,
   StudentDashboard,
   StudentToday,
-  StaffCourseOption,
   AiCapabilities,
   StaffDashboard,
-  StaffRoomOption,
-  StaffTimetableRow,
-  StaffOfficeDetail,
-  StaffQueueDetail,
   Term,
   TimetableEntry,
   TimetableWeek,
@@ -107,10 +106,14 @@ export const authApi = {
   login: (body: { email: string; password: string }) =>
     request<SessionInfo>('/auth/login', { method: 'POST', body, auth: false }),
   logout: () => api.post<{ revoked: boolean }>('/auth/logout'),
-  me: () => api.get<{ user: User; assignments: User['assignments'] }>('/me'),
+  me: async () => {
+    const payload = await api.get<{ user: User; assignments: User['assignments']; permissions?: string[] }>('/me');
+    // The envelope contains the platform-filtered session permissions; User contains role grants.
+    return { ...payload, user: { ...payload.user, permissions: Array.isArray(payload.permissions) ? payload.permissions : payload.user.permissions } };
+  },
   updateProfile: (body: { name?: string; phone?: string | null; department?: string | null; avatar_url?: string | null }) =>
     api.patch<{ user: User }>('/me', body),
-  changePassword: (body: { current_password: string; password: string }) => api.put<{ changed: boolean }>('/auth/password', body),
+  changePassword: (body: { current_password: string; password: string; password_confirmation: string }) => api.put<{ changed: boolean }>('/auth/password', body),
   forgotPassword: (body: { email: string }) =>
     request<{ sent: boolean; reset_token?: string; message?: string }>('/auth/forgot-password', { method: 'POST', body, auth: false }),
   resetPassword: (body: { token: string; password: string }) =>
@@ -129,13 +132,25 @@ export const authApi = {
  * "one app, same features everywhere" pattern this restructure removes — the payload those screens need
  * now comes from the role group below, so a screen can only ask for what its role actually owns.
  */
+/** Tell other mounted inbox surfaces only after the server confirms a read mutation. */
+async function confirmedNotificationRead(operation: Promise<{ unread: number }>) {
+  const result = await operation;
+  if (!Number.isFinite(result.unread) || result.unread < 0) throw new Error('The server did not confirm the notification read status.');
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('campusflow:notifications-changed'));
+  return result;
+}
+
 export const meApi = {
   profile: () => api.get<{ user: User; assignments: User['assignments'] }>('/me'),
   updateProfile: (body: { name?: string; phone?: string | null; department?: string | null; avatar_url?: string | null }) =>
     api.patch<{ user: User }>('/me', body),
-  notifications: (query: ListQuery = {}) => api.get<{ items: NotificationRow[]; meta: PageMeta; unread: number }>('/me/notifications', { query }),
-  readNotification: (id: string) => api.post<{ unread: number }>(`/me/notifications/${id}/read`),
-  readAllNotifications: () => api.post<{ unread: number }>('/me/notifications/read-all'),
+  notifications: async (query: ListQuery = {}) => {
+    const response = await api.get<{ items: NotificationRow[]; meta?: PageMeta & { current_page?: number; last_page?: number }; unread: number }>('/me/notifications', { query });
+    const meta = response.meta;
+    return { ...response, meta: meta ? { ...meta, page: meta.page ?? meta.current_page ?? 1, total_pages: meta.total_pages ?? meta.last_page ?? 1 } : undefined };
+  },
+  readNotification: (id: string) => confirmedNotificationRead(api.post<{ unread: number }>(`/me/notifications/${id}/read`)),
+  readAllNotifications: () => confirmedNotificationRead(api.post<{ unread: number }>('/me/notifications/read-all')),
   registerDevice: (body: { token: string; platform: 'ios' | 'android' | 'web' }) => api.post<{ registered: boolean }>('/me/devices', body),
 };
 
@@ -147,7 +162,7 @@ export const meApi = {
  * screen by accident.
  */
 export const studentApi = {
-  dashboard: () => api.get<StudentDashboard>('/student/dashboard'),
+  dashboard: async () => dashboardProjection(await api.get<StudentDashboard>('/student/dashboard')),
   timetable: (week?: string) => api.get<TimetableWeek>('/student/timetable', { query: { week } }),
   today: () => api.get<StudentToday>('/student/timetable/today'),
   nextClass: () => api.get<{ next_class: StudentDashboard['next_class'] }>('/student/next-class'),
@@ -155,7 +170,14 @@ export const studentApi = {
 
   queueBoard: () => api.get<{ queues: QueueListItem[] }>('/student/queues/board'),
   queueTickets: (query: ListQuery = {}) => api.get<{ tickets: QueueTicketView[] }>('/student/queue-tickets', { query }),
-  activeQueueTicket: () => api.get<{ ticket: QueueTicketView | null }>('/student/queue-tickets/active'),
+  activeQueueTicket: async (): Promise<{ ticket: QueueTicketView | null }> => {
+    const { ticket } = await api.get<{ ticket: QueueTicket | QueueTicketView | null }>('/student/queue-tickets/active');
+    if (!ticket) return { ticket: null };
+    // The active endpoint is a raw row; capability and estimate fields come from its own view.
+    if ('queue' in ticket) return { ticket: normalizeQueueTicket(ticket) };
+    if (!ticket.id) throw new Error('The active ticket could not be identified.');
+    return { ticket: normalizeQueueTicket(await api.get<QueueTicketView>(`/student/queue-tickets/${ticket.id}`)) };
+  },
   queueTicket: (id: string) => api.get<QueueTicketView>(`/student/queue-tickets/${id}`),
   queueTicketHistory: (id: string) =>
     api.get<{ events: { id: string; type: string; created_at: string; metadata: Record<string, unknown> | null }[] }>(`/student/queue-tickets/${id}/history`),
@@ -168,8 +190,8 @@ export const studentApi = {
   // The office index answers "which desk, how long, am I already in a line" — one projection,
   // built server-side, shared by the student web list and the mobile office screens.
   offices: () => api.get<{ offices: OfficeSummary[] }>('/student/offices'),
-  officeTickets: (query: ListQuery = {}) => api.get<{ tickets: OfficeTicketView[] }>('/student/office-tickets', { query }),
-  activeOfficeTicket: () => api.get<{ ticket: OfficeTicketView | null }>('/student/office-tickets/active'),
+  officeTickets: (query: ListQuery = {}) => api.get<{ tickets: OfficeTicket[]; total?: number }>('/student/office-tickets', { query }),
+  activeOfficeTicket: () => api.get<{ ticket: OfficeTicket | null }>('/student/office-tickets/active'),
   officeTicket: (id: string) => api.get<OfficeTicketView>(`/student/office-tickets/${id}`),
   officeTicketHistory: (id: string) =>
     api.get<{ events: { id: string; type: string; created_at: string; metadata: Record<string, unknown> | null }[] }>(`/student/office-tickets/${id}/history`),
@@ -197,9 +219,9 @@ function normalizeFloorPlan(value: unknown): FloorPlanPayload {
 
   return {
     ...value,
-    floor: value.floor as unknown as FloorPlanPayload['floor'],
+    floor: { ...value.floor, plan_width: value.floor.plan_width ?? value.floor.plan_width_m, plan_height: value.floor.plan_height ?? value.floor.plan_height_m } as unknown as FloorPlanPayload['floor'],
     building: value.building as unknown as FloorPlanPayload['building'],
-    rooms: arrayOrEmpty<Room>(value.rooms),
+    rooms: arrayOrEmpty<Record<string, unknown>>(value.rooms).map(room => ({ ...room, room_type: room.room_type ?? room.type ?? 'other' })) as unknown as Room[],
     qr_nodes: arrayOrEmpty<QrNode>(value.qr_nodes),
     navigation_nodes: arrayOrEmpty<NavigationNode>(value.navigation_nodes),
     navigation_edges: arrayOrEmpty<NavigationEdge>(value.navigation_edges),
@@ -235,7 +257,21 @@ export const campusApi = {
     normalizeFloorPlan(await api.get<unknown>(`/campus/floors/${floorId}/plan`, { query: { date } })),
   floorAvailability: (floorId: string, date?: string) =>
     api.get<{ date: string; busy: Record<string, unknown>; free_now: string[] }>(`/campus/floors/${floorId}/availability`, { query: { date } }),
-  rooms: (query: ListQuery = {}) => api.get<Paginated<Room>>('/campus/rooms', { query }),
+  rooms: async (query: ListQuery = {}): Promise<Paginated<Room>> => {
+    const value = await api.get<unknown>('/campus/rooms', { query });
+    if (!isRecord(value) || !Array.isArray(value.items) || !isRecord(value.meta)) {
+      throw new ApiError(502, 'The rooms service returned an invalid room list.', 'INVALID_ROOMS_RESPONSE');
+    }
+    // Laravel's paginator uses current_page/last_page; other campus lists use page/total_pages.
+    // Normalize once here so all room consumers can paginate without inventing missing pages.
+    const m = value.meta;
+    const page = m.page ?? m.current_page;
+    const pages = m.total_pages ?? m.last_page;
+    if (typeof page !== 'number' || typeof pages !== 'number' || typeof m.total !== 'number' || typeof m.per_page !== 'number') {
+      throw new ApiError(502, 'The rooms service returned invalid pagination.', 'INVALID_ROOMS_RESPONSE');
+    }
+    return { items: value.items as Room[], meta: { page, total_pages: pages, total: m.total, per_page: m.per_page } };
+  },
   room: (idOrCode: string) => api.get<RoomDetail>(`/campus/rooms/${idOrCode}`),
   roomAvailability: (id: string, date?: string) => api.get<{ availability: RoomDetail['availability'] }>(`/campus/rooms/${id}/availability`, { query: { date } }),
   queues: () => api.get<{ queues: QueueListItem[] }>('/campus/queues'),
@@ -333,17 +369,25 @@ export const navigationApi = {
  * what lives here is only what a student *does* to their own ticket, which is why every path below is
  * under `/student/` and every one of them is authorised by `QueueTicketPolicy` on the server.
  */
+function normalizeQueueTicket(value: unknown): QueueTicketView {
+  const view = isRecord(value) && isRecord(value.queue) ? value : isRecord(value) ? value.ticket : null;
+  if (!isRecord(view) || !isRecord(view.ticket) || !view.ticket.id || !isRecord(view.queue)) {
+    throw new Error('The server did not confirm a complete queue ticket. Refresh before retrying.');
+  }
+  return view as unknown as QueueTicketView;
+}
+
 export const queueApi = {
   join: (
     queueId: string,
     body: { qr_code?: string; fix?: Record<string, unknown>; note?: string } = {},
     idempotencyKey = newIdempotencyKey('join'),
-  ) => api.post<{ ticket: QueueTicketView; replayed?: boolean }>(`/student/queues/${queueId}/tickets`, { ...body, idempotency_key: idempotencyKey }, { idempotencyKey }),
+  ) => api.post<unknown>(`/student/queues/${queueId}/tickets`, { ...body, idempotency_key: idempotencyKey }, { idempotencyKey }).then(value => ({ ticket: normalizeQueueTicket(value) })),
   joinByRoom: (
     roomId: string,
     body: { qr_code?: string; fix?: Record<string, unknown>; note?: string } = {},
     idempotencyKey = newIdempotencyKey('join'),
-  ) => api.post<{ ticket: QueueTicketView }>(`/student/rooms/${roomId}/queue/join`, { ...body, idempotency_key: idempotencyKey }, { idempotencyKey }),
+  ) => api.post<unknown>(`/student/rooms/${roomId}/queue/join`, { ...body, idempotency_key: idempotencyKey }, { idempotencyKey }).then(value => ({ ticket: normalizeQueueTicket(value) })),
   ticket: (id: string) => api.get<QueueTicketView>(`/student/queue-tickets/${id}`),
   history: (id: string) => api.get<{ events: { type: string; created_at: string; metadata: Record<string, unknown> | null }[] }>(`/student/queue-tickets/${id}/history`),
   cancel: (id: string) => api.post<QueueTicketView>(`/student/queue-tickets/${id}/cancel`),
@@ -359,7 +403,7 @@ export const officeApi = {
   list: () => api.get<{ offices: OfficeSummary[] }>('/campus/offices'),
   detail: (idOrCode: string) => api.get<OfficeSummary>(`/student/offices/${idOrCode}`),
   request: (officeId: string, body: { subject: string; notes?: string; qr_code?: string; fix?: Record<string, unknown> }, idempotencyKey = newIdempotencyKey('office')) =>
-    api.post<OfficeTicketView>(`/student/offices/${officeId}/tickets`, { ...body, idempotency_key: idempotencyKey }, { idempotencyKey }),
+    api.post<OfficeTicketView | { ticket: OfficeTicket; replayed: true }>(`/student/offices/${officeId}/tickets`, { ...body, idempotency_key: idempotencyKey }, { idempotencyKey }),
   ticket: (id: string) => api.get<OfficeTicketView>(`/student/office-tickets/${id}`),
   history: (id: string) => api.get<{ events: { type: string; created_at: string; metadata: Record<string, unknown> | null }[] }>(`/student/office-tickets/${id}/history`),
   // Every student mutation answers with the same ticket view the read endpoints use, so a screen
@@ -408,20 +452,29 @@ export const engagementApi = {
  * into the web bundle.
  */
 export const assistantApi = {
-  send: (body: { message: string; conversation_id?: string; context?: { screen?: string; room?: string } }) => api.post<AiReply>('/ai/chat', body),
+  send: async (body: { message: string; conversation_id?: string; context?: { screen?: string; room?: string } }) => {
+    const reply = await api.post<AiReply>('/ai/chat', body);
+    if (!reply.conversation_id || !reply.message?.id || typeof reply.message.content !== 'string') throw new Error('The assistant response was incomplete. Check conversation history before retrying.');
+    return { ...reply, message: { ...reply.message, actions: reply.suggested_actions ?? reply.message.actions } };
+  },
   capabilities: () => api.get<AiCapabilities>('/ai/capabilities'),
   conversations: () => api.get<{ conversations: AiConversation[] }>('/ai/conversations'),
-  conversation: (id: string) => api.get<{ conversation: AiConversation; messages: AiMessage[] }>(`/ai/conversations/${id}`),
-  remove: (id: string) => api.delete<void>(`/ai/conversations/${id}`),
+  conversation: async (id: string) => {
+    const payload = await api.get<{ conversation: AiConversation & { messages?: AiMessage[] }; messages?: AiMessage[] }>(`/ai/conversations/${id}`);
+    const messages = payload.conversation?.messages ?? payload.messages;
+    if (!payload.conversation?.id || !Array.isArray(messages)) throw new Error('This conversation could not be read. Please try again.');
+    return { conversation: payload.conversation, messages };
+  },
+  remove: (id: string) => api.delete<{ deleted: string }>(`/ai/conversations/${id}`),
 
 };
 
 /* --------------------------------------------------------------------- staff */
 
 export const staffApi = {
-  dashboard: () => api.get<StaffDashboard>('/staff/dashboard'),
-  queues: () => api.get<{ queues: StaffDashboard['queues'] }>('/staff/queues'),
-  queueLine: (id: string) => api.get<StaffQueueDetail>(`/staff/queues/${id}/line`),
+  dashboard: async () => staffOverview(await api.get<StaffDashboard>('/staff/dashboard')),
+  queues: async () => operationQueues(await api.get<unknown>('/staff/queues')),
+  queueLine: async (id: string) => operationLine(await api.get<unknown>(`/staff/queues/${id}/line`)),
   callNext: (id: string) => api.post<{ called: QueueLineRow }>(`/staff/queues/${id}/call-next`),
   /**
    * Opening and closing a line is a decision of the day, so it belongs to the operator running it.
@@ -434,8 +487,8 @@ export const staffApi = {
   complete: (ticketId: string) => api.post<{ ticket: QueueLineRow }>(`/staff/queue-tickets/${ticketId}/complete`),
   staffCheckIn: (ticketId: string) => api.post<{ ticket: QueueLineRow }>(`/staff/queue-tickets/${ticketId}/check-in`),
   noShow: (ticketId: string, reason?: string) => api.post<{ ticket: QueueLineRow }>(`/staff/queue-tickets/${ticketId}/no-show`, { reason }),
-  offices: () => api.get<{ offices: StaffDashboard['offices'] }>('/staff/offices'),
-  officeLine: (id: string) => api.get<StaffOfficeDetail>(`/staff/offices/${id}/line`),
+  offices: async () => desksProjection(await api.get<unknown>('/staff/offices')),
+  officeLine: async (id: string) => deskLineProjection(await api.get<unknown>(`/staff/offices/${id}/line`)),
   officeCallNext: (id: string) => api.post<{ called: OfficeLineRow }>(`/staff/offices/${id}/call-next`),
   officeCheckIn: (ticketId: string) => api.post<{ ticket: OfficeLineRow }>(`/staff/office-tickets/${ticketId}/check-in`),
   officeStartService: (ticketId: string) => api.post<{ ticket: OfficeLineRow }>(`/staff/office-tickets/${ticketId}/start-service`),
@@ -453,12 +506,11 @@ export const staffApi = {
     ),
   /** The single campus write staff may make: flipping a room's availability on the day. */
   updateRoom: (id: string, body: Record<string, unknown>) => api.patch<{ room: Room }>(`/staff/rooms/${id}`, body),
-  rooms: (query: ListQuery = {}) => api.get<Paginated<Room>>('/staff/rooms', { query }),
+  rooms: async (query: ListQuery = {}) => managedRoomsProjection(await api.get<unknown>('/staff/rooms', { query })),
 
-  timetable: (query: ListQuery = {}) =>
-    api.get<{ entries: StaffTimetableRow[]; can_manage: boolean; courses: StaffCourseOption[]; rooms: StaffRoomOption[] }>('/staff/timetable', { query }),
-  createEntry: (body: Record<string, unknown>) => api.post<{ entry: StaffTimetableRow }>('/staff/timetable', body),
-  updateEntry: (id: string, body: Record<string, unknown>) => api.patch<{ entry: StaffTimetableRow }>(`/staff/timetable/${id}`, body),
+  timetable: async (query: ListQuery = {}) => teachingProjection(await api.get<unknown>('/staff/timetable', { query })),
+  createEntry: async (body: Record<string, unknown>) => ({ entry: teachingEntry((await api.post<{ entry: unknown }>('/staff/timetable', body)).entry) }),
+  updateEntry: async (id: string, body: Record<string, unknown>) => ({ entry: teachingEntry((await api.patch<{ entry: unknown }>(`/staff/timetable/${id}`, body)).entry) }),
   deleteEntry: (id: string) => api.delete<void>(`/staff/timetable/${id}`),
   createEvent: (body: Record<string, unknown>) => api.post<{ event: CampusEvent }>('/staff/events', body),
   updateEvent: (id: string, body: Record<string, unknown>) => api.patch<{ event: CampusEvent }>(`/staff/events/${id}`, body),
@@ -471,7 +523,7 @@ export const staffApi = {
 /* --------------------------------------------------------------------- admin */
 
 export const adminApi = {
-  dashboard: () => api.get<AdminDashboard>('/admin/dashboard'),
+  dashboard: async () => adminOverview(await api.get<AdminDashboard>('/admin/dashboard')),
   analytics: () => api.get<AnalyticsOverview>('/admin/analytics'),
   auditLogs: (query: ListQuery = {}) => api.get<Paginated<AuditLogRow>>('/admin/audit-logs', { query }),
 
@@ -482,28 +534,28 @@ export const adminApi = {
    * and `ack` mutes one specific fingerprint so the same condition is not shouted about twice.
    */
   alerts: () =>
-    api.get<{ alerts: AdminAlert[]; counts: { critical: number; warning: number; acknowledged: number }; generated_at: string }>('/admin/alerts'),
+    api.get<unknown>('/admin/alerts').then(alertSnapshot),
   acknowledgeAlert: (fingerprint: string, note?: string) =>
-    api.post<{ acknowledged: string }>('/admin/alerts/ack', { fingerprint, note: note ?? null }),
+    api.post<unknown>('/admin/alerts/ack', { fingerprint, note: note ?? null }).then(value => confirmedAcknowledgement(value, fingerprint)),
   monitoring: () => api.get<AdminMonitoring>('/admin/monitoring/summary'),
 
   /** The permission registry as the server sees it: role → permissions → platforms. */
   roles: () => api.get<AdminRoleRegistry>('/admin/roles'),
 
-  users: (query: ListQuery = {}) => api.get<Paginated<AdminUser>>('/admin/users', { query }),
-  createUser: (body: { name: string; email: string; role_code: string; password?: string; registration_no?: string; department?: string }) =>
-    api.post<{ user: AdminUser; password?: string }>('/admin/users', body),
+  users: async (query: ListQuery = {}) => peoplePage(await api.get<unknown>('/admin/users', { query: { ...query, role: query.role ?? query.role_code, role_code: undefined } })),
+  createUser: async (body: { name: string; email: string; role_code: string; password?: string; registration_no?: string; department?: string }) =>
+    personResult(await api.post<unknown>('/admin/users', { ...body, role: body.role_code, role_code: undefined })),
   /**
    * A role change is its own call, not a field on the profile form: it is the one user edit that changes
    * what a person can *do*, so the server guards it separately (nobody demotes themselves, nobody demotes
    * the last administrator) and writes its own audit row with before and after.
    */
-  setUserRole: (id: string, role: Role) => api.patch<{ user: AdminUser; changed: boolean }>(`/admin/users/${id}/role`, { role }),
-  updateUser: (id: string, body: Record<string, unknown>) => api.patch<{ user: AdminUser }>(`/admin/users/${id}`, body),
+  setUserRole: async (id: string, role: Role) => personResult(await api.patch<unknown>(`/admin/users/${id}/role`, { role })),
+  updateUser: async (id: string, body: Record<string, unknown>) => personResult(await api.patch<unknown>(`/admin/users/${id}`, body)),
   resetUserPassword: (id: string) => api.post<{ password: string }>(`/admin/users/${id}/reset-password`),
   deleteUser: (id: string) => api.delete<void>(`/admin/users/${id}`),
 
-  staffAssignments: () => api.get<{ assignments: (User['assignments'] extends (infer A)[] | undefined ? A : never)[] }>('/admin/staff-assignments'),
+  staffAssignments: async () => scopeDirectory(await api.get<unknown>('/admin/staff-assignments')),
   createAssignment: (body: { user_id: string; scope_type: string; scope_id: string; role_in_scope?: string; can_manage_timetable?: boolean; can_publish_content?: boolean; can_call_tickets?: boolean }) =>
     api.post<{ assignment: unknown }>('/admin/staff-assignments', body),
   deleteAssignment: (id: string) => api.delete<void>(`/admin/staff-assignments/${id}`),
