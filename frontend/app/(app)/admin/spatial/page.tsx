@@ -33,8 +33,14 @@ export default function AdminSpatialPage() {
   const buildingOptions = buildings.data?.buildings ?? [];
   const building = useAsync(() => (buildingId ? campusApi.building(buildingId) : Promise.resolve(null)), [buildingId]);
   const floors = building.data?.floors ?? [];
-  const activeFloorId = floorId || floors[0]?.id || '';
+  const activeFloorId = floors.some((floor) => floor.id === floorId) ? floorId : floors[0]?.id || '';
   const plan = useAsync(() => (activeFloorId ? campusApi.floorPlan(activeFloorId) : Promise.resolve(null)), [activeFloorId]);
+  const qrBuildingId = form?.kind === 'qr' ? form.values.building_id : '';
+  const qrBuilding = useAsync(
+    () => (qrBuildingId ? campusApi.building(qrBuildingId) : Promise.resolve(null)),
+    [qrBuildingId],
+  );
+  const formFloors = form?.kind === 'qr' ? (qrBuilding.data?.floors ?? []) : floors;
 
   const qrNodes = useAsync(() => adminApi.qrNodes({ per_page: 100, q: debounced || undefined }), [debounced]);
   const navNodes = useAsync(() => adminApi.navigationNodes({ per_page: 200 }), []);
@@ -50,7 +56,7 @@ export default function AdminSpatialPage() {
   const openCreate = (kind: 'qr' | 'node' | 'edge' | 'geofence') => {
     setFormError(null);
     const base: Record<string, string> = {};
-    if (kind === 'qr') Object.assign(base, { code: '', label: '', building_id: buildingId || buildingOptions[0]?.id || '', floor_id: activeFloorId, plan_x: '0', plan_y: '0' });
+    if (kind === 'qr') Object.assign(base, { code: '', label: '', building_id: buildingId || buildingOptions[0]?.id || '', floor_id: buildingId ? activeFloorId : '', plan_x: '0', plan_y: '0' });
     if (kind === 'node') Object.assign(base, { code: '', label: '', floor_id: activeFloorId, kind: 'corridor', plan_x: '0', plan_y: '0' });
     if (kind === 'edge') Object.assign(base, { from_node_id: '', to_node_id: '', kind: 'corridor', distance_m: '5', is_accessible: 'true' });
     if (kind === 'geofence') Object.assign(base, { name: '', target_type: 'room', target_id: '', radius_m: '25', purpose: 'check_in' });
@@ -189,7 +195,16 @@ export default function AdminSpatialPage() {
       render: (row) => <span className="font-mono text-[12px]">{nodeOptions.find((node) => node.id === row.to_node_id)?.code ?? row.to_node_id.slice(0, 8)}</span>,
     },
     { key: 'kind', header: 'Kind', render: (row) => <Badge tone={row.floor_change ? 'warning' : 'neutral'}>{row.kind}</Badge> },
-    { key: 'distance', header: 'Distance', align: 'right', render: (row) => <span className="tnum">{row.distance_m.toFixed(1)} m</span> },
+    {
+      key: 'distance',
+      header: 'Distance',
+      align: 'right',
+      render: (row) => (
+        <span className="tnum">
+          {typeof row.distance_m === 'number' && Number.isFinite(row.distance_m) ? `${row.distance_m.toFixed(1)} m` : '—'}
+        </span>
+      ),
+    },
     { key: 'accessible', header: 'Step-free', render: (row) => (row.is_accessible ? <Badge tone="success">yes</Badge> : <span className="text-[12px] text-ink-400">no</span>) },
   ];
 
@@ -330,7 +345,15 @@ export default function AdminSpatialPage() {
                 ))}
               </Select>
             </Field>
-            {floors.length > 0 ? (
+            {building.loading ? (
+              <Field label="Floor" htmlFor="editor-floor">
+                <Select id="editor-floor" value="" disabled>
+                  <option value="">Loading floors…</option>
+                </Select>
+              </Field>
+            ) : building.error ? (
+              <p className="mb-1 text-[13px] text-coral-600">{building.error}</p>
+            ) : floors.length > 0 ? (
               <Field label="Floor" htmlFor="editor-floor">
                 <Select id="editor-floor" value={activeFloorId} onChange={(event) => setFloorId(event.target.value)}>
                   {floors.map((floor) => (
@@ -340,6 +363,8 @@ export default function AdminSpatialPage() {
                   ))}
                 </Select>
               </Field>
+            ) : buildingId ? (
+              <p className="mb-1 text-[13px] text-ink-500">No floors are configured for this building.</p>
             ) : null}
             {plan.data ? (
               <div className="mb-1 flex gap-2">
@@ -414,7 +439,16 @@ export default function AdminSpatialPage() {
                 </Field>
                 {form.kind === 'qr' ? (
                   <Field label="Building" htmlFor="spatial-building">
-                    <Select id="spatial-building" value={form.values.building_id} onChange={(event) => setForm({ ...form, values: { ...form.values, building_id: event.target.value } })}>
+                    <Select
+                      id="spatial-building"
+                      value={form.values.building_id}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          values: { ...form.values, building_id: event.target.value, floor_id: '' },
+                        })
+                      }
+                    >
                       {buildingOptions.map((option) => (
                         <option key={option.id} value={option.id}>
                           {option.code} · {option.name}
@@ -434,15 +468,23 @@ export default function AdminSpatialPage() {
                   </Field>
                 )}
                 <Field label="Floor" htmlFor="spatial-floor">
-                  <Select id="spatial-floor" value={form.values.floor_id} onChange={(event) => setForm({ ...form, values: { ...form.values, floor_id: event.target.value } })}>
+                  <Select
+                    id="spatial-floor"
+                    value={form.values.floor_id}
+                    disabled={form.kind === 'qr' && (qrBuilding.loading || !!qrBuilding.error)}
+                    onChange={(event) => setForm({ ...form, values: { ...form.values, floor_id: event.target.value } })}
+                  >
                     <option value="">Select a floor…</option>
-                    {floors.map((floor) => (
+                    {formFloors.map((floor) => (
                       <option key={floor.id} value={floor.id}>
                         {floor.name}
                       </option>
                     ))}
                   </Select>
                 </Field>
+                {form.kind === 'qr' && qrBuilding.error ? (
+                  <p className="text-[13px] text-coral-600">{qrBuilding.error}</p>
+                ) : null}
                 <Field label="Plan x (m)" htmlFor="spatial-x">
                   <Input id="spatial-x" value={form.values.plan_x} onChange={(event) => setForm({ ...form, values: { ...form.values, plan_x: event.target.value } })} />
                 </Field>

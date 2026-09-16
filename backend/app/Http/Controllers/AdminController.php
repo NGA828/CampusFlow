@@ -539,24 +539,66 @@ class AdminController extends Controller
     public function navigationEdges(Request $request): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        $q = NavigationEdge::query();
-        return $this->ok($this->paginate($q, $request, fn($e) => $e->toArray()));
+        $q = NavigationEdge::query()->with([
+            'fromNode:id,floor_id',
+            'toNode:id,floor_id',
+        ]);
+        return $this->ok($this->paginate($q, $request, fn($e) => $e->toApiArray()));
     }
 
     public function createNavigationEdge(Request $request): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        $request->validate(['from_node_id' => 'required|uuid', 'to_node_id' => 'required|uuid']);
-        $e = NavigationEdge::create($request->only(['from_node_id', 'to_node_id', 'distance_m', 'edge_type', 'is_accessible', 'bidirectional']));
-        return $this->ok($e->toArray(), 201);
+        $validated = $request->validate([
+            'from_node_id' => 'required|uuid|exists:navigation_nodes,id',
+            'to_node_id' => 'required|uuid|different:from_node_id|exists:navigation_nodes,id',
+            'distance_m' => 'required_without:weight|numeric|min:0',
+            'weight' => 'required_without:distance_m|numeric|min:0',
+            'kind' => 'sometimes|string|in:corridor,stairs,elevator,ramp,door,outdoor,service',
+            'edge_type' => 'sometimes|string|in:corridor,stairwell,lift,ramp,door,outdoor,service',
+            'is_accessible' => 'sometimes|boolean',
+            'accessible' => 'sometimes|boolean',
+            'bidirectional' => 'sometimes|boolean',
+        ]);
+        $e = NavigationEdge::create([
+            'from_node_id' => $validated['from_node_id'],
+            'to_node_id' => $validated['to_node_id'],
+            'weight' => (float) ($validated['distance_m'] ?? $validated['weight']),
+            'edge_type' => $validated['kind'] ?? $validated['edge_type'] ?? 'corridor',
+            'accessible' => (bool) ($validated['is_accessible'] ?? $validated['accessible'] ?? true),
+            'bidirectional' => (bool) ($validated['bidirectional'] ?? true),
+        ]);
+        return $this->ok($e->fresh()->toApiArray(), 201);
     }
 
     public function updateNavigationEdge(Request $request, string $id): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $e = NavigationEdge::findOrFail($id);
-        $e->update($request->only(['distance_m', 'edge_type', 'is_accessible', 'bidirectional']));
-        return $this->ok($e->fresh()->toArray());
+        $validated = $request->validate([
+            'distance_m' => 'sometimes|numeric|min:0',
+            'weight' => 'sometimes|numeric|min:0',
+            'kind' => 'sometimes|string|in:corridor,stairs,elevator,ramp,door,outdoor,service',
+            'edge_type' => 'sometimes|string|in:corridor,stairwell,lift,ramp,door,outdoor,service',
+            'is_accessible' => 'sometimes|boolean',
+            'accessible' => 'sometimes|boolean',
+            'bidirectional' => 'sometimes|boolean',
+        ]);
+        $attributes = [];
+        if (array_key_exists('distance_m', $validated) || array_key_exists('weight', $validated)) {
+            $attributes['weight'] = (float) ($validated['distance_m'] ?? $validated['weight']);
+        }
+        if (array_key_exists('kind', $validated) || array_key_exists('edge_type', $validated)) {
+            $attributes['edge_type'] = $validated['kind'] ?? $validated['edge_type'];
+        }
+        if (array_key_exists('is_accessible', $validated) || array_key_exists('accessible', $validated)) {
+            $attributes['accessible'] = (bool) ($validated['is_accessible'] ?? $validated['accessible']);
+        }
+        if (array_key_exists('bidirectional', $validated)) {
+            $attributes['bidirectional'] = (bool) $validated['bidirectional'];
+        }
+        $e->update($attributes);
+        return $this->ok($e->fresh()->load(['fromNode:id,floor_id', 'toNode:id,floor_id'])->toApiArray());
     }
 
     public function deleteNavigationEdge(Request $request, string $id): JsonResponse
@@ -832,7 +874,7 @@ class AdminController extends Controller
         ]));
 
         $nodes = NavigationNode::all()->map(fn($n) => $n->toArray());
-        $edges = NavigationEdge::all()->map(fn($e) => $e->toArray());
+        $edges = NavigationEdge::with(['fromNode:id,floor_id', 'toNode:id,floor_id'])->get()->map(fn($e) => $e->toApiArray());
         $qrNodes = QrNode::all()->map(fn($n) => $n->toApiArray());
 
         return $this->ok(['buildings' => $buildings, 'nodes' => $nodes, 'edges' => $edges, 'qr_nodes' => $qrNodes]);

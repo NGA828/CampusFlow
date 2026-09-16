@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Announcement;
 use App\Models\Building;
+use App\Models\NavigationEdge;
 use App\Models\Room;
 use App\Models\RoomQueue;
 use App\Models\User;
@@ -217,6 +218,33 @@ class PlatformRoleAccessTest extends TestCase
                     'utilisation',
                 ],
             ]);
+    }
+
+    public function test_admin_navigation_edges_return_the_spatial_client_contract(): void
+    {
+        $response = $this->actingAs($this->admin(), 'sanctum')
+            ->getJson('/api/v1/admin/navigation-edges?per_page=10');
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'data' => [
+                    'items' => [[
+                        'id',
+                        'from_node_id',
+                        'to_node_id',
+                        'distance_m',
+                        'kind',
+                        'bidirectional',
+                        'is_accessible',
+                        'floor_change',
+                    ]],
+                ],
+            ]);
+
+        $this->assertSame(
+            (float) NavigationEdge::query()->value('weight'),
+            (float) $response->json('data.items.0.distance_m'),
+        );
     }
 
     public function test_admin_may_read_a_students_dashboard_because_it_is_a_student_route_not_a_private_one(): void

@@ -176,7 +176,7 @@ export interface NavigationEdge {
   id: UUID;
   from_node_id: UUID;
   to_node_id: UUID;
-  kind: 'corridor' | 'stairs' | 'elevator' | 'ramp' | 'outdoor' | 'door';
+  kind: 'corridor' | 'stairs' | 'elevator' | 'ramp' | 'outdoor' | 'door' | 'service';
   distance_m: number;
   bidirectional: boolean;
   is_accessible: boolean;

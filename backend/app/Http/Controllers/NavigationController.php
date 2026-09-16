@@ -239,7 +239,7 @@ class NavigationController extends Controller
             $query->whereHas('fromNode', fn ($q) => $q->where('building_id', $buildingId));
         }
 
-        $edges = $query->limit(5000)->get()->map(fn ($e) => $e->toApiArray());
+        $edges = $query->with(['fromNode:id,floor_id', 'toNode:id,floor_id'])->limit(5000)->get()->map(fn ($e) => $e->toApiArray());
 
         return response()->json(['success' => true, 'data' => ['edges' => $edges->values()]]);
     }
@@ -393,7 +393,8 @@ class NavigationController extends Controller
             ->get()
             ->keyBy('id');
 
-        $edges = NavigationEdge::when($accessible, fn ($q) => $q->where('accessible', true))
+        $edges = NavigationEdge::with(['fromNode:id,floor_id', 'toNode:id,floor_id'])
+            ->when($accessible, fn ($q) => $q->where('accessible', true))
             ->get();
 
         // Build adjacency list

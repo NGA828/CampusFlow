@@ -90,6 +90,42 @@ function arrayOrEmpty<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+function normalizeFloor(value: unknown): Floor {
+  if (!isRecord(value)) {
+    throw new ApiError(502, 'The campus service returned an invalid floor.', 'INVALID_FLOOR');
+  }
+
+  return {
+    ...value,
+    plan_width: value.plan_width ?? value.plan_width_m ?? 0,
+    plan_height: value.plan_height ?? value.plan_height_m ?? 0,
+    plan_units: value.plan_units ?? 'm',
+  } as Floor;
+}
+
+function normalizeBuildingPayload(value: unknown): { building: Building; floors: Floor[]; rooms: Room[] } {
+  if (!isRecord(value) || !isRecord(value.building)) {
+    throw new ApiError(502, 'The campus service returned an incomplete building.', 'INVALID_BUILDING_RESPONSE');
+  }
+
+  return {
+    building: value.building as unknown as Building,
+    floors: arrayOrEmpty<unknown>(value.floors).map(normalizeFloor),
+    rooms: arrayOrEmpty<Record<string, unknown>>(value.rooms).map((room) => ({
+      ...room,
+      room_type: room.room_type ?? room.type ?? 'other',
+    })) as Room[],
+  };
+}
+
+function normalizeFloorList(value: unknown): { floors: Floor[] } {
+  if (!isRecord(value) || !Array.isArray(value.floors)) {
+    throw new ApiError(502, 'The campus service returned an incomplete floor list.', 'INVALID_FLOORS_RESPONSE');
+  }
+
+  return { floors: value.floors.map(normalizeFloor) };
+}
+
 /* ----------------------------------------------------------------------- auth */
 
 export const authApi = {
@@ -233,7 +269,7 @@ function normalizeFloorPlan(value: unknown): FloorPlanPayload {
 export const publicApi = {
   overview: () => api.get<PublicOverview>('/public/overview', { auth: false }),
   buildings: () => api.get<{ buildings: Building[] }>('/public/buildings', { auth: false }),
-  building: (idOrCode: string) => api.get<{ building: Building; floors: Floor[]; rooms: Room[] }>(`/public/buildings/${idOrCode}`, { auth: false }),
+  building: async (idOrCode: string) => normalizeBuildingPayload(await api.get<unknown>(`/public/buildings/${idOrCode}`, { auth: false })),
   floorPlan: (floorId: string) => api.get<unknown>(`/public/floors/${floorId}/plan`, { auth: false }),
   rooms: (query: ListQuery = {}) => api.get<Paginated<Room>>('/public/rooms', { query, auth: false }),
   room: (idOrCode: string) => api.get<RoomDetail>(`/public/rooms/${idOrCode}`, { auth: false }),
@@ -250,8 +286,8 @@ export const publicApi = {
  */
 export const campusApi = {
   buildings: () => api.get<{ buildings: Building[] }>('/campus/buildings'),
-  building: (idOrCode: string) => api.get<{ building: Building; floors: Floor[]; rooms: Room[] }>(`/campus/buildings/${idOrCode}`),
-  floors: (buildingId: string) => api.get<{ floors: Floor[] }>(`/campus/buildings/${buildingId}/floors`),
+  building: async (idOrCode: string) => normalizeBuildingPayload(await api.get<unknown>(`/campus/buildings/${idOrCode}`)),
+  floors: async (buildingId: string) => normalizeFloorList(await api.get<unknown>(`/campus/buildings/${buildingId}/floors`)),
   floor: (floorId: string) => api.get<{ floor: Floor; building: Building; rooms: Room[] }>(`/campus/floors/${floorId}`),
   floorPlan: async (floorId: string, date?: string) =>
     normalizeFloorPlan(await api.get<unknown>(`/campus/floors/${floorId}/plan`, { query: { date } })),

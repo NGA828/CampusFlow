@@ -24,7 +24,7 @@ export function text(v: unknown, fallback = "") {
   return typeof v === "string" ? v : fallback;
 }
 export function identity(v: unknown) {
-  const s = text(v);
+  const s = typeof v === "string" || typeof v === "number" ? String(v) : "";
   if (!s) throw invalidWorkspace();
   return s;
 }
