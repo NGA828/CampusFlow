@@ -78,6 +78,9 @@ export interface Floor {
 }
 
 export interface Room {
+  /** Current Laravel room payload; older clients may expose room_type/amenities. */
+  type?: string;
+  features?: string[];
   id: UUID;
   building_id: UUID;
   floor_id: UUID;
@@ -400,10 +403,12 @@ export interface QueueTicketView {
   check_in_deadline: string | null;
   seconds_until_deadline: number | null;
   can_check_in: boolean;
+  can_navigate?: boolean;
   can_cancel: boolean;
 }
 
 export interface QueueListItem {
+  max_capacity?: number | null;
   id: UUID;
   room_id: UUID;
   is_active: boolean;
@@ -544,6 +549,11 @@ export interface OfficeSummary {
 
 
 export interface OfficeTicket {
+  /** Raw Laravel ticket timestamps and directory identity. */
+  joined_at?: string | null;
+  issued_at?: string | null;
+  office_name?: string | null;
+  office_code?: string | null;
   id: UUID;
   office_id: UUID;
   student_id: UUID;
@@ -572,6 +582,7 @@ export interface OfficeTicket {
 }
 
 export interface OfficeTicketView {
+  check_in_deadline?: string | null;
   ticket: OfficeTicket;
   office: Office;
   people_ahead: number;
@@ -696,6 +707,7 @@ export interface AiCapabilities {
 /* ---------------------------------------------------------------- engagement */
 
 export interface Announcement {
+  target_roles?: string[] | null;
   id: UUID;
   title: string;
   body: string;
@@ -712,6 +724,8 @@ export interface Announcement {
 }
 
 export interface CampusEvent {
+  /** Registration state returned by the campus events controller. */
+  is_registered?: boolean;
   id: UUID;
   title: string;
   description: string | null;
@@ -776,26 +790,29 @@ export interface AiMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   intent?: string | null;
-  data: Record<string, unknown> | null;
-  actions: { label: string; href: string; kind?: string }[] | null;
-  tool_calls: AiToolCall[] | null;
+  data?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
+  actions?: { label: string; href: string; kind?: string }[] | null;
+  tool_calls?: AiToolCall[] | null;
   created_at: string;
 }
 
 export interface AiReply {
   conversation_id: UUID;
-  provider: 'deterministic' | 'llm';
-  model: string | null;
-  intent: string;
+  provider?: 'deterministic' | 'llm';
+  model?: string | null;
+  intent?: string;
   message: AiMessage;
-  latency_ms: number;
+  suggested_actions?: AiMessage['actions'];
+  latency_ms?: number;
 }
 
 export interface AiConversation {
   id: UUID;
   title: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
+  last_message_at?: string | null;
   message_count?: number;
 }
 
@@ -827,7 +844,7 @@ export interface StaffQueueRow {
   is_active: boolean;
   admission_capacity: number;
   avg_service_seconds: number;
-  max_size: number;
+  max_size: number | null;
   proximity_radius_m: number;
   requires_proximity_to_join: boolean;
   waiting: number;
@@ -919,6 +936,7 @@ export interface StaffPendingQueueRow {
 }
 
 export interface StaffPendingOfficeRow {
+  office_id?: UUID;
   id: UUID;
   ticket_number: string;
   status: string;

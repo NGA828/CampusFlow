@@ -1,9 +1,10 @@
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { Badge, Button, Card, ErrorNote, Eyebrow, H2, H3, KeyValue, Loading, Screen, SectionTitle, Small, Stat, Title } from '@/components/ui';
+import { AdaptiveRow, Badge, Button, Card, ErrorNote, Eyebrow, H2, H3, KeyValue, Loading, Screen, SectionTitle, Small, Stat, Title } from '@/components/ui';
+import { IconTile, Notice, PageIntro, TicketStatus } from '@/components/visual';
 import { ApiError, queueApi, studentApi } from '@/lib/api';
 import { useLoader } from '@/lib/auth';
 import { colors, countdown, formatClock, spacing } from '@/lib/theme';
@@ -15,18 +16,8 @@ export default function QueueScreen() {
   const ticket = useLoader(() => studentApi.activeQueueTicket(), []);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [ticker, setTicker] = useState(0);
 
   const active: QueueTicketView | null = ticket.data?.ticket ?? null;
-
-  // Recompute the countdown every second so "check in before" is always current.
-  useEffect(() => {
-    if (!active?.seconds_until_deadline) return;
-    const timer = setInterval(() => setTicker((value) => value + 1), 1000);
-    return () => clearInterval(timer);
-  }, [active?.seconds_until_deadline]);
-
-  void ticker;
 
   /** A join attempt carries the best position fix we can get; the API still validates the geofence. */
   const fix = useCallback(async (): Promise<Record<string, unknown> | undefined> => {
@@ -46,7 +37,7 @@ export default function QueueScreen() {
     try {
       const locationFix = await fix();
       await queueApi.join(queueId, locationFix ? { fix: locationFix } : {});
-      setNotice('Ticket issued. Keep an eye on your position — it updates live.');
+      setNotice('Ticket issued. Keep an eye on your position and pull to refresh for updates.');
       ticket.reload();
       queues.reload();
     } catch (caught) {
@@ -88,13 +79,10 @@ export default function QueueScreen() {
   };
 
   return (
-    <Screen onRefresh={() => { void ticket.reload(); void queues.reload(); }} refreshing={ticket.loading || queues.loading}>
-      <View style={styles.header}>
-        <Eyebrow>Room admission</Eyebrow>
-        <Title style={{ marginTop: 2 }}>Queues</Title>
-        <Small style={{ marginTop: 4 }}>Join from anywhere, then check in when you are physically at the room.</Small>
-      </View>
-
+    <Screen bottomSafeArea={false} onRefresh={() => { void ticket.reload(); void queues.reload(); }} refreshing={ticket.loading || queues.loading}>
+      <PageIntro eyebrow="A little less waiting" title="Your place in line." description="Take a ticket. Keep your day moving. Check each room's entry requirements before joining." icon="ticket-outline" />
+      {!active && !ticket.loading && !ticket.error ? <View style={styles.padded}><Notice icon="ticket-outline" title="No active room ticket">Choose an open line below. Your ticket and next step will appear here.</Notice></View> : null}
+      {ticket.loading && !ticket.data ? <Loading label="Finding your ticket…" /> : null}
       {notice ? (
         <View style={styles.padded}>
           <Card style={{ backgroundColor: colors.mint100, borderColor: colors.mint100 }}>
@@ -113,27 +101,28 @@ export default function QueueScreen() {
         <View style={styles.padded}>
           <Card style={{ borderColor: colors.brand300 }}>
             <SectionTitle title="Your ticket" action={<Badge tone="brand">{active.ticket.status}</Badge>} />
-            <H2 style={{ letterSpacing: 1 }}>{active.ticket.ticket_number}</H2>
+            <H2 style={{ letterSpacing: -1.5, fontSize: 38, color: colors.brand700 }}>{active.ticket.ticket_number}</H2>
             <Small style={{ marginTop: 4 }}>
               {active.queue.room_code} · {active.queue.room_name} · {active.queue.building_code ?? ''} {active.queue.floor_name ?? ''}
             </Small>
 
-            <View style={styles.stats}>
+            <TicketStatus status={active.ticket.status} />
+            <AdaptiveRow style={styles.stats}>
               <Stat label="People ahead" value={active.people_ahead} tone="brand" />
-              <Stat label="Wait" value={countdown(active.eta_seconds)} tone="mint" />
-            </View>
+              <Stat label="Estimated wait" value={countdown(active.eta_seconds)} tone="mint" />
+            </AdaptiveRow>
 
             <View style={{ marginTop: spacing.md }}>
               <KeyValue label="Expected service" value={formatClock(active.expected_service_at)} />
               <KeyValue
                 label="Check-in closes"
-                value={active.seconds_until_deadline === null ? 'Not called yet' : countdown(active.seconds_until_deadline)}
+                value={active.check_in_deadline ? formatClock(active.check_in_deadline) : 'Not called yet'}
                 tone={active.seconds_until_deadline !== null && active.seconds_until_deadline < 120 ? 'coral' : undefined}
               />
               <KeyValue label="Serving now" value={active.counts.in_service} />
             </View>
 
-            <View style={styles.actions}>
+            <AdaptiveRow style={styles.actions}>
               <Button
                 label={active.can_check_in ? 'Check in' : 'Check in (not yet called)'}
                 onPress={() => void checkIn()}
@@ -142,7 +131,7 @@ export default function QueueScreen() {
                 style={{ flex: 1 }}
               />
               <Button label="Navigate" variant="secondary" onPress={() => router.push(`/student/navigate/${encodeURIComponent(active.queue.room_code ?? '')}` as any)} style={{ flex: 1 }} />
-            </View>
+            </AdaptiveRow>
             {active.can_cancel ? (
               <Button label="Cancel ticket" variant="ghost" onPress={() => void cancel()} style={{ marginTop: spacing.sm }} />
             ) : null}
@@ -168,6 +157,7 @@ export default function QueueScreen() {
       ) : null}
 
       <View style={styles.padded}>
+        <SectionTitle title="Find an open line" action={<IconTile name="people-outline" size={34} />} />
         {queues.data?.queues.map((queue) => {
           const mine = queue.my_ticket_id !== null;
           return (
@@ -177,11 +167,11 @@ export default function QueueScreen() {
                 action={<Badge tone={queue.is_active ? 'mint' : 'neutral'}>{queue.is_active ? 'open' : 'paused'}</Badge>}
               />
               <Small>{queue.room_name}</Small>
-              <View style={styles.stats}>
+              <AdaptiveRow style={styles.stats}>
                 <Stat label="Waiting" value={queue.waiting} />
                 <Stat label="Serving" value={queue.serving} />
                 <Stat label="Avg service" value={`${Math.round(queue.avg_service_seconds / 60)}m`} />
-              </View>
+              </AdaptiveRow>
               <Small style={{ marginTop: spacing.sm }}>
                 {queue.requires_proximity_to_join ? `Join within ${queue.proximity_radius_m} m` : 'Join from anywhere'}
                 {queue.max_capacity ? ` · up to ${queue.max_capacity} in line` : ''}
@@ -203,7 +193,7 @@ export default function QueueScreen() {
 
 const styles = StyleSheet.create({
   header: { padding: spacing.lg },
-  padded: { paddingHorizontal: spacing.lg },
-  stats: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  padded: { paddingHorizontal: 20, marginBottom: 18 },
+  stats: { marginTop: spacing.md },
+  actions: { marginTop: spacing.lg },
 });

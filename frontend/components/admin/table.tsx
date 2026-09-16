@@ -55,7 +55,7 @@ export function ResourceTable<T>({
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-3">
         {search ? (
-          <div className="min-w-[220px] flex-1">
+          <div className="min-w-0 basis-[220px] flex-1">
             <Input
               value={search.value}
               onChange={(event) => search.onChange(event.target.value)}
@@ -65,7 +65,7 @@ export function ResourceTable<T>({
           </div>
         ) : null}
         {filters}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           {toolbar}
           {onCreate ? (
             <Button size="sm" onClick={onCreate}>
@@ -83,20 +83,20 @@ export function ResourceTable<T>({
         <EmptyState title={emptyTitle} description={emptyDescription} />
       ) : (
         <Card className="!p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] border-collapse text-left">
+          <div className="overflow-x-auto overscroll-x-contain" tabIndex={0} role="region" aria-label="Data table, scroll horizontally for more columns">
+            <table data-ui="table" className="w-full min-w-[680px] border-collapse text-left [overflow-wrap:normal]">
               <thead>
                 <tr className="border-b border-ink-100 bg-ink-50/60">
                   {columns.map((column) => (
                     <th
                       key={column.key}
                       scope="col"
-                      className={`px-4 py-2.5 text-[11.5px] font-semibold tracking-wide text-ink-500 uppercase ${column.align === 'right' ? 'text-right' : ''} ${column.className ?? ''}`}
+                      className={`whitespace-nowrap px-4 py-2.5 text-[11.5px] font-semibold tracking-wide text-ink-500 uppercase ${column.align === 'right' ? 'text-right' : ''} ${column.className ?? ''}`}
                     >
                       {column.header}
                     </th>
                   ))}
-                  {rowActions ? <th className="px-4 py-2.5 text-right text-[11.5px] font-semibold tracking-wide text-ink-500 uppercase">Actions</th> : null}
+                  {rowActions ? <th className="whitespace-nowrap px-4 py-2.5 text-right text-[11.5px] font-semibold tracking-wide text-ink-500 uppercase">Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -115,7 +115,7 @@ export function ResourceTable<T>({
           </div>
 
           {meta && meta.total_pages > 1 ? (
-            <div className="flex items-center justify-between border-t border-ink-100 px-4 py-3 text-[12.5px] text-ink-500">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 px-4 py-3 text-[12.5px] text-ink-500">
               <span>
                 Page {meta.page} of {meta.total_pages} · {meta.total} rows
               </span>

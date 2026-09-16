@@ -4,6 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Announcement;
 use App\Models\CampusEvent;
+use App\Models\Course;
+use App\Support\Access\Permissions;
+use App\Support\Access\StaffScope;
+use Illuminate\Validation\Rule;
 use App\Models\Office;
 use App\Models\OfficeEvent;
 use App\Models\OfficeServiceWindow;
@@ -23,13 +27,13 @@ class StaffController extends Controller
 {
     /* ------------------------------------------------------------------ guard */
 
-    private function requireStaff(Request $request): bool
+    private function requireStaff(Request $request, string $permission = Permissions::QUEUE_OPERATE_ASSIGNED): bool
     {
         $user = $request->user();
 
         return $user !== null
             && $user->isActive()
-            && $user->hasPermission(\App\Support\Access\Permissions::QUEUE_OPERATE_ASSIGNED);
+            && $user->hasPermission($permission);
     }
 
     private function forbidden(): JsonResponse
@@ -110,21 +114,26 @@ class StaffController extends Controller
      */
     public function dashboard(Request $request): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$request->user()?->isActive() || $request->user()->role !== 'staff') return $this->forbidden();
 
         $user = $request->user();
 
-        $activeRoomTickets   = QueueTicket::whereIn('status', ['waiting', 'called', 'checked_in'])->count();
-        $activeOfficeTickets = OfficeTicket::whereIn('status', ['waiting', 'called', 'in_service'])->count();
-        $todayAdmitted       = QueueTicket::where('status', 'admitted')
+        $allowedQueues = RoomQueue::with('room.floor.building')->get()->filter(fn ($q) =>
+            $user->hasPermission(Permissions::QUEUE_OPERATE_ASSIGNED) && StaffScope::canOperateQueue($user, $q));
+        $allowedOffices = Office::with('room.floor.building')->get()->filter(fn ($o) =>
+            $user->hasPermission(Permissions::OFFICE_OPERATE_ASSIGNED) && StaffScope::canOperateOffice($user, $o));
+        $queueIds = $allowedQueues->pluck('id');
+        $officeIds = $allowedOffices->pluck('id');
+
+        $activeRoomTickets   = QueueTicket::whereIn('queue_id', $queueIds)->where('status', 'waiting')->count();
+        $activeOfficeTickets = OfficeTicket::whereIn('office_id', $officeIds)->where('status', 'waiting')->count();
+        $todayAdmitted       = QueueTicket::whereIn('queue_id', $queueIds)->whereNotNull('admitted_at')
             ->whereDate('admitted_at', now()->today())->count();
-        $todayServed         = OfficeTicket::where('status', 'completed')
+        $todayServed         = OfficeTicket::whereIn('office_id', $officeIds)->where('status', 'completed')
             ->whereDate('completed_at', now()->today())->count();
 
-        // Queues the staff member may manage (simplified: all open queues)
-        $queues = RoomQueue::with(['room.floor.building'])
-            ->where('is_open', true)
-            ->get()
+        // The same policy as the operator directory, including closed assigned queues.
+        $queues = $allowedQueues
             ->map(function ($q) {
                 $active = QueueTicket::with('user')
                     ->where('queue_id', $q->id)
@@ -167,9 +176,8 @@ class StaffController extends Controller
                 ];
             })->values();
 
-        // Offices the staff member is assigned to
-        $officeIds = OfficeStaff::where('user_id', $user->id)->pluck('office_id');
-        $offices   = Office::with('room.floor.building')->whereIn('id', $officeIds)->where('status', 'active')->get()
+        // Office scope is resolved by the same operation policy as the office directory.
+        $offices = $allowedOffices
             ->map(function ($o) {
                 $active = OfficeTicket::with('user')->where('office_id', $o->id)
                     ->whereNotIn('status', ['completed', 'cancelled', 'no_show'])
@@ -212,7 +220,7 @@ class StaffController extends Controller
             })->values();
 
         $pendingQueueActions = QueueTicket::with(['user', 'queue.room'])
-            ->whereIn('status', ['called', 'checked_in'])
+            ->whereIn('queue_id', $queueIds)->whereIn('status', ['called', 'checked_in'])
             ->orderBy('position')
             ->get()
             ->map(fn($ticket) => [
@@ -227,8 +235,8 @@ class StaffController extends Controller
                 'queue_id' => $ticket->queue_id,
             ])->values();
 
-        $pendingOfficeActions = OfficeTicket::with('user')
-            ->whereIn('status', ['called', 'checked_in'])
+        $pendingOfficeActions = OfficeTicket::with(['user', 'office'])->whereIn('office_id', $officeIds)
+            ->whereIn('status', ['called', 'checked_in', 'in_service'])
             ->orderBy('created_at')
             ->get()
             ->map(fn($ticket) => [
@@ -240,6 +248,7 @@ class StaffController extends Controller
                 'subject' => $ticket->subject,
                 'student_name' => $ticket->user?->name ?? 'Student',
                 'office_name' => $ticket->office?->name,
+                'office_id' => $ticket->office_id,
             ])->values();
 
         return response()->json([
@@ -250,7 +259,15 @@ class StaffController extends Controller
                 'offices' => $offices,
                 'pending_queue_actions' => $pendingQueueActions,
                 'pending_office_actions' => $pendingOfficeActions,
-                'teaching_today' => [],
+                'teaching_today' => $user->hasPermission(Permissions::TIMETABLE_MANAGE_ASSIGNED)
+                    ? TimetableEntry::with(['course', 'room.floor.building'])->where('lecturer_id', $user->id)
+                        ->where('term_code', Term::where('is_current', true)->value('code'))
+                        ->where('day_of_week', now()->dayOfWeek)->orderBy('starts_at')->get()->map(fn ($entry) => [
+                            'id' => $entry->id, 'course_code' => $entry->course?->code,
+                            'course_title' => $entry->course?->name, 'room_code' => $entry->room?->code,
+                            'starts_at' => $entry->starts_at, 'ends_at' => $entry->ends_at,
+                            'session_type' => $entry->type,
+                        ])->values() : [],
                 'kpis' => [
                     'served_today' => $todayAdmitted + $todayServed,
                     'waiting_now' => $activeRoomTickets + $activeOfficeTickets,
@@ -269,19 +286,22 @@ class StaffController extends Controller
     /* --------------------------------------------------------------- queues */
 
     /**
-     * List all open queues with waiting counts.
+     * List assigned queues, including closed lines an operator may reopen.
      */
     public function queues(Request $request): JsonResponse
     {
         if (!$this->requireStaff($request)) return $this->forbidden();
 
-        $queues = RoomQueue::with(['room'])
-            ->where('is_open', true)
+        $queues = RoomQueue::with(['room.floor.building'])
             ->get()
+            ->filter(fn ($q) => \App\Support\Access\StaffScope::canOperateQueue($request->user(), $q))
+            ->values()
             ->map(fn($q) => array_merge($q->toApiArray(), [
                 'room_code'  => $q->room?->code,
                 'room_name'  => $q->room?->name,
                 'building'   => $q->room?->floor?->building?->name,
+                'building_code' => $q->room?->floor?->building?->code,
+                'floor_name' => $q->room?->floor?->name,
                 'waiting'    => QueueTicket::where('queue_id', $q->id)->where('status', 'waiting')->count(),
                 'called'     => QueueTicket::where('queue_id', $q->id)->where('status', 'called')->count(),
                 'checked_in' => QueueTicket::where('queue_id', $q->id)->where('status', 'checked_in')->count(),
@@ -315,6 +335,8 @@ class StaffController extends Controller
                 'queue'   => array_merge($queue->toApiArray(), [
                     'room_code' => $queue->room?->code,
                     'room_name' => $queue->room?->name,
+                    'building_code' => $queue->room?->floor?->building?->code,
+                    'floor_name' => $queue->room?->floor?->name,
                 ]),
                 'line'    => $tickets,
                 'counts'  => [
@@ -465,20 +487,19 @@ class StaffController extends Controller
      */
     public function offices(Request $request): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::OFFICE_OPERATE_ASSIGNED)) return $this->forbidden();
 
         $user = $request->user();
 
-        $q = Office::with(['serviceWindows'])->where('status', 'active');
-        if ($user->role !== 'admin') {
-            $officeIds = OfficeStaff::where('user_id', $user->id)->pluck('office_id');
-            $q->whereIn('id', $officeIds);
-        }
-
-        $offices = $q->get()->map(fn($o) => array_merge($o->toApiArray(), [
-            'waiting' => OfficeTicket::where('office_id', $o->id)->where('status', 'waiting')->count(),
-            'serving' => OfficeTicket::where('office_id', $o->id)->where('status', 'in_service')->count(),
-        ]));
+        // The directory must use the same policy as the desk it links to. Active status is not
+        // current opening hours; include inactive assigned offices for operational context.
+        $offices = Office::with(['serviceWindows', 'room.floor.building'])->get()
+            ->filter(fn ($office) => StaffScope::canOperateOffice($user, $office))
+            ->values()->map(fn ($o) => array_merge($o->toApiArray(), [
+                'waiting' => OfficeTicket::where('office_id', $o->id)->where('status', 'waiting')->count(),
+                'serving' => OfficeTicket::where('office_id', $o->id)->where('status', 'in_service')->count(),
+                'completed_today' => OfficeTicket::where('office_id', $o->id)->where('status', 'completed')->whereDate('completed_at', now()->toDateString())->count(),
+            ]));
 
         return response()->json(['success' => true, 'data' => ['offices' => $offices]]);
     }
@@ -488,7 +509,7 @@ class StaffController extends Controller
      */
     public function officeLine(Request $request, string $id): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::OFFICE_OPERATE_ASSIGNED)) return $this->forbidden();
 
         $office  = $this->findOffice($request, $id);
         $tickets = OfficeTicket::with(['user'])
@@ -504,7 +525,9 @@ class StaffController extends Controller
         return response()->json([
             'success' => true,
             'data'    => [
-                'office'  => $office->toApiArray(),
+                'office'  => array_merge($office->toApiArray(), [
+                    'completed_today' => OfficeTicket::where('office_id', $id)->where('status', 'completed')->whereDate('completed_at', now()->toDateString())->count(),
+                ]),
                 'line'    => $tickets,
                 'windows' => $office->serviceWindows->map(fn (OfficeServiceWindow $window) => $window->toApiArray())->values(),
                 'counts'  => [
@@ -521,7 +544,7 @@ class StaffController extends Controller
      */
     public function officeCallNext(Request $request, string $id): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::OFFICE_OPERATE_ASSIGNED)) return $this->forbidden();
 
         $this->findOffice($request, $id);
 
@@ -560,7 +583,7 @@ class StaffController extends Controller
      */
     public function officeCheckIn(Request $request, string $ticketId): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::OFFICE_OPERATE_ASSIGNED)) return $this->forbidden();
 
         $ticket = $this->findOfficeTicket($request, $ticketId);
         DB::transaction(function () use ($ticket, $request) {
@@ -581,7 +604,7 @@ class StaffController extends Controller
      */
     public function officeStartService(Request $request, string $ticketId): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::OFFICE_OPERATE_ASSIGNED)) return $this->forbidden();
 
         $ticket = $this->findOfficeTicket($request, $ticketId);
         DB::transaction(function () use ($ticket, $request) {
@@ -602,7 +625,7 @@ class StaffController extends Controller
      */
     public function officeComplete(Request $request, string $ticketId): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::OFFICE_OPERATE_ASSIGNED)) return $this->forbidden();
 
         $ticket = $this->findOfficeTicket($request, $ticketId);
         DB::transaction(function () use ($ticket, $request) {
@@ -623,7 +646,7 @@ class StaffController extends Controller
      */
     public function officeNoShow(Request $request, string $ticketId): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::OFFICE_OPERATE_ASSIGNED)) return $this->forbidden();
 
         $ticket = $this->findOfficeTicket($request, $ticketId);
         DB::transaction(function () use ($ticket, $request) {
@@ -646,7 +669,7 @@ class StaffController extends Controller
      */
     public function timetable(Request $request): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::TIMETABLE_MANAGE_ASSIGNED)) return $this->forbidden();
 
         $user     = $request->user();
         $termCode = $request->query('term_code');
@@ -665,8 +688,10 @@ class StaffController extends Controller
             'data'    => [
                 'entries'      => $entries,
                 'can_manage'   => true,
-                'courses'      => [],  // staff's own courses — extend if needed
-                'rooms'        => [],
+                'courses'      => Course::orderBy('code')->get(['id', 'code', 'name']),
+                'rooms'        => Room::orderBy('code')->get(['id', 'code', 'name']),
+                'terms'        => Term::orderByDesc('starts_at')->get()->map(fn ($term) => $term->toApiArray()),
+                'term_code'    => $termCode,
             ],
         ]);
     }
@@ -676,7 +701,7 @@ class StaffController extends Controller
      */
     public function createEntry(Request $request): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::TIMETABLE_MANAGE_ASSIGNED)) return $this->forbidden();
 
         $request->validate([
             'course_id'  => 'required|uuid|exists:courses,id',
@@ -703,14 +728,21 @@ class StaffController extends Controller
      */
     public function updateEntry(Request $request, string $id): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::TIMETABLE_MANAGE_ASSIGNED)) return $this->forbidden();
 
         $entry = TimetableEntry::findOrFail($id);
         if ($entry->lecturer_id !== $request->user()->id && $request->user()->role !== 'admin') {
             return $this->forbidden();
         }
 
-        $entry->update($request->only(['room_id', 'type', 'day_of_week', 'starts_at', 'ends_at']));
+        $validated = $request->validate([
+            'room_id' => 'sometimes|nullable|uuid|exists:rooms,id',
+            'type' => 'sometimes|required|in:lecture,tutorial,lab,seminar',
+            'day_of_week' => 'sometimes|required|integer|between:0,6',
+            'starts_at' => 'sometimes|required|date_format:H:i:s',
+            'ends_at' => 'sometimes|required|date_format:H:i:s|after:starts_at',
+        ]);
+        $entry->update($validated);
 
         return response()->json([
             'success' => true,
@@ -723,7 +755,7 @@ class StaffController extends Controller
      */
     public function deleteEntry(Request $request, string $id): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::TIMETABLE_MANAGE_ASSIGNED)) return $this->forbidden();
 
         $entry = TimetableEntry::findOrFail($id);
         if ($entry->lecturer_id !== $request->user()->id && $request->user()->role !== 'admin') {
@@ -742,7 +774,7 @@ class StaffController extends Controller
      */
     public function createEvent(Request $request): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::CONTENT_MANAGE_OWN_SCOPE)) return $this->forbidden();
 
         $request->validate([
             'title'      => 'required|string|max:255',
@@ -751,11 +783,12 @@ class StaffController extends Controller
             'ends_at'    => 'nullable|date|after:starts_at',
             'venue'      => 'nullable|string|max:255',
             'category'   => 'nullable|string|max:100',
+            'capacity' => 'nullable|integer|min:1',
         ]);
 
         $event = CampusEvent::create(array_merge($request->only([
-            'title', 'description', 'starts_at', 'ends_at', 'venue', 'category',
-        ]), ['status' => 'published', 'organizer_id' => $request->user()->id]));
+            'title', 'description', 'starts_at', 'ends_at', 'venue', 'category', 'capacity',
+        ]), ['status' => 'published', 'created_by' => $request->user()->id]));
 
         return response()->json(['success' => true, 'data' => ['event' => $event]], 201);
     }
@@ -765,10 +798,14 @@ class StaffController extends Controller
      */
     public function updateEvent(Request $request, string $id): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::CONTENT_MANAGE_OWN_SCOPE)) return $this->forbidden();
 
-        $event = CampusEvent::findOrFail($id);
-        $event->update($request->only(['title', 'description', 'starts_at', 'ends_at', 'venue', 'category', 'status']));
+        $event = CampusEvent::where('created_by', $request->user()->id)->findOrFail($id);
+        $request->validate(['title' => 'required|string|max:255', 'description' => 'nullable|string',
+            'starts_at' => 'required|date', 'ends_at' => 'nullable|date|after:starts_at',
+            'venue' => 'nullable|string|max:255', 'category' => 'nullable|string|max:100',
+            'capacity' => 'nullable|integer|min:1']);
+        $event->update($request->only(['title', 'description', 'starts_at', 'ends_at', 'venue', 'category', 'capacity', 'status']));
 
         return response()->json(['success' => true, 'data' => ['event' => $event->fresh()]]);
     }
@@ -778,9 +815,9 @@ class StaffController extends Controller
      */
     public function deleteEvent(Request $request, string $id): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::CONTENT_MANAGE_OWN_SCOPE)) return $this->forbidden();
 
-        CampusEvent::findOrFail($id)->delete();
+        CampusEvent::where('created_by', $request->user()->id)->firstOrFail()->delete();
 
         return response()->json(['success' => true, 'message' => 'Event deleted']);
     }
@@ -792,9 +829,9 @@ class StaffController extends Controller
      */
     public function announcements(Request $request): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::CONTENT_MANAGE_OWN_SCOPE)) return $this->forbidden();
 
-        $announcements = Announcement::orderBy('created_at', 'desc')->get();
+        $announcements = Announcement::where('created_by', $request->user()->id)->orderBy('created_at', 'desc')->get();
 
         return response()->json(['success' => true, 'data' => ['announcements' => $announcements]]);
     }
@@ -804,16 +841,18 @@ class StaffController extends Controller
      */
     public function createAnnouncement(Request $request): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::CONTENT_MANAGE_OWN_SCOPE)) return $this->forbidden();
 
         $request->validate([
             'title'   => 'required|string|max:255',
             'body'    => 'required|string',
             'priority'=> 'nullable|in:low,normal,high,urgent',
+            'target_roles' => 'nullable|array|min:1',
+            'target_roles.*' => 'in:all,student,staff,admin,visitor',
         ]);
 
-        $ann = Announcement::create(array_merge($request->only(['title', 'body', 'priority']), [
-            'author_id'    => $request->user()->id,
+        $ann = Announcement::create(array_merge($request->only(['title', 'body', 'priority', 'target_roles']), [
+            'created_by'    => $request->user()->id,
             'published_at' => now(),
         ]));
 
@@ -825,9 +864,9 @@ class StaffController extends Controller
      */
     public function deleteAnnouncement(Request $request, string $id): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::CONTENT_MANAGE_OWN_SCOPE)) return $this->forbidden();
 
-        Announcement::findOrFail($id)->delete();
+        Announcement::where('created_by', $request->user()->id)->firstOrFail()->delete();
 
         return response()->json(['success' => true, 'message' => 'Announcement deleted']);
     }
@@ -981,7 +1020,7 @@ class StaffController extends Controller
     /** POST /staff/office-tickets/{ticket}/call — call a named office ticket. */
     public function officeCallTicket(Request $request, string $ticketId): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::OFFICE_OPERATE_ASSIGNED)) return $this->forbidden();
 
         $ticket = $this->findOfficeTicket($request, $ticketId);
 
@@ -1155,6 +1194,28 @@ class StaffController extends Controller
         ]);
     }
 
+    /** GET /staff/rooms — existing campus read scope, explicit per-room write capability. */
+    public function rooms(Request $request): JsonResponse
+    {
+        if (!$this->requireStaff($request, Permissions::CAMPUS_VIEW_PRIVATE)) return $this->forbidden();
+        $request->validate(['q' => 'nullable|string|max:200', 'per_page' => 'sometimes|integer|between:1,100']);
+        $query = Room::with(['floor.building', 'queue']);
+        $search = $request->query('q');
+        if ($search !== null && $search !== '') {
+            $query->where(fn ($q) => $q->where('code', 'ilike', "%{$search}%")->orWhere('name', 'ilike', "%{$search}%"));
+        }
+        $paged = $query->orderBy('code')->paginate((int) $request->query('per_page', 24));
+        return response()->json(['success' => true, 'data' => [
+            'items' => collect($paged->items())->map(fn ($room) => array_merge($room->toApiArray(true), [
+                // The existing read grant covers campus rooms; only this separate write policy
+                // permits an edit. Do not infer permission from visible records or role labels.
+                'can_update_status' => $request->user()->hasPermission(Permissions::ROOMS_UPDATE_OWN_SCOPE)
+                    && StaffScope::canManageRoom($request->user(), $room),
+            ])),
+            'meta' => ['total' => $paged->total(), 'per_page' => $paged->perPage(), 'current_page' => $paged->currentPage(), 'last_page' => $paged->lastPage()],
+        ]]);
+    }
+
     /**
      * PATCH /staff/rooms/{room}
      *
@@ -1164,7 +1225,7 @@ class StaffController extends Controller
      */
     public function updateRoom(Request $request, string $room): JsonResponse
     {
-        if (!$this->requireStaff($request)) return $this->forbidden();
+        if (!$this->requireStaff($request, Permissions::ROOMS_UPDATE_OWN_SCOPE)) return $this->forbidden();
 
         $record = Room::findOrFail($room);
 

@@ -33,6 +33,9 @@ class EngagementController extends Controller
 
         $items = collect($page->items())->map(function (CampusEvent $event) use ($user) {
             $array = $event->toApiArray();
+            $array['can_manage'] = $user && $user->role === 'staff'
+                && $user->hasPermission(\App\Support\Access\Permissions::CONTENT_MANAGE_OWN_SCOPE)
+                && (string) $event->created_by === (string) $user->id;
 
             if ($user) {
                 $array['is_registered'] = EventRegistration::where('event_id', $event->id)

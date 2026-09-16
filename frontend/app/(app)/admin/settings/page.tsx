@@ -105,7 +105,7 @@ export default function AdminSettingsPage() {
                 const value = valueOf(setting.key, stored?.value);
                 return (
                   <div key={setting.key} className="flex flex-wrap items-end gap-3">
-                    <div className="min-w-[220px] flex-1">
+                    <div className="min-w-0 basis-[220px] flex-1">
                       <Field label={setting.label} htmlFor={`setting-${setting.key}`} hint={setting.description}>
                         <Input
                           id={`setting-${setting.key}`}

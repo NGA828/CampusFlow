@@ -1,3 +1,4 @@
+import { useReducedMotion } from '@/components/motion';
 import { Stack } from 'expo-router';
 
 /**
@@ -10,8 +11,9 @@ import { Stack } from 'expo-router';
  * refuse them even if the files were added here by mistake.
  */
 export default function StaffLayout() {
+  const reduced = useReducedMotion();
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#f6f7fb' } }}>
+    <Stack screenOptions={{ animation: reduced ? 'none' : 'slide_from_right', headerShown: false, contentStyle: { backgroundColor: '#f6f7fb' } }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="line/[id]" options={{ headerShown: true, title: 'Line' }} />
       <Stack.Screen name="office/[id]" options={{ headerShown: true, title: 'Desk' }} />

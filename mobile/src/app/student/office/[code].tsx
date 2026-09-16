@@ -3,7 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, TextInput, View } from 'react-native';
 
-import { Badge, Button, Card, ErrorNote, Eyebrow, H2, H3, KeyValue, Loading, Screen, SectionTitle, Small, Stat, Title } from '@/components/ui';
+import { AdaptiveRow, Badge, Button, Card, ErrorNote, Eyebrow, H2, H3, KeyValue, Loading, Screen, SectionTitle, Small, Stat, Title } from '@/components/ui';
 import { ApiError, officeApi } from '@/lib/api';
 import { useLoader } from '@/lib/auth';
 import { colors, countdown, dayName, formatClock, radius, spacing } from '@/lib/theme';
@@ -101,11 +101,11 @@ export default function OfficeDetailScreen() {
         <View style={styles.padded}>
           <Card>
             <SectionTitle title="Live status" action={<Badge tone={detail.is_open_now ? 'mint' : 'neutral'}>{detail.is_open_now ? 'open' : 'closed'}</Badge>} />
-            <View style={styles.stats}>
+            <AdaptiveRow style={styles.stats}>
               <Stat label="Waiting" value={detail.counts.waiting} />
               <Stat label="In service" value={detail.counts.in_service} />
               <Stat label="Avg service" value={`${detail.average_service_minutes}m`} />
-            </View>
+            </AdaptiveRow>
             <View style={{ marginTop: spacing.md }}>
               <KeyValue label="Next ticket" value={detail.next_ticket_number} />
               <KeyValue label="Estimated wait" value={`${detail.estimated_wait_minutes} min`} />
@@ -125,10 +125,10 @@ export default function OfficeDetailScreen() {
               <SectionTitle title="Your ticket" action={<Badge tone="brand">{ticket.status_label}</Badge>} />
               <H2 style={{ letterSpacing: 1 }}>{ticket.ticket.ticket_number}</H2>
               <Small style={{ marginTop: 4 }}>{ticket.ticket.subject}</Small>
-              <View style={styles.stats}>
+              <AdaptiveRow style={styles.stats}>
                 <Stat label="People ahead" value={ticket.people_ahead} tone="brand" />
                 <Stat label="Wait" value={countdown(ticket.eta_seconds)} tone="mint" />
-              </View>
+              </AdaptiveRow>
               <Button
                 label={ticket.can_check_in ? 'Check in now' : 'Check in after you are called'}
                 disabled={!ticket.can_check_in}
@@ -207,7 +207,7 @@ export default function OfficeDetailScreen() {
 const styles = StyleSheet.create({
   header: { padding: spacing.lg },
   padded: { paddingHorizontal: spacing.lg },
-  stats: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  stats: { marginTop: spacing.md },
   input: {
     marginTop: spacing.md,
     borderWidth: 1,

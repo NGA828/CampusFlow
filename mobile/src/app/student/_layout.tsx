@@ -1,3 +1,4 @@
+import { useReducedMotion } from '@/components/motion';
 import { Stack } from 'expo-router';
 
 /**
@@ -9,8 +10,9 @@ import { Stack } from 'expo-router';
  * student and the web is where those screens live.
  */
 export default function StudentLayout() {
+  const reduced = useReducedMotion();
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#f6f7fb' } }}>
+    <Stack screenOptions={{ animation: reduced ? 'none' : 'slide_from_right', headerShown: false, contentStyle: { backgroundColor: '#f6f7fb' } }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="timetable" options={{ headerShown: true, title: 'Timetable' }} />
       <Stack.Screen name="navigate/[code]" options={{ headerShown: true, title: 'Navigate' }} />

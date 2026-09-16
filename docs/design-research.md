@@ -294,3 +294,87 @@ first viewport, state coverage, contrast, 360 px reflow, token reuse).
 
 No implemented screen scored below 8.0 in review; the sub-8 drafts (dashboard week view,
 timetable mobile grid, the typography-only landing page) were redesigned as recorded above.
+
+## Responsive foundation follow-up — 2026-09-15
+
+The shared-layout audit, four inspected technical references, comparison, scores and selected
+patterns are recorded in [responsive-foundation.md](design-decisions/responsive-foundation.md).
+This repair preserves the existing screen designs; it adds content-width and font-scale
+adaptation rather than introducing another dashboard template.
+
+## Mobile visual redesign — 2026-09-15
+
+See [the eleven-screen mobile redesign record](design-decisions/mobile-visual-redesign.md)
+for eight inspected Dribbble sources, visual-access limitations, per-screen shortlists, selected
+patterns, original artwork provenance, motion policy and verification scope.
+
+## Web workspace visual redesign — 2026-09-15
+
+[Research, per-surface comparison and implementation review](design-decisions/web-visual-redesign.md) ·
+[Rendered screenshot gallery](design-decisions/web-visual-review.html) ·
+[Landing preservation evidence](design-decisions/web-landing-preservation.json).
+Login and authenticated workspaces only; the landing page was protected and remains unchanged from
+the start of this request. Original decorative campus artwork is reused across platforms, not copied
+from Dribbble. Browser review images contain test fixtures, not live campus data.
+
+## Full individual web pass — 2026-09-15
+
+Progress is tracked per canonical page in [web-page-tracker](design-decisions/web-page-tracker.md), not inferred from shared styles. First research gate: [student discovery](design-decisions/student-discovery-redesign.md), comparing five Dribbble sources for room search/detail, events and announcements. Inspection limitations are recorded explicitly.
+
+Student discovery batch reviewed: [four-page gallery](design-decisions/student-discovery-review.html). 99/99 combined web checks passed; only four canonical pages are marked complete in the expanded pass. Remaining pages stay pending in the tracker.
+
+## Student services and timetable — batch two
+
+Research gate and page-specific decisions: [student-services-redesign](design-decisions/student-services-redesign.md). New inspected appointment/calendar imagery is compared with documented QMS, Stride and UVER references; limitations and weighted scores are explicit. Targets: timetable, office directory, office detail/request, office ticket.
+
+Batch two implemented and reviewed: [service-page gallery](design-decisions/student-services-review.html). Four additional individual pages complete (8/31 cumulative), with 131/131 web checks passing. The all-role pass remains in progress.
+
+
+## Student companion and shared account — batch three, 2026-09-16
+
+[Research, reference comparisons and individual screen decisions](design-decisions/student-companion-redesign.md) ·
+[Four-page review gallery](design-decisions/student-companion-review.html) ·
+[Landing preservation evidence](design-decisions/student-companion-landing-preservation.json).
+
+Queues, assistant, account and notifications are individually redesigned and fixture-verified. New
+Dribbble assistant/settings references are compared with explicitly reused QMS/Stride/UVER/room-board
+research; image-inspection limitations are recorded. **175/175** combined web checks pass. **12/31**
+canonical signed-in pages are complete; the remaining map/dashboard audits and staff/admin work are
+still pending. Landing source and strict stable pixels are unchanged. Gallery data is test-only.
+
+## Batch four — planning, campus exploration and staff room queues (delivered)
+Per-screen comparisons and pre-implementation reference selection:
+[Campus operations research](design-decisions/campus-operations-redesign.md).
+Dashboard D/S/U/Q; map M/U/R/S; staff list Q/R/S/N; staff detail Q/S/R/N.
+Landing protected. Completed expanded individual pass: **16/31**. Four new pages at320/768/1440,211combined web checks passed; build/lint/both-client typechecks and PHP/API static gates passed.
+[Review gallery](design-decisions/campus-operations-review.html) · [Landing evidence](design-decisions/campus-operations-landing-preservation.json). New Laravel scope tests are written but not executed without PHP/backend dependencies. Remaining15staff/admin pages are still pending.
+
+## Batch five — staff desks, room status and teaching (delivered)
+[Per-page comparisons and original directions](design-decisions/staff-services-redesign.md).
+Office directory T/Q/R/S; office worklist T/Q/S/N; rooms R/U/S; timetable T/D/S/A.
+All four reference gates were recorded before UI implementation. **20/31** distinct signed-in pages now individually redesigned and fixture-verified; two staff and nine admin pages remain. **256 unique web checks passed** across the main and layout runs; final 50-test follow-up passed after copy/format cleanup. Build/lint/PHP/API static gates and both-client types passed. Landing: seven identical hashes and strict zero differing pixels. Three new backend feature tests are written, not executed.
+[15-image review gallery](design-decisions/staff-services-review.html) · [Evidence](design-decisions/staff-services-evidence.json) · [Landing preservation](design-decisions/staff-services-landing-preservation.json).
+
+## Batch six — people, publishing and oversight (delivered)
+[Pre-implementation comparisons](design-decisions/coordination-redesign.md): staff dashboard S/T/D/Q;
+content C/T/N/S; admin dashboard C/S/R/N; users P/N/S/R. New CMS/permission thumbnail inspections
+are distinguished from unavailable exact artwork. **24/31** distinct signed-in pages now individually reviewed. All staff pages are included; seven admin pages remain. **302/302 unique fixture web tests passed**, with **72/72** final follow-up checks after copy/table polish. Build/lint/static PHP/API gates and both-client types pass. Four new backend tests are written but unexecuted without PHP. Landing source hashes and strict stable pixels are unchanged.
+[27-image review gallery](design-decisions/coordination-review.html) · [Evidence](design-decisions/coordination-evidence.json) · [Landing preservation](design-decisions/coordination-landing-preservation.json).
+
+## 2026-09-16 — Individual admin alerts gate
+
+Research completed **before** final UI work on `/admin/alerts`: Loom incident master/detail and related inbox crop, contextual insurance alert rail, Terchera record list and the exact Jordan Hughes Notifications settings shot 25796474. The per-source inspection, attribution limitations, weighted comparison, rejected patterns and original direction are in `design-decisions/alerts-redesign.md`. Select Loom's review structure + Untitled UI's explanatory sections + Terchera's quiet actions, not source artwork or fictitious incident analytics. Campus/services/academics remain audit-only pending their configuration-contract repairs; this gate does not count them as redesigned.
+
+**Alerts outcome:** implemented and visually reviewed at 320/768/1440px. Original master/detail triage, DOM-ordered narrow review, exact-fingerprint confirmation and honest snapshot states. Subjective implemented mean 8.4/10; 334 unique fixture checks passed, followed by 58 repeated final checks. Nine-image gallery: `design-decisions/alerts-review.html`. Backend runtime unavailable; three Laravel tests added but unrun. Tracker advances only one page to **25/31**; campus/services/academics are not included in this completion.
+
+## 2026-09-16 — Campus directory gate (buildings / floors / rooms)
+
+Before UI implementation: visually compared HoPR hotel room management hierarchy, two property dashboards, the exact Hatypo Room Booking alternate artwork and the previously inspected Untitled UI configuration reference. Per-workflow comparisons, source/thumbnail limitations, weighted scores and original direction are recorded in `design-decisions/campus-admin-redesign.md`. Select hierarchy and configuration clarity, reject finance widgets, fake occupancy and fabricated plan geometry. Central correction: stored fields, valid parent/code requirements and real paginated context selection—not a reskin of silently ignored form fields.
+
+**Campus implementation outcome (acceptance held):** the three directories and storage-correct
+editors are implemented and visually reviewed in21 captures at320/768/1440.41 campus browser tests
+pass, along with build/lint/static/type checks. [Gallery](design-decisions/campus-admin-review.html)
+and [evidence](design-decisions/campus-admin-evidence.json). The landing's seven protected source
+hashes match, but strict raster preservation is intermittent and direct pre/post differs31,759
+channels; the full375 selection has374 passes/1 failure. Five backend feature tests are authored,
+not executed. **Do not advance the accepted tracker beyond25/31 until preservation is resolved.**

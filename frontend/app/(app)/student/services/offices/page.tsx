@@ -1,172 +1,331 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useAsync, formatDuration, relativeTime, STATUS_TONES, statusLabel } from '@/lib/hooks';
-import { studentApi } from '@/lib/api/endpoints';
-import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, KeyValue, SectionHeading } from '@/components/ui/kit';
-import { PageHeader } from '@/components/layout/app-shell';
+import { useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import {
+  useAsync,
+  formatDuration,
+  formatDate,
+  formatClock,
+  STATUS_TONES,
+  statusLabel,
+} from "@/lib/hooks";
+import { studentApi } from "@/lib/api/endpoints";
+import {
+  Badge,
+  Button,
+  CardSkeleton,
+  EmptyState,
+  ErrorState,
+  Input,
+} from "@/components/ui/kit";
+import { WorkspaceIcon } from "@/components/layout/workspace-visual";
+import { PageHeader } from "@/components/layout/app-shell";
+import s from "@/components/layout/student-services.module.css";
 
 export default function OfficesPage() {
   const summaries = useAsync(() => studentApi.offices(), []);
   const history = useAsync(() => studentApi.officeTickets(), []);
-  const [filter, setFilter] = useState<'all' | 'open'>('all');
-
-  const offices = useMemo(() => {
-    const list = [...(summaries.data?.offices ?? [])];
-    list.sort((a, b) => Number(b.is_open_now) - Number(a.is_open_now) || a.office.name.localeCompare(b.office.name));
-    return filter === 'open' ? list.filter((office) => office.is_open_now) : list;
-  }, [summaries.data, filter]);
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [allHistory, setAllHistory] = useState(false);
+  const offices = [...(summaries.data?.offices ?? [])]
+    .filter(
+      (o) =>
+        (filter !== "open" || o.is_open_now) &&
+        `${o.office.name} ${o.office.code} ${o.office.description ?? ""}`
+          .toLowerCase()
+          .includes(search.trim().toLowerCase()),
+    )
+    .sort(
+      (a, b) =>
+        Number(b.is_open_now) - Number(a.is_open_now) ||
+        a.office.name.localeCompare(b.office.name),
+    );
+  const tickets = history.data?.tickets ?? [];
 
   return (
-    <div>
+    <div className={s.page}>
       <PageHeader
         title="Administrative offices"
-        description="Request a ticket before you walk over. CampusFlow shows the line, the expected service window and calls you when it is your turn."
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant={filter === 'all' ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter('all')}>
-              All
-            </Button>
-            <Button variant={filter === 'open' ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter('open')}>
-              Open now
+        description="Find the right desk. Plan your visit before you walk over."
+      />
+      <section className={s.hero} aria-label="Campus services">
+        <div>
+          <p className={s.eyebrow}>Support for the everyday</p>
+          <h2>
+            A little less waiting.
+            <br />A simpler campus visit.
+          </h2>
+          <p className={s.muted}>
+            Check office hours, review requirements and request your place in
+            the service line.
+          </p>
+        </div>
+        <Image
+          src="/images/campus-workspace.webp"
+          width={380}
+          height={280}
+          alt=""
+        />
+      </section>
+      <div className={s.columns}>
+        <section aria-label="Office directory" aria-busy={summaries.loading}>
+          <div className={s.toolbar}>
+            <Input
+              aria-label="Search offices"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search office name, code or description"
+            />
+            <div
+              className={s.controls}
+              role="group"
+              aria-label="Office opening filter"
+            >
+              <button
+                className={s.chip}
+                aria-pressed={filter === "all"}
+                onClick={() => setFilter("all")}
+              >
+                All offices
+              </button>
+              <button
+                className={s.chip}
+                aria-pressed={filter === "open"}
+                onClick={() => setFilter("open")}
+              >
+                Open now
+              </button>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={summaries.loading}
+              onClick={summaries.reload}
+            >
+              Refresh offices
             </Button>
           </div>
-        }
-      />
-
-      {summaries.error ? <ErrorState message={summaries.error} onRetry={summaries.reload} /> : null}
-
-      {summaries.loading ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <CardSkeleton rows={4} />
-          <CardSkeleton rows={4} />
-        </div>
-      ) : offices.length === 0 ? (
-        <EmptyState
-          title={filter === 'open' ? 'No offices are open right now' : 'No offices configured'}
-          description="Service windows are set by the administration — check back during working hours."
-          action={
-            filter === 'open' ? (
-              <Button variant="secondary" size="sm" onClick={() => setFilter('all')}>
-                Show all offices
-              </Button>
-            ) : undefined
-          }
-        />
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {offices.map((summary) => {
-            const { office } = summary;
-            return (
-              <Card key={office.id} className="flex flex-col">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[15px] font-semibold text-ink-900">{office.name}</p>
-                    <p className="mt-0.5 text-[12.5px] text-ink-500">
-                      {office.building_code ? `Building ${office.building_code}` : '—'}
-                      {office.floor_name ? ` · ${office.floor_name}` : ''}
-                      {office.room_code ? ` · ${office.room_code}` : ''}
-                    </p>
-                  </div>
-                  <Badge tone={summary.is_open_now ? 'success' : 'neutral'}>{summary.is_open_now ? 'Open now' : 'Closed'}</Badge>
-                </div>
-
-                <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
-                  <div className="rounded-[10px] bg-ink-50 px-2 py-2.5">
-                    <p className="tnum text-[17px] font-semibold text-ink-900">{summary.counts.waiting}</p>
-                    <p className="text-[11px] text-ink-500">waiting</p>
-                  </div>
-                  <div className="rounded-[10px] bg-ink-50 px-2 py-2.5">
-                    <p className="tnum text-[17px] font-semibold text-ink-900">{summary.counts.in_service}</p>
-                    <p className="text-[11px] text-ink-500">in service</p>
-                  </div>
-                  <div className="rounded-[10px] bg-ink-50 px-2 py-2.5">
-                    <p className="tnum text-[17px] font-semibold text-ink-900">{summary.average_service_minutes}</p>
-                    <p className="text-[11px] text-ink-500">min avg</p>
-                  </div>
-                </dl>
-
-                <dl className="mt-3 divide-y divide-ink-50">
-                  <KeyValue
-                    label="Next number"
-                    value={<span className="font-mono">{summary.next_ticket_number}</span>}
-                  />
-                  <KeyValue
-                    label="Estimated wait"
-                    value={summary.is_open_now ? formatDuration(summary.estimated_wait_minutes * 60) : summary.next_opening ? `Opens ${relativeTime(summary.next_opening)}` : '—'}
-                  />
-                  {summary.expected_window ? (
-                    <KeyValue
-                      label="Expected window"
-                      value={`${summary.expected_window.starts_at.slice(11, 16)} – ${summary.expected_window.ends_at.slice(11, 16)}`}
-                      mono
-                    />
-                  ) : null}
-                  {summary.daily_capacity ? (
-                    <KeyValue label="Daily capacity" value={`${summary.daily_capacity_used} / ${summary.daily_capacity}`} mono />
-                  ) : null}
-                </dl>
-
-                {summary.staff.length > 0 ? (
-                  <p className="mt-3 text-[12px] text-ink-500">
-                    Served by {summary.staff.map((staff) => staff.name).join(', ')}
-                  </p>
+          {summaries.loading ? (
+            <CardSkeleton rows={7} />
+          ) : summaries.error ? (
+            <ErrorState message={summaries.error} onRetry={summaries.reload} />
+          ) : !offices.length ? (
+            <EmptyState
+              title="No offices match this view"
+              description="Try another search or include closed offices to check their hours."
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setSearch("");
+                    setFilter("all");
+                  }}
+                >
+                  Clear filters
+                </Button>
+              }
+            />
+          ) : (
+            <>
+              <p className={`${s.muted} mb-4`} role="status">
+                {offices.length} offices shown · open offices first
+              </p>
+              <div className={s.stack}>
+                {offices.map((summary) => {
+                  const { office } = summary;
+                  return (
+                    <article className={s.officeRow} key={office.id}>
+                      <div className={s.officeCode} aria-hidden="true">
+                        {office.code.length <= 3 ? (
+                          office.code
+                        ) : (
+                          <WorkspaceIcon name="office" size={25} />
+                        )}
+                      </div>
+                      <div>
+                        <div className={s.toolbar}>
+                          <h3>{office.name}</h3>
+                          <Badge
+                            tone={summary.is_open_now ? "success" : "neutral"}
+                          >
+                            {summary.is_open_now ? "Open now" : "Closed"}
+                          </Badge>
+                        </div>
+                        <p className={s.muted}>
+                          {[
+                            office.building_name ?? office.building_code,
+                            office.floor_name,
+                            office.room_code,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "Location not listed"}
+                        </p>
+                        {office.description ? (
+                          <p className={`${s.muted} mt-2`}>
+                            {office.description}
+                          </p>
+                        ) : null}
+                        <div className={s.officeStats}>
+                          <div>
+                            <strong>
+                              {summary.is_open_now
+                                ? formatDuration(
+                                    summary.estimated_wait_minutes * 60,
+                                  )
+                                : "—"}
+                            </strong>
+                            <span>Estimated wait</span>
+                          </div>
+                          <div>
+                            <strong>{summary.counts.waiting}</strong>
+                            <span>Waiting</span>
+                          </div>
+                          <div>
+                            <strong>{summary.counts.in_service}</strong>
+                            <span>In service</span>
+                          </div>
+                        </div>
+                        {!summary.is_open_now && summary.next_opening ? (
+                          <p className={`${s.muted} mb-3`}>
+                            Next opening: {formatDate(summary.next_opening)} ·{" "}
+                            {formatClock(summary.next_opening)}
+                          </p>
+                        ) : null}
+                        {office.requires_appointment ? (
+                          <p className={`${s.muted} mb-3`}>
+                            Appointment required · contact the office before
+                            visiting.
+                          </p>
+                        ) : office.requires_proximity_to_request ? (
+                          <p className={`${s.muted} mb-3`}>
+                            On-site location verification is required to request
+                            a ticket.
+                          </p>
+                        ) : null}
+                        <div className={s.actions}>
+                          <Link
+                            className={s.link}
+                            href={`/student/services/offices/${encodeURIComponent(office.code)}`}
+                          >
+                            Office details{" "}
+                            <WorkspaceIcon name="arrow" size={15} />
+                          </Link>
+                          {summary.my_ticket ? (
+                            <Link
+                              className={s.link}
+                              href={`/student/services/offices/tickets/${summary.my_ticket.id}`}
+                            >
+                              Open your ticket
+                            </Link>
+                          ) : !office.requires_appointment ? (
+                            <Link
+                              className={s.link}
+                              href={`/student/services/offices/${encodeURIComponent(office.code)}?request=1`}
+                            >
+                              Request a ticket
+                            </Link>
+                          ) : null}
+                          {office.room_code ? (
+                            <Link
+                              className={s.link}
+                              href={`/student/campus/map?route=${encodeURIComponent(office.room_code)}`}
+                            >
+                              Directions
+                            </Link>
+                          ) : null}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </section>
+        <aside className={s.stack} aria-label="Your office visits">
+          <section className={s.panel}>
+            <div className={s.toolbar}>
+              <h2>Your visits</h2>
+              <WorkspaceIcon name="queue" size={22} />
+            </div>
+            <p className={s.muted}>
+              Your recent tickets, separate from the office directory.
+            </p>
+            {history.loading ? (
+              <CardSkeleton rows={3} />
+            ) : history.error ? (
+              <ErrorState message={history.error} onRetry={history.reload} />
+            ) : !tickets.length ? (
+              <p className={`${s.muted} mt-5`}>
+                No office tickets yet. Choose a desk to get started.
+              </p>
+            ) : (
+              <>
+                <ul className="mt-5">
+                  {tickets.slice(0, allHistory ? 50 : 5).map((ticket) => (
+                    <li className={s.historyRow} key={ticket.id}>
+                      <div className={s.toolbar}>
+                        <strong>{ticket.ticket_number}</strong>
+                        <Badge
+                          tone={
+                            STATUS_TONES[ticket.status.toUpperCase()] ??
+                            "neutral"
+                          }
+                        >
+                          {statusLabel(ticket.status.toUpperCase())}
+                        </Badge>
+                      </div>
+                      <p className="text-sm font-semibold">
+                        {ticket.office_name ?? "Office visit"}
+                      </p>
+                      <p className={s.muted}>
+                        {ticket.subject ?? "No reason recorded"}
+                      </p>
+                      <p className={s.muted}>
+                        {formatDate(
+                          ticket.joined_at ??
+                            ticket.requested_at ??
+                            ticket.issued_at,
+                        )}
+                      </p>
+                      <Link
+                        className={s.link}
+                        href={`/student/services/offices/tickets/${ticket.id}`}
+                      >
+                        View ticket <WorkspaceIcon name="arrow" size={14} />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                {tickets.length > 5 ? (
+                  <button
+                    className={s.link}
+                    onClick={() => setAllHistory((v) => !v)}
+                  >
+                    {allHistory
+                      ? "Show fewer visits"
+                      : `Show all ${tickets.length} loaded visits`}
+                  </button>
                 ) : null}
-
-                <div className="mt-auto flex flex-wrap gap-2 pt-4">
-                  <Link href={`/student/services/offices/${office.code}`}>
-                    <Button size="sm" variant="secondary">
-                      Details
-                    </Button>
-                  </Link>
-                  <Link href={`/student/services/offices/${office.code}?request=1`}>
-                    <Button size="sm">Get a ticket</Button>
-                  </Link>
-                  {office.building_code ? (
-                    <Link href={`/student/campus/map?route=${encodeURIComponent(office.room_code ?? office.building_code)}`}>
-                      <Button size="sm" variant="ghost">
-                        Navigate
-                      </Button>
-                    </Link>
-                  ) : null}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      <Card className="mt-4">
-        <SectionHeading title="Your recent office tickets" description="Every request you have made, newest first." />
-        {history.loading ? (
-          <CardSkeleton rows={3} />
-        ) : (history.data?.tickets.length ?? 0) === 0 ? (
-          <p className="text-[13px] text-ink-500">You have not requested an office ticket yet.</p>
-        ) : (
-          <ul className="divide-y divide-ink-50">
-            {history.data?.tickets.slice(0, 8).map((ticket) => (
-              <li key={ticket.ticket.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <p className="font-mono text-[13px] font-medium text-ink-800">{ticket.ticket.ticket_number}</p>
-                  <p className="truncate text-[12.5px] text-ink-500">
-                    {ticket.office.name} · {ticket.ticket.subject ?? 'No subject'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[12px] text-ink-400">{relativeTime(ticket.ticket.requested_at)}</span>
-                  <Badge tone={STATUS_TONES[ticket.ticket.status] ?? 'neutral'}>{statusLabel(ticket.ticket.status)}</Badge>
-                  <Link href={`/student/services/offices/tickets/${ticket.ticket.id}`}>
-                    <Button size="sm" variant="ghost">
-                      Open
-                    </Button>
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+              </>
+            )}
+          </section>
+          <section className={s.darkPanel}>
+            <p className={s.eyebrow}>A prepared visit</p>
+            <h2>Know before you go.</h2>
+            <p className={s.muted}>
+              Review the office’s requirements and service hours. A wait
+              estimate can change as the line moves.
+            </p>
+            <Link className={s.link} href="/student/campus/map">
+              Explore the campus map <WorkspaceIcon name="arrow" size={16} />
+            </Link>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }

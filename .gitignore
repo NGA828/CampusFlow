@@ -36,3 +36,10 @@ __pycache__/
 Thumbs.db
 .idea/
 *.swp
+
+# Browser regression artifacts
+playwright-report/
+test-results/
+
+# Local audit scratch files
+.cache/

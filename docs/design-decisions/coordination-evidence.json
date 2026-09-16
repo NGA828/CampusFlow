@@ -1,0 +1,103 @@
+{
+  "date": "2026-09-16",
+  "branch": "arena/01a0a266-campusflow",
+  "pages": [
+    "/staff/dashboard",
+    "/staff/content",
+    "/admin/dashboard",
+    "/admin/users"
+  ],
+  "completion": {
+    "reviewed": 24,
+    "total": 31,
+    "student": 12,
+    "shared": 2,
+    "staff": 8,
+    "admin": 2,
+    "remainingAdmin": 7,
+    "loginFinalAudit": "separate, pending"
+  },
+  "browser": {
+    "runtime": "Chromium 153; production Next port 3100",
+    "data": "isolated mutable wire fixtures, not live campus records",
+    "previousUniqueChecks": 256,
+    "newUniqueChecks": 46,
+    "totalUniqueChecksPassed": 302,
+    "runs": [
+      {
+        "log": ".cache/coordination-pass/tests-second.log",
+        "logSha256": "b81d6d0bd953e3ba1481df765de6a68f84e3f830158577c4a011fdc9a5e02e0b",
+        "passed": 46,
+        "duration": "1.1m",
+        "command": "LD_LIBRARY_PATH=/tmp/lib PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium npm --prefix frontend run test:responsive -- coordination.spec.ts"
+      },
+      {
+        "log": ".cache/coordination-pass/tests-full.log",
+        "logSha256": "14679e3b6144141ae844fd028c75b722eaacc200065d6b255af07bc12c881373",
+        "passed": 302,
+        "duration": "5.7m",
+        "command": "LD_LIBRARY_PATH=/tmp/lib PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium npm --prefix frontend run test:responsive -- layout.spec.ts web-visual student-discovery student-services student-companion campus-operations staff-services coordination.spec.ts"
+      },
+      {
+        "log": ".cache/coordination-pass/tests-final.log",
+        "logSha256": "4bc2a70139bc93543d2eb81f51da462d66b8a3a927e62056d0423e8676ea54ab",
+        "passed": 72,
+        "duration": "2.4m",
+        "command": "LD_LIBRARY_PATH=/tmp/lib PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium npm --prefix frontend run test:responsive -- coordination.spec.ts layout.spec.ts student-discovery-states.spec.ts"
+      }
+    ],
+    "followUpRunsAreNotAdditionalUniqueChecks": true,
+    "widths": [
+      320,
+      768,
+      1440
+    ],
+    "galleryImages": 27,
+    "supplementalAssignmentCaptures": 6,
+    "supplementalAssertions": [
+      "no page errors",
+      "no document overflow",
+      "modal focus",
+      "modal horizontal bounds"
+    ],
+    "fixturesCapUserAndEventPagesAt": 2
+  },
+  "static": {
+    "build": "passed",
+    "lint": "passed",
+    "webAndMobileTypes": "passed",
+    "phpParsedFiles": 125,
+    "phpSyntaxErrors": 0,
+    "apiRoutes": 199,
+    "webCalls": 185,
+    "mobileCalls": 82,
+    "testCalls": 90,
+    "rolePermissionPairs": 62,
+    "orphans": 0,
+    "problems": 0
+  },
+  "backendTests": {
+    "added": 4,
+    "executed": false,
+    "reason": "PHP/Composer absent; php.new prerequisite download failed TLS; no live Laravel"
+  },
+  "landing": {
+    "sourceHashesUnchanged": 7,
+    "width": 1440,
+    "height": 5065,
+    "differingChannels": 0,
+    "detail": "coordination-landing-preservation.json"
+  },
+  "initialFailures": [
+    "First 44-case run interrupted after content date-format rendering failures; local explicit formatter fixed it",
+    "Two user tests switched from exact nested-label text to accessible combobox names; product controls retained"
+  ],
+  "limitations": [
+    "No deployed database/permission/transport certification",
+    "Last-admin/deactivation checks are not concurrency-hardened",
+    "Large scope/catalogue queries not benchmarked",
+    "No physical device, native mobile, cross-browser or screen-reader certification",
+    "Unowned legacy content was not automatically reassigned",
+    "No backend publication idempotency claim; refresh after ambiguous failure"
+  ]
+}

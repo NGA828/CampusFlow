@@ -1,16 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from 'expo-router/react-navigation';
 import { useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
-import { Badge, Button, Card, Eyebrow, H3, KeyValue, Screen, Small, Title } from '@/components/ui';
+import { AdaptiveRow, Badge, Button, Card, Eyebrow, H3, KeyValue, Screen, Small, Title } from '@/components/ui';
 import { ApiError, positioningApi } from '@/lib/api';
+import { PageIntro, Notice, IconTile } from '@/components/visual';
+import { ScanSweep } from '@/components/motion';
 import { colors, radius, relativeTime, spacing } from '@/lib/theme';
 import type { Position } from '@/lib/types';
 
 export default function ScanScreen() {
   const router = useRouter();
+  const focused = useIsFocused();
+  const [manualOpen, setManualOpen] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [code, setCode] = useState('');
   const [payload, setPayload] = useState('');
@@ -21,6 +26,7 @@ export default function ScanScreen() {
   const lastScan = useRef<{ value: string; at: number } | null>(null);
 
   const submit = async (body: { payload?: string; code?: string }) => {
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -44,16 +50,12 @@ export default function ScanScreen() {
   };
 
   return (
-    <Screen>
-      <View style={styles.header}>
-        <Eyebrow>Indoor positioning</Eyebrow>
-        <Title style={{ marginTop: 2 }}>Scan an anchor</Title>
-        <Small style={{ marginTop: 4 }}>Every code is signed by the campus API — an unknown or expired anchor is rejected.</Small>
-      </View>
+    <Screen bottomSafeArea={false}>
+      <PageIntro eyebrow="Find your place" title="Scan. Locate. Go." description="Point your camera at a CampusFlow QR anchor. We'll take it from there." icon="qr-code-outline" />
 
       <View style={styles.padded}>
         <Card style={{ padding: 0, overflow: 'hidden' }}>
-          {permission?.granted && scanning ? (
+          {permission?.granted && scanning && focused ? (
             <CameraView
               style={styles.camera}
               facing="back"
@@ -62,8 +64,8 @@ export default function ScanScreen() {
             />
           ) : (
             <View style={[styles.camera, styles.cameraFallback]}>
-              <Ionicons name="qr-code-outline" size={44} color={colors.ink300} />
-              <Small style={{ marginTop: spacing.sm, textAlign: 'center' }}>
+              <View style={{ padding: 18, borderWidth: 1, borderColor: '#5c6788', borderRadius: 24 }}><Ionicons name="qr-code-outline" size={68} color="#c3ccff" /></View>
+              <Small style={{ marginTop: spacing.sm, textAlign: 'center', color: '#c7cde5' }}>
                 {permission?.granted
                   ? 'Camera paused. Scan again or enter the code manually.'
                   : 'Camera access is needed to read the anchor. You can also type the code printed below the QR.'}
@@ -73,7 +75,9 @@ export default function ScanScreen() {
               ) : null}
             </View>
           )}
+          {permission?.granted && scanning && focused ? <><View pointerEvents="none" style={{ position: 'absolute', top: 28, bottom: 28, left: 28, right: 28, borderWidth: 2, borderColor: '#9ce6d6', borderRadius: 24 }} /><ScanSweep active={!busy} /></> : null}
         </Card>
+        <View style={{ marginTop: 12 }}><Notice icon="shield-checkmark-outline" title={busy ? 'Verifying your anchor…' : 'A trusted starting point'}>Your camera finds the code. The campus API verifies your location before you continue.</Notice></View>
 
         {position ? (
           <Card style={{ marginTop: spacing.lg, borderColor: colors.mint100, backgroundColor: colors.mint100 }}>
@@ -87,10 +91,10 @@ export default function ScanScreen() {
                 <KeyValue label="Plan position" value={`${position.plan_x.toFixed(1)} m, ${position.plan_y.toFixed(1)} m`} />
               ) : null}
             </View>
-            <View style={styles.actions}>
+            <AdaptiveRow style={styles.actions}>
               <Button label="Campus map" variant="secondary" onPress={() => router.push('/student/map' as any)} style={{ flex: 1 }} />
               <Button label="Scan again" onPress={() => { setPosition(null); setScanning(true); setError(null); }} style={{ flex: 1 }} />
-            </View>
+            </AdaptiveRow>
           </Card>
         ) : null}
 
@@ -102,7 +106,8 @@ export default function ScanScreen() {
           </Card>
         ) : null}
 
-        <Card style={{ marginTop: spacing.lg }}>
+        <Button label={manualOpen ? 'Hide manual entry' : 'Enter code manually'} variant="secondary" onPress={() => setManualOpen((value) => !value)} style={{ marginTop: 20 }} />
+        {manualOpen ? <Card style={{ marginTop: spacing.lg }}>
           <H3>Enter the code manually</H3>
           <Small style={{ marginTop: 4 }}>Printed anchors carry a short code such as QR-A-ENTRANCE.</Small>
           <TextInput
@@ -134,7 +139,14 @@ export default function ScanScreen() {
             onPress={() => void submit({ payload: payload.trim() })}
             style={{ marginTop: spacing.md }}
           />
-        </Card>
+        </Card> : null}
+        <View style={{ gap: 16, paddingVertical: 24 }}>
+          {[
+            ['01', 'Find an anchor', 'Look for a CampusFlow QR sign at an entrance or room.'],
+            ['02', 'Hold steady', 'Keep the code inside the frame until it is verified.'],
+            ['03', 'Continue your day', 'Use your confirmed position to find your next room.'],
+          ].map(([step, title, detail]) => <View key={step} style={{ flexDirection: 'row', gap: 14 }}><View style={{ width: 32, height: 32, borderRadius: 12, backgroundColor: colors.brand50, alignItems: 'center', justifyContent: 'center' }}><Small style={{ color: colors.brand700, fontWeight: '800' }}>{step}</Small></View><View style={{ flex: 1 }}><H3>{title}</H3><Small style={{ marginTop: 3 }}>{detail}</Small></View></View>)}
+        </View>
       </View>
     </Screen>
   );
@@ -142,9 +154,9 @@ export default function ScanScreen() {
 
 const styles = StyleSheet.create({
   header: { padding: spacing.lg },
-  padded: { paddingHorizontal: spacing.lg },
-  camera: { height: 280, backgroundColor: colors.ink900 },
-  cameraFallback: { alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: colors.ink50 },
+  padded: { paddingHorizontal: 20 },
+  camera: { width: '100%', aspectRatio: 4 / 3, maxHeight: 360, backgroundColor: colors.ink900 },
+  cameraFallback: { aspectRatio: undefined, minHeight: 220, maxHeight: undefined, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: colors.ink900 },
   input: {
     marginTop: spacing.md,
     borderWidth: 1,
@@ -156,5 +168,5 @@ const styles = StyleSheet.create({
     color: colors.ink800,
     backgroundColor: colors.white,
   },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  actions: { marginTop: spacing.lg },
 });

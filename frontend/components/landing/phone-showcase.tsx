@@ -145,14 +145,14 @@ export function PhoneShowcase({ className }: { className?: string }) {
   const active = SCREENS[index];
 
   return (
-    <div className={`relative ${className ?? ''}`}>
+    <div className={`@container relative ${className ?? ''}`}>
       <div className="flex items-end justify-center gap-5">
         <motion.div
           initial={reduced ? undefined : { opacity: 0, y: 26, rotate: -6 }}
           whileInView={reduced ? undefined : { opacity: 1, y: 0, rotate: -6 }}
           viewport={{ once: true, amount: 0.3 }}
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="hidden origin-bottom scale-[0.86] sm:block"
+          className="hidden origin-bottom scale-[0.86] @min-[720px]:block"
         >
           <PhoneFrame label="Timetable screen">
             <TimetableScreen />
@@ -195,7 +195,7 @@ export function PhoneShowcase({ className }: { className?: string }) {
           whileInView={reduced ? undefined : { opacity: 1, y: 0, rotate: 6 }}
           viewport={{ once: true, amount: 0.3 }}
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="hidden origin-bottom scale-[0.86] sm:block"
+          className="hidden origin-bottom scale-[0.86] @min-[720px]:block"
         >
           <PhoneFrame label="QR scanner screen">
             <ScanScreen />

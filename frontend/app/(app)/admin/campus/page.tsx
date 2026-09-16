@@ -1,378 +1,758 @@
-'use client';
+"use client";
+import { useCallback, useRef, useState } from "react";
+import Link from "next/link";
+import { useDebounced } from "@/lib/hooks";
+import { useOperator } from "@/lib/use-operator";
+import {
+  campusFields,
+  campusPage,
+  campusBody,
+  saveCampus,
+  removeCampus,
+  singular,
+  type CampusKind,
+  type CampusRow,
+} from "@/lib/api/campus-admin";
+import { ApiError } from "@/lib/api/client";
+import { Button, Input, Select, Textarea, Modal } from "@/components/ui/kit";
+import { Feedback, ReadState, Pager } from "@/components/layout/coordination";
+import s from "./campus.module.css";
 
-import { useMemo, useState } from 'react';
-import { useAsync, useDebounced } from '@/lib/hooks';
-import { adminApi } from '@/lib/api/endpoints';
-import { ApiError } from '@/lib/api/client';
-import { Badge, Button, ConfirmDialog, Field, Input, Modal, Select, Tabs } from '@/components/ui/kit';
-import { PageHeader } from '@/components/layout/app-shell';
-import { ResourceTable, type Column } from '@/components/admin/table';
-import { useToast } from '@/components/ui/toast';
-import type { Building, Floor, Room } from '@/lib/api/types';
-
-type Tab = 'buildings' | 'floors' | 'rooms';
-
-const ROOM_TYPES = ['lecture', 'lab', 'study', 'office', 'library', 'auditorium', 'meeting', 'service', 'other'] as const;
-
-interface Draft {
-  kind: Tab;
-  id?: string;
+type Place = { id: string; name: string; code: string };
+type Context = { building?: Place; floor?: Place };
+type Draft = {
+  kind: CampusKind;
+  row?: CampusRow;
   values: Record<string, string>;
-}
+};
+const txt = (v: unknown, fallback = "Not set") =>
+  typeof v === "string" && v ? v : fallback;
+const measure = (v: unknown, suffix = "") =>
+  typeof v === "number" && Number.isFinite(v) ? `${v}${suffix}` : "Not set";
+const errorText = (e: unknown) =>
+  e instanceof ApiError
+    ? (e.firstError ?? e.message)
+    : e instanceof Error
+      ? e.message
+      : "The action could not be confirmed.";
 
 export default function AdminCampusPage() {
-  const toast = useToast();
-  const [tab, setTab] = useState<Tab>('buildings');
-  const [search, setSearch] = useState('');
+  const [kind, setKind] = useState<CampusKind>("buildings");
+  const [context, setContext] = useState<Context>({});
+  const [search, setSearch] = useState("");
   const debounced = useDebounced(search, 250);
+  const [page, setPage] = useState(1);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<{ kind: Tab; id: string; label: string } | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [removal, setRemoval] = useState<CampusRow | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const locked = useRef(false);
+  const scope = JSON.stringify([
+    kind,
+    page,
+    debounced,
+    context.building?.id,
+    context.floor?.id,
+  ]);
+  const work = useOperator(
+    useCallback(
+      async () => ({
+        ...(await campusPage(kind, {
+          page,
+          per_page: 12,
+          q: debounced || undefined,
+          building_id: kind !== "buildings" ? context.building?.id : undefined,
+          floor_id: kind === "rooms" ? context.floor?.id : undefined,
+        })),
+        scope,
+      }),
+      [kind, page, debounced, context.building?.id, context.floor?.id, scope],
+    ),
+  );
+  const ready =
+    !work.loading &&
+    !work.error &&
+    work.data?.scope === scope &&
+    search === debounced;
+  const data = ready ? work.data : null;
+  const canCreate =
+    kind === "buildings" ||
+    (kind === "floors" ? !!context.building : !!context.floor);
 
-  const buildings = useAsync(() => adminApi.buildings({ per_page: 100 }), []);
-  const floors = useAsync(() => adminApi.floors({ per_page: 300 }), []);
-  const rooms = useAsync(() => adminApi.rooms({ per_page: 400 }), []);
-
-  const buildingOptions = useMemo(() => buildings.data?.items ?? [], [buildings.data]);
-  const floorOptions = useMemo(() => floors.data?.items ?? [], [floors.data]);
-
-  const filtered = useMemo(() => {
-    const needle = debounced.trim().toLowerCase();
-    const match = (value: string | null | undefined) => !needle || (value ?? '').toLowerCase().includes(needle);
-    return {
-      buildings: buildingOptions.filter((item) => match(item.code) || match(item.name)),
-      floors: floorOptions.filter((item) => match(item.name) || match(String(item.level))),
-      rooms: (rooms.data?.items ?? []).filter((item) => match(item.code) || match(item.name)),
-    };
-  }, [buildingOptions, floorOptions, rooms.data, debounced]);
-
-  const openCreate = () => {
-    setFormError(null);
-    if (tab === 'buildings') setDraft({ kind: 'buildings', values: { code: '', name: '', campus_name: 'Main Campus', lat: '', lng: '', status: 'operational' } });
-    if (tab === 'floors') setDraft({ kind: 'floors', values: { building_id: buildingOptions[0]?.id ?? '', level: '0', name: '', plan_width: '40', plan_height: '30' } });
-    if (tab === 'rooms') setDraft({ kind: 'rooms', values: { building_id: buildingOptions[0]?.id ?? '', floor_id: '', code: '', name: '', room_type: 'lecture', capacity: '30', plan_x: '0', plan_y: '0', plan_w: '6', plan_h: '5' } });
-  };
-
-  const openEdit = (kind: Tab, row: Building | Floor | Room) => {
-    setFormError(null);
-    if (kind === 'buildings') {
-      const building = row as Building;
-      setDraft({ kind, id: building.id, values: { code: building.code, name: building.name, campus_name: building.campus_name ?? '', lat: String(building.lat), lng: String(building.lng), status: building.status } });
-    }
-    if (kind === 'floors') {
-      const floor = row as Floor;
-      setDraft({ kind, id: floor.id, values: { building_id: floor.building_id, level: String(floor.level), name: floor.name, plan_width: String(floor.plan_width), plan_height: String(floor.plan_height) } });
-    }
-    if (kind === 'rooms') {
-      const room = row as Room;
-      setDraft({
-        kind,
-        id: room.id,
-        values: {
-          building_id: room.building_id ?? '',
-          floor_id: room.floor_id ?? '',
-          code: room.code,
-          name: room.name,
-          room_type: room.room_type,
-          capacity: String(room.capacity),
-          plan_x: String(room.plan_x ?? 0),
-          plan_y: String(room.plan_y ?? 0),
-          plan_w: String(room.plan_w ?? 6),
-          plan_h: String(room.plan_h ?? 5),
+  function navigate(next: CampusKind, ctx = context) {
+    setKind(next);
+    setContext(ctx);
+    setPage(1);
+    setSearch("");
+  }
+  function explore(row: CampusRow) {
+    if (row.kind === "buildings") navigate("floors", { building: row });
+    if (row.kind === "floors")
+      navigate("rooms", {
+        building: {
+          id: String(row.data.building_id),
+          name: txt(row.data.building_name, "Building"),
+          code: txt(row.data.building_code, ""),
         },
+        floor: row,
       });
-    }
-  };
-
-  const save = async () => {
-    if (!draft) return;
-    setSaving(true);
+  }
+  function edit(row?: CampusRow) {
     setFormError(null);
+    setDraft({
+      kind,
+      row,
+      values: row
+        ? { ...row.values }
+        : Object.fromEntries(
+            campusFields[kind].map((f) => [f.key, f.initial ?? ""]),
+          ),
+    });
+  }
+  async function save() {
+    if (!draft || locked.current) return;
+    let body: Record<string, unknown>;
     try {
-      if (draft.kind === 'buildings') {
-        const body = { ...draft.values, lat: Number(draft.values.lat), lng: Number(draft.values.lng) };
-        if (draft.id) await adminApi.updateBuilding(draft.id, body);
-        else await adminApi.createBuilding(body);
-        buildings.reload();
-      } else if (draft.kind === 'floors') {
-        const body = { ...draft.values, level: Number(draft.values.level), plan_width: Number(draft.values.plan_width), plan_height: Number(draft.values.plan_height) };
-        if (draft.id) await adminApi.updateFloor(draft.id, body);
-        else await adminApi.createFloor(body);
-        floors.reload();
-      } else {
-        const body = {
-          ...draft.values,
-          capacity: Number(draft.values.capacity),
-          plan_x: Number(draft.values.plan_x),
-          plan_y: Number(draft.values.plan_y),
-          plan_w: Number(draft.values.plan_w),
-          plan_h: Number(draft.values.plan_h),
-        };
-        if (draft.id) await adminApi.updateRoom(draft.id, body);
-        else await adminApi.createRoom(body);
-        rooms.reload();
+      body = campusBody(draft.kind, draft.values, draft.row);
+      if (!Object.keys(body).length) throw new Error("No changes to save.");
+      if (!draft.row && draft.kind === "floors")
+        body.building_id = context.building?.id;
+      if (!draft.row && draft.kind === "rooms")
+        body.floor_id = context.floor?.id;
+    } catch (e) {
+      setFormError(errorText(e));
+      return;
+    }
+    locked.current = true;
+    setFormError(null);
+    await work.act(async () => {
+      try {
+        await saveCampus(draft.kind, body, draft.row);
+        setDraft(null);
+      } catch (e) {
+        setFormError(errorText(e));
+        throw e;
       }
-      toast.success(draft.id ? 'Saved' : 'Created');
-      setDraft(null);
-    } catch (caught) {
-      const message = caught instanceof ApiError ? (caught.firstError ?? caught.message) : 'Could not save.';
-      setFormError(message);
-      toast.error('Save failed', message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const remove = async () => {
-    if (!pendingDelete) return;
-    try {
-      if (pendingDelete.kind === 'buildings') await adminApi.deleteBuilding(pendingDelete.id);
-      if (pendingDelete.kind === 'floors') await adminApi.deleteFloor(pendingDelete.id);
-      if (pendingDelete.kind === 'rooms') await adminApi.deleteRoom(pendingDelete.id);
-      toast.success('Removed');
-      if (pendingDelete.kind === 'buildings') buildings.reload();
-      if (pendingDelete.kind === 'floors') floors.reload();
-      if (pendingDelete.kind === 'rooms') rooms.reload();
-    } catch (caught) {
-      toast.error('Delete failed', caught instanceof ApiError ? (caught.firstError ?? caught.message) : 'It may still be referenced by rooms, sessions or queues.');
-    } finally {
-      setPendingDelete(null);
-    }
-  };
-
-  const buildingColumns: Column<Building>[] = [
-    { key: 'code', header: 'Code', render: (row) => <span className="font-mono font-medium text-ink-800">{row.code}</span> },
-    { key: 'name', header: 'Building', render: (row) => row.name },
-    { key: 'campus', header: 'Campus', render: (row) => row.campus_name ?? '—' },
-    {
-      key: 'coords',
-      header: 'Coordinates',
-      render: (row) => (
-        <span className="font-mono text-[12px] text-ink-500">
-          {row.lat.toFixed(4)}, {row.lng.toFixed(4)}
-        </span>
-      ),
-    },
-    { key: 'floors', header: 'Floors / rooms', render: (row) => <span className="tnum">{row.floor_count ?? '—'} / {row.room_count ?? '—'}</span> },
-    { key: 'status', header: 'Status', render: (row) => <Badge tone={row.status === 'operational' ? 'success' : row.status === 'closed' ? 'danger' : 'warning'}>{row.status}</Badge> },
-  ];
-
-  const floorColumns: Column<Floor>[] = [
-    { key: 'level', header: 'Level', render: (row) => <span className="tnum font-medium text-ink-800">{row.level}</span> },
-    { key: 'name', header: 'Floor', render: (row) => row.name },
-    { key: 'building', header: 'Building', render: (row) => buildingOptions.find((building) => building.id === row.building_id)?.code ?? row.building_id.slice(0, 8) },
-    { key: 'plan', header: 'Plan size', render: (row) => <span className="tnum text-[12.5px] text-ink-500">{row.plan_width} × {row.plan_height} m</span> },
-  ];
-
-  const roomColumns: Column<Room>[] = [
-    { key: 'code', header: 'Room', render: (row) => <span className="font-mono font-medium text-ink-800">{row.code}</span> },
-    { key: 'name', header: 'Name', render: (row) => row.name },
-    { key: 'type', header: 'Type', render: (row) => <Badge tone="neutral">{row.room_type}</Badge> },
-    { key: 'capacity', header: 'Capacity', align: 'right', render: (row) => <span className="tnum">{row.capacity}</span> },
-    { key: 'floor', header: 'Floor', render: (row) => floorOptions.find((floor) => floor.id === row.floor_id)?.name ?? '—' },
-    {
-      key: 'plan',
-      header: 'Plan position',
-      render: (row) => (
-        <span className="font-mono text-[12px] text-ink-500">
-          {row.plan_x}, {row.plan_y} · {row.plan_w}×{row.plan_h}
-        </span>
-      ),
-    },
-    { key: 'admission', header: 'Admission', render: (row) => (row.requires_admission ? <Badge tone="warning">queue</Badge> : <span className="text-[12px] text-ink-400">walk-in</span>) },
-  ];
+    }, "Saved record confirmed by the server.");
+    locked.current = false;
+  }
+  async function remove() {
+    if (!removal || locked.current) return;
+    locked.current = true;
+    setFormError(null);
+    await work.act(async () => {
+      try {
+        await removeCampus(removal);
+        setRemoval(null);
+      } catch (e) {
+        setFormError(errorText(e));
+        throw e;
+      }
+    }, "Unused record removed from the active directory.");
+    locked.current = false;
+  }
+  const groups = draft
+    ? [...new Set(campusFields[draft.kind].map((f) => f.group))]
+    : [];
 
   return (
-    <div>
-      <PageHeader
-        title="Campus & floors"
-        description="Buildings, floors and rooms. Room geometry feeds the indoor map, navigation graph and the spatial editor."
-      />
-
-      <div className="mb-4">
-        <Tabs
-          value={tab}
-          onChange={setTab}
-          tabs={[
-            { value: 'buildings', label: 'Buildings', count: buildingOptions.length },
-            { value: 'floors', label: 'Floors', count: floorOptions.length },
-            { value: 'rooms', label: 'Rooms', count: rooms.data?.items.length },
-          ]}
-        />
-      </div>
-
-      <ResourceTable
-        rows={tab === 'buildings' ? filtered.buildings : tab === 'floors' ? filtered.floors : filtered.rooms}
-        columns={(tab === 'buildings' ? buildingColumns : tab === 'floors' ? floorColumns : roomColumns) as Column<Building | Floor | Room>[]}
-        loading={tab === 'buildings' ? buildings.loading : tab === 'floors' ? floors.loading : rooms.loading}
-        error={tab === 'buildings' ? buildings.error : tab === 'floors' ? floors.error : rooms.error}
-        onRetry={() => (tab === 'buildings' ? buildings.reload() : tab === 'floors' ? floors.reload() : rooms.reload())}
-        emptyTitle="Nothing to show"
-        emptyDescription="Create the first record or clear the search."
-        search={{ value: search, onChange: setSearch, placeholder: tab === 'buildings' ? 'Search buildings' : tab === 'floors' ? 'Search floors' : 'Search rooms' }}
-        onCreate={openCreate}
-        createLabel={tab === 'buildings' ? 'New building' : tab === 'floors' ? 'New floor' : 'New room'}
-        rowActions={(row) => (
-          <div className="flex justify-end gap-1.5">
-            <Button size="sm" variant="secondary" onClick={() => openEdit(tab, row)}>
-              Edit
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setPendingDelete({ kind: tab, id: String(row.id), label: 'code' in row ? row.code : row.name })}>
-              Remove
-            </Button>
+    <div className={s.page}>
+      <header className={s.header}>
+        <div>
+          <p className={s.eyebrow}>Campus administration / Places</p>
+          <h1>Campus management</h1>
+          <p>Every place, in its proper context.</p>
+        </div>
+        <div className={s.actions}>
+          <Button
+            variant="secondary"
+            disabled={work.busy || work.loading}
+            onClick={work.refresh}
+          >
+            Refresh
+          </Button>
+          <Button
+            disabled={work.busy || !canCreate || !ready}
+            onClick={() => edit()}
+          >
+            New {singular[kind]}
+          </Button>
+        </div>
+      </header>
+      <section
+        className={s.hero}
+        data-contextual={kind !== "buildings"}
+        aria-label="Campus model"
+      >
+        <div>
+          <p className={s.eyebrow}>The structure behind a campus day</p>
+          <h2>
+            Buildings become floors.
+            <br />
+            Floors become destinations.
+          </h2>
+          <p>
+            Maintain the directory here. Configure routes, anchors and floor
+            plans in the spatial workspace.
+          </p>
+          <Link href="/admin/spatial">
+            Open spatial workspace <span aria-hidden="true">↗</span>
+          </Link>
+        </div>
+        <div
+          className={s.diagram}
+          aria-label="Hierarchy illustration, not a campus map"
+        >
+          <div>
+            <span>01</span>
+            <strong>Building</strong>
           </div>
-        )}
-      />
-
+          <i aria-hidden="true" />
+          <div>
+            <span>02</span>
+            <strong>Floor</strong>
+          </div>
+          <i aria-hidden="true" />
+          <div>
+            <span>03</span>
+            <strong>Room</strong>
+          </div>
+          <small>One connected place hierarchy · Not a map</small>
+        </div>
+      </section>
+      <Feedback value={work.feedback} />
+      <div className={s.workspace}>
+        <aside className={s.context} aria-label="Directory context">
+          <p className={s.eyebrow}>Explore your campus</p>
+          <h2>Place hierarchy</h2>
+          <div className={s.steps}>
+            {(["buildings", "floors", "rooms"] as const).map((v, i) => (
+              <button
+                key={v}
+                type="button"
+                disabled={work.busy}
+                aria-label={`${v[0].toUpperCase() + v.slice(1)} directory`}
+                aria-pressed={kind === v}
+                onClick={() => navigate(v)}
+              >
+                <span>0{i + 1}</span>
+                <div>
+                  <strong>{v[0].toUpperCase() + v.slice(1)}</strong>
+                  <small>
+                    {v === "buildings"
+                      ? "Campus-wide directory"
+                      : v === "floors"
+                        ? (context.building?.name ?? "All buildings")
+                        : (context.floor?.name ??
+                          context.building?.name ??
+                          "All floors")}
+                  </small>
+                </div>
+                <b aria-hidden="true">›</b>
+              </button>
+            ))}
+          </div>
+          {(context.building || context.floor) && (
+            <div className={s.selected}>
+              <p className={s.eyebrow}>Selected context</p>
+              <p>
+                {context.building?.code} · {context.building?.name}
+              </p>
+              {context.floor && (
+                <p>
+                  {context.floor.code} · {context.floor.name}
+                </p>
+              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={work.busy}
+                onClick={() => navigate(kind, {})}
+              >
+                Clear context
+              </Button>
+            </div>
+          )}
+          <p className={s.contextHint}>
+            Open a building to browse its floors, then a floor to browse its
+            rooms. Parent locations cannot be moved by this editor.
+          </p>
+        </aside>
+        <section className={s.directory} aria-label={`${kind} directory`}>
+          <div className={s.directoryHeader}>
+            <div>
+              <p className={s.eyebrow}>
+                {kind === "buildings"
+                  ? "Campus-wide"
+                  : (context.floor?.name ??
+                    context.building?.name ??
+                    "Campus-wide")}
+              </p>
+              <h2>
+                {kind[0].toUpperCase() + kind.slice(1)}{" "}
+                <span>{data?.meta.total ?? "—"}</span>
+              </h2>
+            </div>
+            <p>
+              {data
+                ? `${data.items.length} shown · ${data.meta.total} matching records`
+                : "Requesting directory"}
+            </p>
+          </div>
+          <div className={s.search}>
+            <label htmlFor="campus-search">Search {kind}</label>
+            <Input
+              maxLength={120}
+              id="campus-search"
+              placeholder={
+                kind === "floors" ? "Code, name or level" : "Code or name"
+              }
+              value={search}
+              disabled={work.busy}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+          {!canCreate && (
+            <div className={s.guidance}>
+              <p>
+                Choose a {kind === "floors" ? "building" : "floor"} before
+                adding a {singular[kind]}. Every record needs its correct
+                parent.
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={work.busy}
+                onClick={() =>
+                  navigate(kind === "floors" ? "buildings" : "floors")
+                }
+              >
+                Browse {kind === "floors" ? "buildings" : "floors"}
+              </Button>
+            </div>
+          )}
+          <ReadState
+            loading={!ready && !work.error}
+            error={work.error}
+            retry={work.refresh}
+          />
+          {data && (
+            <>
+              {data.items.length === 0 ? (
+                <div className={s.empty}>
+                  <h3>
+                    {search ? "No matching places" : "No records on this page"}
+                  </h3>
+                  <p>
+                    {search
+                      ? "Try a different code or name, or clear the search."
+                      : canCreate
+                        ? `Add the first ${singular[kind]} in this context, or return to the first page.`
+                        : "Browse the parent directory to choose where a new record belongs."}
+                  </p>
+                  {search ? (
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setSearch("");
+                        setPage(1);
+                      }}
+                    >
+                      Clear search
+                    </Button>
+                  ) : (
+                    page > 1 && (
+                      <Button variant="secondary" onClick={() => setPage(1)}>
+                        First page
+                      </Button>
+                    )
+                  )}
+                </div>
+              ) : (
+                <div className={kind === "floors" ? s.floorList : s.cards}>
+                  {data.items.map((row) => (
+                    <article key={row.id} className={s.place} data-kind={kind}>
+                      <div className={s.placeHead}>
+                        {kind === "floors" ? (
+                          <div className={s.level}>
+                            <small>Level</small>
+                            <strong>{measure(row.data.level)}</strong>
+                          </div>
+                        ) : (
+                          <div className={s.codePlate}>{row.code}</div>
+                        )}
+                        <div>
+                          <p
+                            className={s.status}
+                            data-status={row.values.status}
+                          >
+                            {row.values.status.replaceAll("_", " ")}
+                          </p>
+                          <h3>{row.name}</h3>
+                          <p>
+                            {kind === "buildings"
+                              ? txt(row.data.short_name, "Building")
+                              : kind === "floors"
+                                ? `${row.code} · ${txt(row.data.building_name, "Parent unavailable")}`
+                                : `${txt(row.data.building_code, "Building not set")} / ${txt(row.data.floor_name, "Floor not set")}`}
+                          </p>
+                        </div>
+                      </div>
+                      {kind === "buildings" && (
+                        <>
+                          <p className={s.description}>
+                            {txt(
+                              row.data.description,
+                              "A place in the campus directory. Add descriptive context in its record.",
+                            )}
+                          </p>
+                          <dl className={s.facts}>
+                            <div>
+                              <dt>Floors</dt>
+                              <dd>{measure(row.data.floors_count)}</dd>
+                            </div>
+                            <div>
+                              <dt>Coordinates</dt>
+                              <dd>
+                                {row.data.lat === null || row.data.lng === null
+                                  ? "Not set"
+                                  : `${measure(row.data.lat)}, ${measure(row.data.lng)}`}
+                              </dd>
+                            </div>
+                          </dl>
+                        </>
+                      )}
+                      {kind === "floors" && (
+                        <dl className={s.facts}>
+                          <div>
+                            <dt>Plan dimensions</dt>
+                            <dd>
+                              {row.data.plan_width_m === null ||
+                              row.data.plan_height_m === null
+                                ? "Not set"
+                                : `${measure(row.data.plan_width_m)} × ${measure(row.data.plan_height_m)} m`}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Rooms</dt>
+                            <dd>{measure(row.data.rooms_count)}</dd>
+                          </div>
+                        </dl>
+                      )}
+                      {kind === "rooms" && (
+                        <>
+                          <dl className={s.facts}>
+                            <div>
+                              <dt>Type</dt>
+                              <dd>{row.values.type}</dd>
+                            </div>
+                            <div>
+                              <dt>Capacity</dt>
+                              <dd>{row.values.capacity} people</dd>
+                            </div>
+                            <div>
+                              <dt>Area</dt>
+                              <dd>{measure(row.data.area_m2, " m²")}</dd>
+                            </div>
+                            <div>
+                              <dt>Plan anchor</dt>
+                              <dd>
+                                {row.data.plan_x === null ||
+                                row.data.plan_y === null
+                                  ? "Not set"
+                                  : `${measure(row.data.plan_x)}, ${measure(row.data.plan_y)} m`}
+                              </dd>
+                            </div>
+                          </dl>
+                          <p className={s.policy}>
+                            {row.data.requires_admission
+                              ? "Admission ticket required"
+                              : "No admission ticket requirement"}{" "}
+                            ·{" "}
+                            {row.data.is_public
+                              ? "Visitor-visible"
+                              : "Not public"}
+                          </p>
+                        </>
+                      )}
+                      <div className={s.recordActions}>
+                        {kind !== "rooms" && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={work.busy}
+                            onClick={() => explore(row)}
+                          >
+                            Open {kind === "buildings" ? "floors" : "rooms"}
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={work.busy}
+                          aria-label={`Edit ${row.code}`}
+                          onClick={() => edit(row)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={work.busy}
+                          aria-label={`Remove ${row.code}`}
+                          onClick={() => {
+                            setFormError(null);
+                            setRemoval(row);
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+              <Pager
+                page={data.meta.page}
+                pages={data.meta.total_pages}
+                total={data.meta.total}
+                busy={work.busy}
+                onPage={setPage}
+              />
+            </>
+          )}
+        </section>
+      </div>
+      <footer className={s.footer}>
+        <strong>Directory metadata, not live occupancy.</strong> Admission
+        policies, plan anchors and geographic coordinates are separate
+        configuration.{" "}
+        <Link href="/admin/services">Manage queues & offices ↗</Link>
+      </footer>
       <Modal
-        open={draft !== null}
-        onClose={() => setDraft(null)}
-        title={draft?.id ? `Edit ${draft.kind.slice(0, -1)}` : `New ${draft?.kind.slice(0, -1) ?? 'record'}`}
+        open={!!draft}
+        onClose={() => {
+          if (!locked.current) setDraft(null);
+        }}
+        title={`${draft?.row ? "Edit" : "New"} ${singular[draft?.kind ?? "buildings"]}`}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setDraft(null)}>
+            <Button
+              variant="secondary"
+              disabled={work.busy}
+              onClick={() => setDraft(null)}
+            >
               Cancel
             </Button>
-            <Button loading={saving} onClick={() => void save()}>
-              Save
+            <Button type="submit" form="campus-editor" loading={work.busy}>
+              Save record
             </Button>
           </>
         }
       >
-        {draft ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {draft.kind === 'buildings' ? (
-              <>
-                <Field label="Code" htmlFor="building-code" error={formError} hint="Short code used on the map, e.g. B.">
-                  <Input id="building-code" value={draft.values.code} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, code: event.target.value } })} />
-                </Field>
-                <Field label="Name" htmlFor="building-name">
-                  <Input id="building-name" value={draft.values.name} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, name: event.target.value } })} />
-                </Field>
-                <Field label="Campus" htmlFor="building-campus">
-                  <Input id="building-campus" value={draft.values.campus_name} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, campus_name: event.target.value } })} />
-                </Field>
-                <Field label="Status" htmlFor="building-status">
-                  <Select id="building-status" value={draft.values.status} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, status: event.target.value } })}>
-                    {['operational', 'limited', 'maintenance', 'closed'].map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
+        {draft && (
+          <form
+            id="campus-editor"
+            className={s.editor}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void save();
+            }}
+          >
+            {draft.kind !== "buildings" && (
+              <p className={s.parentNote}>
+                <strong>
+                  {draft.kind === "floors" ? "Building" : "Floor"}:
+                </strong>{" "}
+                {draft.row
+                  ? txt(
+                      draft.row.data[
+                        draft.kind === "floors" ? "building_name" : "floor_name"
+                      ],
+                      String(
+                        draft.row.data[
+                          draft.kind === "floors" ? "building_id" : "floor_id"
+                        ],
+                      ),
+                    )
+                  : draft.kind === "floors"
+                    ? context.building?.name
+                    : context.floor?.name}
+                .{" "}
+                {draft.row
+                  ? "Parent location is fixed; it will not be changed."
+                  : "This is the parent for the new record."}
+              </p>
+            )}
+            {formError && (
+              <p className={s.formError} role="alert">
+                {formError}
+              </p>
+            )}
+            {groups.map((group) => (
+              <fieldset key={group} disabled={work.busy}>
+                <legend>{group}</legend>
+                <div className={s.fields}>
+                  {campusFields[draft.kind]
+                    .filter((f) => f.group === group)
+                    .map((f) => (
+                      <div key={f.key}>
+                        <label htmlFor={"campus-" + f.key}>{f.label}</label>
+                        {f.type === "select" ? (
+                          <Select
+                            id={"campus-" + f.key}
+                            aria-describedby={
+                              f.hint ? "campus-hint-" + f.key : undefined
+                            }
+                            value={draft.values[f.key]}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                values: {
+                                  ...draft.values,
+                                  [f.key]: e.target.value,
+                                },
+                              })
+                            }
+                          >
+                            {[
+                              ...new Set([
+                                ...(f.options ?? []),
+                                ...(draft.values[f.key]
+                                  ? [draft.values[f.key]]
+                                  : []),
+                              ]),
+                            ].map((o) => (
+                              <option key={o} value={o}>
+                                {o.replaceAll("_", " ")}
+                              </option>
+                            ))}
+                          </Select>
+                        ) : f.type === "boolean" ? (
+                          <Select
+                            id={"campus-" + f.key}
+                            aria-describedby={
+                              f.hint ? "campus-hint-" + f.key : undefined
+                            }
+                            value={draft.values[f.key]}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                values: {
+                                  ...draft.values,
+                                  [f.key]: e.target.value,
+                                },
+                              })
+                            }
+                          >
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                          </Select>
+                        ) : f.type === "textarea" ? (
+                          <Textarea
+                            id={"campus-" + f.key}
+                            aria-describedby={
+                              f.hint ? "campus-hint-" + f.key : undefined
+                            }
+                            rows={3}
+                            value={draft.values[f.key]}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                values: {
+                                  ...draft.values,
+                                  [f.key]: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        ) : (
+                          <Input
+                            id={"campus-" + f.key}
+                            aria-describedby={
+                              f.hint ? "campus-hint-" + f.key : undefined
+                            }
+                            type={f.type === "number" ? "number" : "text"}
+                            required={f.required}
+                            maxLength={f.maxLength}
+                            min={f.min}
+                            max={f.max}
+                            step={f.step}
+                            value={draft.values[f.key]}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                values: {
+                                  ...draft.values,
+                                  [f.key]: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        )}
+                        {f.hint && (
+                          <p
+                            className={s.fieldHint}
+                            id={"campus-hint-" + f.key}
+                          >
+                            {f.hint}
+                          </p>
+                        )}
+                      </div>
                     ))}
-                  </Select>
-                </Field>
-                <Field label="Latitude" htmlFor="building-lat" hint="Used for outdoor routing.">
-                  <Input id="building-lat" value={draft.values.lat} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, lat: event.target.value } })} placeholder="51.5245" />
-                </Field>
-                <Field label="Longitude" htmlFor="building-lng">
-                  <Input id="building-lng" value={draft.values.lng} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, lng: event.target.value } })} placeholder="-0.1340" />
-                </Field>
-              </>
-            ) : null}
-
-            {draft.kind === 'floors' ? (
-              <>
-                <Field label="Building" htmlFor="floor-building" error={formError}>
-                  <Select id="floor-building" value={draft.values.building_id} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, building_id: event.target.value } })}>
-                    {buildingOptions.map((building) => (
-                      <option key={building.id} value={building.id}>
-                        {building.code} · {building.name}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Level" htmlFor="floor-level" hint="0 for ground, negative for basements.">
-                  <Input id="floor-level" value={draft.values.level} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, level: event.target.value } })} />
-                </Field>
-                <Field label="Name" htmlFor="floor-name">
-                  <Input id="floor-name" value={draft.values.name} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, name: event.target.value } })} placeholder="Ground floor" />
-                </Field>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Plan width (m)" htmlFor="floor-width">
-                    <Input id="floor-width" value={draft.values.plan_width} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, plan_width: event.target.value } })} />
-                  </Field>
-                  <Field label="Plan height (m)" htmlFor="floor-height">
-                    <Input id="floor-height" value={draft.values.plan_height} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, plan_height: event.target.value } })} />
-                  </Field>
                 </div>
-              </>
-            ) : null}
-
-            {draft.kind === 'rooms' ? (
-              <>
-                <Field label="Building" htmlFor="room-building" error={formError}>
-                  <Select
-                    id="room-building"
-                    value={draft.values.building_id}
-                    onChange={(event) => setDraft({ ...draft, values: { ...draft.values, building_id: event.target.value, floor_id: floorOptions.find((floor) => floor.building_id === event.target.value)?.id ?? '' } })}
-                  >
-                    {buildingOptions.map((building) => (
-                      <option key={building.id} value={building.id}>
-                        {building.code} · {building.name}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Floor" htmlFor="room-floor">
-                  <Select id="room-floor" value={draft.values.floor_id} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, floor_id: event.target.value } })}>
-                    <option value="">Select a floor…</option>
-                    {floorOptions
-                      .filter((floor) => floor.building_id === draft.values.building_id)
-                      .map((floor) => (
-                        <option key={floor.id} value={floor.id}>
-                          {floor.name} (level {floor.level})
-                        </option>
-                      ))}
-                  </Select>
-                </Field>
-                <Field label="Room code" htmlFor="room-code">
-                  <Input id="room-code" value={draft.values.code} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, code: event.target.value } })} />
-                </Field>
-                <Field label="Room name" htmlFor="room-name">
-                  <Input id="room-name" value={draft.values.name} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, name: event.target.value } })} />
-                </Field>
-                <Field label="Type" htmlFor="room-type">
-                  <Select id="room-type" value={draft.values.room_type} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, room_type: event.target.value } })}>
-                    {ROOM_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Capacity" htmlFor="room-capacity">
-                  <Input id="room-capacity" value={draft.values.capacity} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, capacity: event.target.value } })} />
-                </Field>
-                <div className="grid grid-cols-2 gap-3 sm:col-span-2">
-                  <Field label="Plan x (m)" htmlFor="room-x">
-                    <Input id="room-x" value={draft.values.plan_x} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, plan_x: event.target.value } })} />
-                  </Field>
-                  <Field label="Plan y (m)" htmlFor="room-y">
-                    <Input id="room-y" value={draft.values.plan_y} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, plan_y: event.target.value } })} />
-                  </Field>
-                  <Field label="Width (m)" htmlFor="room-w">
-                    <Input id="room-w" value={draft.values.plan_w} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, plan_w: event.target.value } })} />
-                  </Field>
-                  <Field label="Height (m)" htmlFor="room-h">
-                    <Input id="room-h" value={draft.values.plan_h} onChange={(event) => setDraft({ ...draft, values: { ...draft.values, plan_h: event.target.value } })} />
-                  </Field>
-                </div>
-              </>
-            ) : null}
-          </div>
-        ) : null}
+              </fieldset>
+            ))}
+          </form>
+        )}
       </Modal>
-
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        title="Remove this record?"
-        message={pendingDelete ? `“${pendingDelete.label}” will be deleted. Records still referenced by rooms, queues or sessions are protected by the database.` : ''}
-        confirmLabel="Remove"
-        tone="danger"
-        onConfirm={() => void remove()}
-        onCancel={() => setPendingDelete(null)}
-      />
+      <Modal
+        open={!!removal}
+        onClose={() => {
+          if (!locked.current) setRemoval(null);
+        }}
+        title="Remove unused record?"
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              disabled={work.busy}
+              onClick={() => setRemoval(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={work.busy}
+              onClick={() => void remove()}
+            >
+              Remove record
+            </Button>
+          </>
+        }
+      >
+        <div className={s.editor}>
+          <p>
+            <strong>
+              {removal?.code} · {removal?.name}
+            </strong>
+          </p>
+          <p>
+            This removes an unused record from the active directory. Linked
+            records, including historical references, prevent removal. Use a
+            closed status for places that have been used. Child records are not
+            deleted.
+          </p>
+          {formError && (
+            <p className={s.formError} role="alert">
+              {formError}
+            </p>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }

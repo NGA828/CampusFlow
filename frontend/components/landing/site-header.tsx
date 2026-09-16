@@ -29,7 +29,7 @@ export function SiteHeader() {
         scrolled ? 'border-white/10 bg-ink-950/85 backdrop-blur-xl' : 'border-transparent bg-transparent'
       }`}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 sm:px-5 py-3.5">
         <Link href="/" className="flex items-center gap-2.5">
           <motion.span
             whileHover={reduced ? undefined : { rotate: -8, scale: 1.06 }}
@@ -57,18 +57,19 @@ export function SiteHeader() {
           <Link href="/status" className="hidden rounded-[var(--radius-control)] px-3 py-2 text-[13px] text-white/60 hover:text-white sm:block">
             Status
           </Link>
-          <Link href="/login" className="rounded-[var(--radius-control)] px-3.5 py-2 text-[13px] font-medium text-white/85 hover:text-white">
+          <Link href="/login" className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3.5 py-2 text-[13px] font-medium text-white/85 hover:text-white">
             Sign in
           </Link>
-          <Link href="/register" className="rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-[13px] font-semibold text-ink-900 transition-transform hover:-translate-y-0.5">
+          <Link href="/register" className="hidden sm:inline-flex min-h-11 items-center rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-[13px] font-semibold text-ink-900 transition-transform hover:-translate-y-0.5">
             Create account
           </Link>
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
+            aria-controls="site-sections"
             aria-expanded={open}
             aria-label="Toggle sections"
-            className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-white/15 text-white/80 lg:hidden"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] border border-white/15 text-white/80 lg:hidden"
           >
             <span aria-hidden="true" className="flex flex-col gap-1">
               <span className="block h-0.5 w-4 bg-current" />
@@ -82,10 +83,13 @@ export function SiteHeader() {
         <motion.nav
           initial={reduced ? undefined : { height: 0, opacity: 0 }}
           animate={reduced ? undefined : { height: 'auto', opacity: 1 }}
-          className="overflow-hidden border-t border-white/10 bg-ink-950/95 px-5 lg:hidden"
+          id="site-sections"
+          className="max-h-[calc(100dvh-6rem)] overflow-y-auto border-t border-white/10 bg-ink-950/95 px-5 lg:hidden"
           aria-label="Sections"
         >
           <ul className="py-2">
+            <li className="sm:hidden"><Link href="/register" className="flex min-h-11 items-center py-2.5 text-sm font-semibold text-white">Create account</Link></li>
+            <li className="sm:hidden"><Link href="/status" className="flex min-h-11 items-center py-2.5 text-sm text-white/80">Service status</Link></li>
             {LINKS.map((link) => (
               <li key={link.href}>
                 <a href={link.href} onClick={() => setOpen(false)} className="block py-2.5 text-[14px] text-white/80">

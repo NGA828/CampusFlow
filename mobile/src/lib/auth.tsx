@@ -6,7 +6,7 @@
  * or expired token signs the user out
  * instead of leaving the app in a half-authenticated state.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { ApiError, authApi, loadToken, saveToken } from './api';
 import type { SessionInfo, User } from './types';
@@ -120,21 +120,28 @@ export function useLoader<T>(loader: () => Promise<T>, deps: unknown[] = []) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const generation = useRef(0);
   const run = useCallbackAlias(async () => {
+    const current = ++generation.current;
     setLoading(true);
     try {
-      setData(await loader());
+      const result = await loader();
+      if (current !== generation.current) return;
+      setData(result);
       setError(null);
     } catch (caught) {
+      if (current !== generation.current) return;
       setError(caught instanceof ApiError ? (caught.firstError ?? caught.message) : 'The request failed. Pull to retry.');
     } finally {
-      setLoading(false);
+      if (current === generation.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   useEffect(() => {
     void run();
+    // Superseded searches and unmounted screens must not publish late responses.
+    return () => { generation.current += 1; };
   }, [run]);
 
   return { data, error, loading, reload: run };

@@ -1,0 +1,94 @@
+{
+  "date": "2026-09-16",
+  "branch": "arena/01a0a266-campusflow",
+  "scope": [
+    "/staff/offices",
+    "/staff/offices/[id]",
+    "/staff/rooms",
+    "/staff/timetable"
+  ],
+  "completion": {
+    "signedInPages": 20,
+    "total": 31,
+    "pendingStaff": 2,
+    "pendingAdmin": 9,
+    "loginFinalAudit": "separate, pending"
+  },
+  "browser": {
+    "runtime": "Chromium 153, production Next on port 3100",
+    "data": "Test-only mutable raw Laravel wire fixtures; no live API",
+    "uniqueChecksPassed": 256,
+    "previousChecks": 211,
+    "newChecks": 45,
+    "runs": [
+      {
+        "command": "LD_LIBRARY_PATH=/tmp/lib PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium npm --prefix frontend run test:responsive -- web-visual student-discovery student-services student-companion campus-operations staff-services",
+        "passed": 235,
+        "durationSecondsApprox": 246,
+        "log": ".cache/staff-services-pass/tests-final.log",
+        "logSha256": "4a565a6b88ce443586d44108de9a881d0bc7e50c11d6f8696291e80105d769ff"
+      },
+      {
+        "command": "LD_LIBRARY_PATH=/tmp/lib PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium npm --prefix frontend run test:responsive -- layout.spec.ts",
+        "passed": 21,
+        "durationSecondsApprox": 58.1,
+        "log": ".cache/staff-services-pass/layout-final.log",
+        "logSha256": "eb11dc384e8e5381e7e912e45568a0bb0da2f6e148429a4d1765e5b8170a3165"
+      },
+      {
+        "command": "LD_LIBRARY_PATH=/tmp/lib PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium npm --prefix frontend run test:responsive -- staff-services.spec.ts student-discovery-states.spec.ts",
+        "passed": 50,
+        "durationSecondsApprox": 72,
+        "log": ".cache/staff-services-pass/tests-formatted.log",
+        "logSha256": "b32185ce78e9529fbbf9f5be3a1a44eced180e95b56bebaff21ff09ecba66ca2"
+      }
+    ],
+    "finalFollowUpNotAdditionalUniqueTests": true,
+    "widths": [
+      320,
+      768,
+      1440
+    ],
+    "galleryScreenshots": 15,
+    "extraEditorCaptureAssertions": [
+      "focus",
+      "zero horizontal overflow",
+      "no page errors"
+    ],
+    "fixtureRoomPageSize": 3
+  },
+  "static": {
+    "productionBuild": "passed",
+    "lint": "passed",
+    "webAndMobileTypes": "passed",
+    "phpParsedFiles": 125,
+    "phpSyntaxErrors": 0,
+    "apiRoutes": 199,
+    "webCallSites": 185,
+    "mobileCallSites": 82,
+    "testCallSites": 78,
+    "rolePermissionPairs": 62,
+    "apiProblems": 0
+  },
+  "backend": {
+    "newFeatureTests": 3,
+    "executed": false,
+    "reason": "No PHP CLI, Composer/vendor or running Laravel"
+  },
+  "landing": {
+    "allSevenSourceHashesUnchanged": true,
+    "width": 1440,
+    "height": 5065,
+    "differingChannels": 0,
+    "details": "staff-services-landing-preservation.json"
+  },
+  "knownLimits": [
+    "Fixture checks do not prove live database or deployment permission behavior",
+    "No physical-device, cross-browser, screen-reader or native-mobile certification",
+    "No backend concurrency/idempotency or transport delivery guarantee",
+    "Large catalogue/scope query optimization not established",
+    "Partial teaching time PATCH against retained fields remains backend follow-up; UI sends both times"
+  ],
+  "firstRunFinding": "38/39; rejected room mutation reset draft on authoritative refresh. Parent-owned draft/error fix subsequently passed.",
+  "laterUsabilityFix": "Server-backed term filter and post-success term/day following prevent hiding a newly published session."
+}

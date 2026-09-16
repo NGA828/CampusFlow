@@ -66,7 +66,7 @@ export default async function LandingPage() {
   ];
 
   return (
-    <div className="min-h-dvh bg-ink-950 text-white">
+    <div className="landing-page min-h-dvh bg-ink-950 text-white">
       <ScrollProgress />
       <SiteHeader />
 

@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { Badge, Button, Card, EmptyState, ErrorNote, Eyebrow, H3, Loading, Screen, Small, Stat, Title } from '@/components/ui';
+import { AdaptiveRow, Badge, Button, Card, EmptyState, ErrorNote, Eyebrow, H3, Loading, Screen, Small, Stat, Title } from '@/components/ui';
 import { ApiError, staffApi } from '@/lib/api';
 import { useLoader } from '@/lib/auth';
 import { countdown, formatClock, spacing } from '@/lib/theme';
@@ -75,13 +75,13 @@ export default function StaffQueueLineScreen() {
               </View>
               <Badge tone={queue.is_open ? 'mint' : 'coral'}>{queue.is_open ? 'open' : 'closed'}</Badge>
             </View>
-            <View style={styles.stats}>
+            <AdaptiveRow style={styles.stats}>
               <Stat label="Waiting" value={counts.waiting} />
               <Stat label="Called" value={counts.called} tone={counts.called > 0 ? 'signal' : 'neutral'} />
               <Stat label="Checked in" value={counts.checked_in} tone="mint" />
               <Stat label="In room" value={queue.current_count} hint={`of ${queue.capacity}`} />
-            </View>
-            <View style={styles.actions}>
+            </AdaptiveRow>
+            <AdaptiveRow style={styles.actions}>
               <Button
                 label={queue.is_open ? 'Close line' : 'Open line'}
                 variant={queue.is_open ? 'danger' : 'primary'}
@@ -97,7 +97,7 @@ export default function StaffQueueLineScreen() {
                 onPress={() => void run('next', () => staffApi.callNext(queue.id))}
                 style={{ flex: 1 }}
               />
-            </View>
+            </AdaptiveRow>
           </Card>
 
           <H3 style={{ marginTop: spacing.lg }}>{rows.length} in line</H3>
@@ -123,7 +123,7 @@ export default function StaffQueueLineScreen() {
                 </Small>
               ) : null}
 
-              <View style={styles.actions}>
+              <AdaptiveRow style={styles.actions}>
                 {ticket.status === 'waiting' ? (
                   <Button label="Call" onPress={() => void run(`call-${ticket.id}`, () => staffApi.callTicket(ticket.id))} style={{ flex: 1 }} />
                 ) : null}
@@ -145,7 +145,7 @@ export default function StaffQueueLineScreen() {
                 {ticket.status === 'called' ? (
                   <Button label="No-show" variant="ghost" onPress={() => void run(`ns-${ticket.id}`, () => staffApi.noShowTicket(ticket.id))} style={{ flex: 1 }} />
                 ) : null}
-              </View>
+              </AdaptiveRow>
             </Card>
           ))}
         </View>
@@ -158,6 +158,6 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   padded: { paddingHorizontal: spacing.lg, marginTop: spacing.md, paddingBottom: spacing.xl },
   row: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
-  stats: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.md },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  stats: { marginTop: spacing.md },
+  actions: { marginTop: spacing.md },
 });

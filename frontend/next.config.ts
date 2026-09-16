@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["*.e2b.app"],
   /**
    * The generic screens this restructure removed (`/dashboard`, `/timetable`, `/map`, `/queue`,
    * `/offices`, `/announcements`, `/profile`, `/assistant`) answered every role with one page — the
@@ -12,6 +13,7 @@ const nextConfig: NextConfig = {
    * capabilities, and a browser has no honest destination to send them to.
    */
   async redirects() {
+    // /account and /notifications are genuine shared routes, not student redirects.
     return [
       { source: "/dashboard", destination: "/student/dashboard", permanent: false },
       { source: "/timetable", destination: "/student/timetable", permanent: false },
@@ -24,8 +26,6 @@ const nextConfig: NextConfig = {
       { source: "/offices/tickets/:id", destination: "/student/services/offices/tickets/:id", permanent: false },
       { source: "/announcements", destination: "/student/announcements", permanent: false },
       { source: "/events", destination: "/student/campus/events", permanent: false },
-      { source: "/notifications", destination: "/student/notifications", permanent: false },
-      { source: "/account", destination: "/student/profile", permanent: false },
       { source: "/assistant", destination: "/student/assistant", permanent: false },
       { source: "/staff", destination: "/staff/dashboard", permanent: false },
       { source: "/admin", destination: "/admin/dashboard", permanent: false },

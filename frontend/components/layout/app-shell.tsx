@@ -8,6 +8,8 @@ import { useRealtime, useRealtimeEvent } from '@/lib/realtime/realtime-context';
 import { Button, Avatar, Badge, cx } from '@/components/ui/kit';
 import { meApi } from '@/lib/api/endpoints';
 import type { NotificationRow } from '@/lib/api/types';
+import styles from './workspace.module.css';
+import { WorkspaceIcon } from './workspace-visual';
 import { relativeTime } from '@/lib/hooks';
 
 interface NavItem {
@@ -137,6 +139,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { connected } = useRealtime();
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  const [notificationRevision, setNotificationRevision] = useState(0);
   const [unread, setUnread] = useState(0);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [bellOpen, setBellOpen] = useState(false);
@@ -159,14 +164,21 @@ export function AppShell({ children }: { children: ReactNode }) {
       .notifications({ per_page: 8 })
       .then((payload) => {
         if (!active) return;
+        setNotificationError(null);
         setNotifications(payload.items);
         setUnread(payload.unread);
       })
-      .catch(() => {});
+      .catch(() => { if (active) setNotificationError('Your inbox could not be loaded. Open notifications to retry.'); });
     return () => {
       active = false;
     };
-  }, [user, pathname]);
+  }, [user, pathname, notificationRevision]);
+
+  useEffect(() => {
+    const changed = () => setNotificationRevision(revision => revision + 1);
+    window.addEventListener('campusflow:notifications-changed', changed);
+    return () => window.removeEventListener('campusflow:notifications-changed', changed);
+  }, []);
 
   useRealtimeEvent(user ? `user:${user.id}` : null, (event) => {
     if (event.event === 'notification.created') {
@@ -178,37 +190,63 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   });
 
+  useEffect(() => {
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setBellOpen(false);
+        setMobileNavOpen(false);
+        setMenuOpen(false);
+      }
+    };
+    const desktop = window.matchMedia('(min-width: 64rem)');
+    const resize = () => { if (desktop.matches) setMobileNavOpen(false); };
+    document.addEventListener('keydown', dismiss);
+    desktop.addEventListener('change', resize);
+    return () => {
+      document.removeEventListener('keydown', dismiss);
+      desktop.removeEventListener('change', resize);
+    };
+  }, []);
+
   const markAllRead = async () => {
-    await meApi.readAllNotifications().catch(() => null);
-    setUnread(0);
-    setNotifications((current) => current.map((item) => ({ ...item, read_at: item.read_at ?? new Date().toISOString() })));
+    if (reading) return;
+    setReading(true);
+    try {
+      const result = await meApi.readAllNotifications();
+      setUnread(result.unread);
+      setNotificationError(null);
+      setNotifications((current) => current.map((item) => ({ ...item, read_at: item.read_at ?? new Date().toISOString() })));
+    } catch { setNotificationError('Could not mark notifications as read. Please try again.'); }
+    finally { setReading(false); }
   };
 
   return (
-    <div className="min-h-dvh bg-ink-50 lg:grid lg:grid-cols-[264px_1fr]">
+    <div className={cx(styles.workspace, "min-h-dvh lg:grid lg:grid-cols-[264px_minmax(0,1fr)]")}>
       {/* Sidebar (desktop) */}
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-ink-100 bg-white lg:flex">
-        <Link href={workspace.home} className="flex items-center gap-2.5 px-5 py-5">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-[14px] font-bold text-white">CF</span>
+      <aside data-shell="sidebar" className="sticky top-0 hidden h-dvh flex-col border-r border-ink-100 bg-white lg:flex">
+        <Link href={workspace.home} data-shell="brand" className="flex items-center gap-3 px-5 py-5">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-[14px] font-bold text-white"><WorkspaceIcon name="compass" /></span>
           <span>
-            <span className="block text-[14px] leading-tight font-semibold text-ink-900">CampusFlow</span>
-            <span className="block text-[11px] text-ink-500">Navigate. Learn. Connect.</span>
+            <strong className="block leading-tight">CampusFlow</strong>
+            <small className="block">Navigate. Learn. Connect.</small>
           </span>
         </Link>
 
-        <p className="px-5 pb-3 text-[11px] leading-snug text-ink-400">{workspace.purpose}</p>
+        <p data-shell="purpose" className="px-5 pb-3 text-[11px] leading-snug text-ink-400">{workspace.purpose}</p>
 
         <nav className="scrollbar-thin flex-1 overflow-y-auto px-3 pb-4">
           {sections.map((section) => (
             <div key={section.title} className="mb-3">
-              <p className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-ink-400">{section.title}</p>
+              <p data-shell="section-label" className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-ink-400">{section.title}</p>
               {section.items.map((item) => {
-            const active = pathname === item.href || (item.match ?? []).some((match) => pathname.startsWith(match));
+            const active = pathname === item.href || pathname.startsWith(item.href + '/') || (item.match ?? []).some((match) => pathname.startsWith(match));
             const count = item.badge === 'notifications' ? unread : 0;
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                data-shell="nav-link"
+                aria-current={active ? 'page' : undefined}
                 className={cx(
                   'mb-0.5 flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13.5px] font-medium transition-colors',
                   active ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-ink-100/70 hover:text-ink-900',
@@ -223,19 +261,19 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
             ))}
 
-          <div className="mt-2 rounded-[10px] border border-dashed border-ink-200 px-3 py-2.5 text-[11.5px] leading-snug text-ink-500">
-            On your phone, CampusFlow adds the camera: scan a location code, join a queue from the door
-            and follow turn-by-turn navigation. Those actions stay on mobile by design.
-          </div>
+          <div data-shell="companion"><strong>{role === 'student' ? 'Your campus companion' : role === 'staff' ? 'Your desk, wherever you are' : 'A connected campus'}</strong>{role === 'student' ? 'Plan here. Use the mobile app for QR positioning and turn-by-turn guidance on campus.' : role === 'staff' ? 'Configure and review on the web. Keep your assigned services moving from the mobile app.' : 'Manage infrastructure here. Review campus conditions from the mobile monitoring workspace.'}</div>
         </nav>
 
-        <div className="border-t border-ink-100 px-3 py-3">
-          <div className="flex items-center gap-2 px-2 pb-2 text-[12px] text-ink-500">
+        <div data-shell="account-footer" className="border-t border-ink-100 px-3 py-3">
+          <div data-shell="connection" className="flex items-center gap-2 px-2 pb-2 text-[12px] text-ink-500">
             <span className={cx('h-2 w-2 rounded-full', connected ? 'bg-mint-500' : 'bg-ink-300')} />
             {connected ? 'Live updates on' : 'Reconnecting…'}
           </div>
           <button
             type="button"
+            data-shell="account"
+            aria-label="Account menu"
+            aria-expanded={menuOpen}
             onClick={() => setMenuOpen((open) => !open)}
             className="flex w-full items-center gap-2.5 rounded-[10px] px-2 py-2 text-left hover:bg-ink-100/70"
           >
@@ -264,14 +302,16 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex min-h-dvh flex-col">
+      <div className="flex min-h-dvh min-w-0 flex-col">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 border-b border-ink-100 bg-white/85 backdrop-blur">
-          <div className="flex items-center gap-2 px-4 py-3 lg:px-6">
+        <header data-shell="topbar" className="sticky top-0 z-30 pt-[env(safe-area-inset-top)] border-b border-ink-100 bg-white/85 backdrop-blur">
+          <div data-shell="topbar-inner" className="flex items-center gap-2 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] py-3 lg:px-6">
             <button
               type="button"
-              className="grid h-9 w-9 place-items-center rounded-[10px] border border-ink-200 lg:hidden"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] border border-ink-200 lg:hidden"
               aria-label="Open navigation"
+              aria-expanded={mobileNavOpen}
+              aria-controls="workspace-navigation"
               onClick={() => setMobileNavOpen((open) => !open)}
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
@@ -282,6 +322,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-[12px] font-bold text-white">CF</span>
             </Link>
 
+            <div className={styles.topbarContext}><span>{workspace.name}</span><span aria-hidden="true">/</span><strong>{navigation.find((item) => pathname === item.href || pathname.startsWith(item.href + '/'))?.label ?? (pathname === '/account' ? 'Your account' : 'Workspace')}</strong></div>
             <div className="ml-auto flex items-center gap-1.5">
               <span className="hidden items-center gap-1.5 rounded-[10px] bg-ink-100/80 px-3 py-2 text-[12px] font-medium text-ink-600 sm:flex">
                 {workspace.name}
@@ -291,8 +332,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <button
                   type="button"
                   aria-label="Notifications"
+                  aria-expanded={bellOpen}
+                  aria-controls="notification-panel"
                   onClick={() => setBellOpen((open) => !open)}
-                  className="relative grid h-10 w-10 place-items-center rounded-[10px] border border-ink-200 text-ink-600 hover:border-ink-300"
+                  className="relative grid h-11 w-11 place-items-center rounded-[10px] border border-ink-200 text-ink-600 hover:border-ink-300"
                 >
                   <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.7">
                     <path d="M6 9a6 6 0 1112 0c0 4 1.5 5.5 1.5 5.5h-15S6 13 6 9zM10 20a2 2 0 004 0" strokeLinecap="round" />
@@ -305,17 +348,18 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </button>
 
                 {bellOpen ? (
-                  <div className="animate-rise absolute right-0 z-40 mt-2 w-[340px] max-w-[calc(100vw-2rem)] rounded-[var(--radius-card)] border border-ink-100 bg-white shadow-[var(--shadow-pop)]">
+                  <div id="notification-panel" role="region" aria-label="Recent notifications" className="[overflow-wrap:anywhere] animate-rise fixed inset-x-4 z-40 mt-2 max-h-[calc(100dvh-10rem)] overflow-y-auto sm:absolute sm:inset-x-auto sm:right-0 sm:w-[340px] rounded-[var(--radius-card)] border border-ink-100 bg-white shadow-[var(--shadow-pop)]">
                     <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
                       <p className="text-[13.5px] font-semibold text-ink-900">Notifications</p>
                       {unread > 0 ? (
-                        <button type="button" onClick={() => void markAllRead()} className="text-[12.5px] font-medium text-brand-600 hover:text-brand-700">
+                        <button type="button" disabled={reading} onClick={() => void markAllRead()} className="text-[12.5px] font-medium text-brand-600 hover:text-brand-700">
                           Mark all read
                         </button>
                       ) : null}
                     </div>
+                    {notificationError ? <p role="alert" className="p-4 text-[13px] text-coral-600">{notificationError}</p> : null}
                     <div className="max-h-80 overflow-y-auto">
-                      {notifications.length === 0 ? (
+                      {notifications.length === 0 && !notificationError ? (
                         <p className="px-4 py-6 text-center text-[13px] text-ink-500">You have no notifications yet.</p>
                       ) : (
                         notifications.map((notification) => (
@@ -338,21 +382,22 @@ export function AppShell({ children }: { children: ReactNode }) {
 
               <Link href="/account" title="Account & devices" className="hidden items-center gap-2 rounded-[10px] border border-ink-200 px-2 py-1.5 hover:border-ink-300 sm:flex">
                 <Avatar name={user?.name ?? 'Guest'} size={26} />
-                <span className="text-[12.5px] font-medium text-ink-700">{user?.name?.split(' ')[0]}</span>
+                <span className="max-w-32 truncate text-[12.5px] font-medium text-ink-700">{user?.name?.split(' ')[0]}</span>
               </Link>
             </div>
           </div>
 
           {mobileNavOpen ? (
-            <nav className="scrollbar-thin max-h-[70dvh] overflow-y-auto border-t border-ink-100 px-3 pb-3 lg:hidden">
-              <div className="grid grid-cols-2 gap-1 pt-2">
+            <nav id="workspace-navigation" aria-label="Workspace navigation" className="scrollbar-thin max-h-[calc(100dvh-11rem)] overflow-y-auto border-t border-ink-100 px-3 pb-3 lg:hidden">
+              <Link href="/account" onClick={() => setMobileNavOpen(false)} className="flex min-h-11 items-center px-3 text-sm text-brand-700">Account & devices</Link>
+              <div className="grid grid-cols-1 gap-1 pt-2 sm:grid-cols-2">
                 {navigation.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={() => setMobileNavOpen(false)}
                     className={cx(
-                      'flex items-center gap-2 rounded-[10px] px-3 py-2 text-[13px] font-medium',
+                      'flex min-h-11 min-w-0 items-center gap-2 rounded-[10px] px-3 py-2 text-[13px] font-medium',
                       pathname === item.href ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-ink-100/70',
                     )}
                   >
@@ -368,15 +413,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
         </header>
 
-        <main className="flex-1 px-4 pt-5 pb-24 lg:px-6 lg:pb-10">{children}</main>
+        <main className="app-content mx-auto w-full min-w-0 max-w-[1600px] flex-1 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-5 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:px-6 lg:pb-10"><div key={pathname} className={styles.routeEntrance}>{children}</div></main>
 
         {/* Bottom navigation (mobile) */}
-        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+        <nav aria-label="Primary navigation" className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white/95 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
           <div className="flex items-stretch justify-around">
             {mobileNav.map((item) => {
               const active = pathname === item.href;
               return (
-                <Link key={item.href} href={item.href} className={cx('flex flex-1 flex-col items-center gap-1 py-2.5 text-[10.5px] font-medium', active ? 'text-brand-700' : 'text-ink-500')}>
+                <Link key={item.href} href={item.href} className={cx('flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2.5 text-center text-[10.5px] leading-tight font-medium', active ? 'text-brand-700' : 'text-ink-500')}>
                   <span className={active ? 'text-brand-600' : 'text-ink-400'}>{item.icon}</span>
                   {item.label.replace('Campus ', '').replace('Room ', '')}
                 </Link>
@@ -400,10 +445,13 @@ export function PageHeader({
   actions?: ReactNode;
   breadcrumb?: { label: string; href?: string }[];
 }) {
+  const pathname = usePathname();
+  const category = pathname.startsWith('/admin') ? 'Campus administration' : pathname.startsWith('/staff') ? 'Staff workspace' : pathname.startsWith('/student') ? 'Your campus workspace' : 'Your CampusFlow account';
   return (
-    <div className="mb-5">
+    <div className={styles.pageHeader}>
+      <p className={styles.headerEyebrow}>{category}</p>
       {breadcrumb?.length ? (
-        <nav className="mb-2 flex items-center gap-1.5 text-[12px] text-ink-500" aria-label="Breadcrumb">
+        <nav className="mb-2 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-500" aria-label="Breadcrumb">
           {breadcrumb.map((crumb, index) => (
             <span key={`${crumb.label}-${index}`} className="flex items-center gap-1.5">
               {index > 0 ? <span className="text-ink-300">/</span> : null}
@@ -419,9 +467,9 @@ export function PageHeader({
         </nav>
       ) : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] leading-tight font-semibold text-ink-900 sm:text-[26px]">{title}</h1>
-          {description ? <p className="mt-1 max-w-2xl text-[13.5px] leading-relaxed text-ink-500">{description}</p> : null}
+        <div className="min-w-0">
+          <h1 className={styles.pageTitle}>{title}</h1>
+          {description ? <p className={styles.pageDescription}>{description}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>

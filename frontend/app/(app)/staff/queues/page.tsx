@@ -1,128 +1,244 @@
-'use client';
+"use client";
+import Link from "next/link";
+import { useCallback, useState } from "react";
+import { staffApi } from "@/lib/api/endpoints";
+import { useOperator } from "@/lib/use-operator";
+import { useRealtimeEvent } from "@/lib/realtime/realtime-context";
+import { Badge, Button, CardSkeleton } from "@/components/ui/kit";
+import { ReadError } from "@/components/layout/student-companion";
+import s from "@/components/layout/campus-operations.module.css";
 
-import Link from 'next/link';
-import { useAsync, relativeTime } from '@/lib/hooks';
-import { staffApi } from '@/lib/api/endpoints';
-import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, Progress, SectionHeading, Stat } from '@/components/ui/kit';
-import { PageHeader } from '@/components/layout/app-shell';
-import { useToast } from '@/components/ui/toast';
-import { ApiError } from '@/lib/api/client';
-import { useState } from 'react';
-import { useRealtimeEvent } from '@/lib/realtime/realtime-context';
-
-/**
- * `/staff/queues` — the lines this operator is responsible for.
- *
- * Scoped, not filtered after the fact: `StaffController::queues` returns only the queues this account
- * may run (its own assigned rooms, shared/public rooms, plus rooms whose department it belongs to), so
- * a tutor in Science never sees the queue board for a hall in Arts.
- *
- * Opening and closing a line lives here because it is an operational decision of the day. Changing
- * *policy* — capacity, call window, proximity, the duplicate rule — does not: that is `Admin →
- * Services`, on the web console, for an administrator.
- */
 export default function StaffQueuesPage() {
-  const toast = useToast();
-  const queues = useAsync(() => staffApi.queues(), []);
-  const [busy, setBusy] = useState<string | null>(null);
-
-  useRealtimeEvent('staff:ops', () => queues.reload(), []);
-
-  const toggle = async (queueId: string, open: boolean) => {
-    setBusy(queueId);
-    try {
-      await staffApi.setQueueOpen(queueId, open);
-      toast.success(open ? 'Queue opened' : 'Queue closed', open ? 'Students can join this line now.' : 'No new tickets will be issued.');
-      queues.reload();
-    } catch (caught) {
-      toast.error('Could not change the queue', caught instanceof ApiError ? caught.message : 'Please try again.');
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  if (queues.error) {
-    return (
-      <div>
-        <PageHeader title="Room queues" />
-        <ErrorState message={queues.error} onRetry={queues.reload} />
-      </div>
-    );
-  }
-
+  const queues = useOperator(useCallback(() => staffApi.queues(), []));
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  useRealtimeEvent("staff:ops", queues.refresh, []);
   const rows = queues.data?.queues ?? [];
-
+  const shown = rows.filter(
+    (q) =>
+      (filter === "all" || q.is_active === (filter === "open")) &&
+      `${q.room_code} ${q.room_name} ${q.building_code}`
+        .toLowerCase()
+        .includes(search.toLowerCase()),
+  );
   return (
-    <div>
-      <PageHeader
-        title="Room queues"
-        description="The lines you run. Call from here, and open or close a line for the day — capacity, windows and proximity rules are set in the admin console."
-      />
-
-      {queues.loading ? (
-        <CardSkeleton rows={4} />
-      ) : rows.length === 0 ? (
-        <EmptyState
-          title="No queues assigned to you"
-          description="Queues appear here when a room you are assigned to has one configured. Ask administration to assign the room, or to enable a queue for it."
-        />
+    <div className={s.page}>
+      <header className={s.heading}>
+        <div>
+          <p className={s.eyebrow}>Operations / room services</p>
+          <h1>Room queues</h1>
+          <p>
+            A clear view of the lines you run. Choose a room to manage its next
+            admission.
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          disabled={queues.busy || queues.loading}
+          onClick={queues.refresh}
+        >
+          Refresh queues
+        </Button>
+      </header>
+      {queues.feedback ? (
+        <p
+          role={queues.feedback.error ? "alert" : "status"}
+          className={queues.feedback.error ? s.error : s.notice}
+        >
+          {queues.feedback.text}
+        </p>
+      ) : null}
+      {queues.error ? (
+        <ReadError message={queues.error} retry={queues.refresh} />
+      ) : queues.loading ? (
+        <CardSkeleton rows={5} />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="grid grid-cols-3 gap-3 lg:col-span-2">
-            <Stat label="Lines you run" value={rows.length} hint="assigned to you" />
-            <Stat label="Open now" value={rows.filter((row) => row.is_active).length} tone={rows.some((row) => row.is_active) ? 'success' : 'default'} />
-            <Stat label="Waiting" value={rows.reduce((sum, row) => sum + row.waiting, 0)} hint="students in all your lines" />
-          </div>
-
-          {rows.map((row) => {
-            const load = row.admission_capacity > 0 ? (row.occupying / row.admission_capacity) * 100 : 0;
-            return (
-              <Card key={row.queue_id}>
-                <SectionHeading
-                  title={`${row.room_code} · ${row.room_name}`}
-                  description={`${row.building_code} · floor ${row.floor_name}`}
-                  action={<Badge tone={row.is_active ? 'success' : 'neutral'}>{row.is_active ? 'open' : 'closed'}</Badge>}
-                />
-
-                <dl className="mt-3 grid grid-cols-3 gap-3 text-center">
-                  <div className="rounded-[10px] bg-ink-50 px-2 py-2.5">
-                    <dt className="text-[11px] text-ink-500">Waiting</dt>
-                    <dd className="tnum text-[17px] font-semibold text-ink-900">{row.waiting}</dd>
-                  </div>
-                  <div className="rounded-[10px] bg-ink-50 px-2 py-2.5">
-                    <dt className="text-[11px] text-ink-500">In room</dt>
-                    <dd className="tnum text-[17px] font-semibold text-ink-900">
-                      {row.occupying}/{row.admission_capacity}
-                    </dd>
-                  </div>
-                  <div className="rounded-[10px] bg-ink-50 px-2 py-2.5">
-                    <dt className="text-[11px] text-ink-500">Checked in</dt>
-                    <dd className="tnum text-[17px] font-semibold text-ink-900">{row.checked_in}</dd>
-                  </div>
-                </dl>
-
-                <div className="mt-3">
-                  <Progress value={Math.min(100, load)} tone={load > 85 ? 'signal' : 'brand'} />
-                  <p className="mt-1.5 text-[11.5px] text-ink-500">
-                    {row.requires_proximity_to_join
-                      ? `Joins are accepted within ${row.proximity_radius_m} m of the room.`
-                      : 'Students may join this line from anywhere.'}
-                    {row.current ? ` Now serving ${row.current.ticket_number} · ${relativeTime(row.current.called_at ?? row.current.issued_at)}.` : ''}
+        <>
+          <dl className={s.stats}>
+            <div>
+              <dt>Assigned lines</dt>
+              <dd>{rows.length}</dd>
+            </div>
+            <div>
+              <dt>Open for joins</dt>
+              <dd>{rows.filter((q) => q.is_active).length}</dd>
+            </div>
+            <div>
+              <dt>Students waiting</dt>
+              <dd>{rows.reduce((n, q) => n + q.waiting, 0)}</dd>
+            </div>
+          </dl>
+          <div className={s.split}>
+            <section className={s.panel} aria-label="Assigned queue directory">
+              <div className={s.bar}>
+                <h2>Your queue directory</h2>
+                <span className={s.muted}>
+                  {shown.length} of {rows.length} lines
+                </span>
+              </div>
+              <div className={`${s.tools} mt-5`}>
+                <label>
+                  Find a room
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Room, name or building"
+                  />
+                </label>
+                <label>
+                  Queue state
+                  <select
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                  >
+                    <option value="all">All lines</option>
+                    <option value="open">Open</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </label>
+              </div>
+              {!rows.length ? (
+                <div className={s.empty}>
+                  <h3>No queues assigned to you</h3>
+                  <p>
+                    Ask administration to assign a room and configure its queue.
                   </p>
                 </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link href={`/staff/queues/${row.queue_id}`}>
-                    <Button size="sm">Open line</Button>
-                  </Link>
-                  <Button size="sm" variant="secondary" loading={busy === row.queue_id} onClick={() => void toggle(row.queue_id, !row.is_active)}>
-                    {row.is_active ? 'Close queue' : 'Open queue'}
-                  </Button>
+              ) : !shown.length ? (
+                <div className={s.empty}>
+                  <h3>No matching queues</h3>
+                  <p>Try another room or queue state.</p>
+                  <button
+                    className={s.link}
+                    onClick={() => {
+                      setSearch("");
+                      setFilter("all");
+                    }}
+                  >
+                    Clear filters
+                  </button>
                 </div>
-              </Card>
-            );
-          })}
-        </div>
+              ) : (
+                shown.map((q) => (
+                  <article
+                    className={s.row}
+                    key={q.queue_id}
+                    aria-label={`${q.room_code} queue`}
+                  >
+                    <div>
+                      <div className={s.identity}>
+                        <span className={s.code}>{q.room_code}</span>
+                        <div className={s.details}>
+                          <h3>{q.room_name}</h3>
+                          <p>
+                            {[q.building_code, q.floor_name]
+                              .filter(Boolean)
+                              .join(" · ") || "Location not provided"}
+                          </p>
+                        </div>
+                        <Badge tone={q.is_active ? "success" : "neutral"}>
+                          {q.is_active ? "Open" : "Closed"}
+                        </Badge>
+                      </div>
+                      <div className={s.meta}>
+                        <span>
+                          <strong>{q.waiting}</strong> waiting
+                        </span>
+                        <span>
+                          <strong>{q.checked_in}</strong> checked in
+                        </span>
+                        <span>
+                          <strong>
+                            {q.occupying}
+                            {q.admission_capacity > 0
+                              ? ` / ${q.admission_capacity}`
+                              : ""}
+                          </strong>{" "}
+                          in room
+                        </span>
+                      </div>
+                    </div>
+                    <div className={s.actions}>
+                      <Link
+                        className={`${s.link} ${s.primary}`}
+                        href={`/staff/queues/${q.queue_id}`}
+                      >
+                        Open console →
+                      </Link>
+                      <Button
+                        variant="secondary"
+                        disabled={queues.busy}
+                        onClick={() =>
+                          void queues.act(
+                            async () => {
+                              const result = await staffApi.setQueueOpen(
+                                q.queue_id,
+                                !q.is_active,
+                              );
+                              if (
+                                result.queue?.id !== q.queue_id ||
+                                result.queue.is_open !== !q.is_active
+                              )
+                                throw new Error(
+                                  "The queue change could not be verified. Refresh before retrying.",
+                                );
+                            },
+                            q.is_active
+                              ? `${q.room_code} closed to new joins. Existing tickets remain.`
+                              : `${q.room_code} opened to new joins.`,
+                          )
+                        }
+                      >
+                        {q.is_active ? "Close queue" : "Open queue"}
+                      </Button>
+                    </div>
+                  </article>
+                ))
+              )}
+            </section>
+            <aside className={s.rail}>
+              <section className={s.panel}>
+                <p className={s.eyebrow}>Operator notes</p>
+                <h2>Keep the line moving.</h2>
+                <dl className={s.policy}>
+                  <div>
+                    <dt>01 / Choose a queue</dt>
+                    <dd>
+                      Open its console to see students and their current ticket
+                      states.
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>02 / Call & admit</dt>
+                    <dd>
+                      Call the next waiting student, confirm presence at the
+                      desk, then admit.
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>03 / Close new joins</dt>
+                    <dd>
+                      Closing a queue does not cancel existing tickets or finish
+                      their service.
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+              <section className={s.panel}>
+                <h3>Your assigned scope</h3>
+                <p className={`${s.muted} mt-3`}>
+                  This list is scoped by the server. Capacity and proximity
+                  rules are managed by administration.
+                </p>
+                <p className={`${s.muted} mt-3`}>
+                  Counts reflect the last successful refresh, not a guaranteed
+                  live feed.
+                </p>
+              </section>
+            </aside>
+          </div>
+        </>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Body, Button, Card, Eyebrow, H3, Screen, Small, Title } from '@/components/ui';
 import { ApiError } from '@/lib/api';
@@ -35,8 +35,8 @@ export default function RegisterScreen() {
   };
 
   return (
-    <Screen>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.wrap}>
+    <Screen maxWidth={560}>
+      <View style={styles.wrap}>
         <View style={styles.brand}>
           <Eyebrow>Student account</Eyebrow>
           <Title style={{ marginTop: spacing.sm }}>Join CampusFlow</Title>
@@ -110,7 +110,7 @@ export default function RegisterScreen() {
             </Link>
           </View>
         </Card>
-      </KeyboardAvoidingView>
+      </View>
     </Screen>
   );
 }
@@ -125,11 +125,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.control,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    fontSize: font.body.fontSize,
+    fontSize: 16,
     color: colors.ink800,
     backgroundColor: colors.white,
   },
   error: { marginTop: spacing.md, color: colors.coral600, fontSize: font.small.fontSize },
-  links: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg },
+  links: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: spacing.lg },
   link: { color: colors.brand600, fontWeight: '600', fontSize: font.small.fontSize },
 });

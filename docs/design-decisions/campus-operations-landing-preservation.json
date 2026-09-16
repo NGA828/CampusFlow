@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-16",
+  "sha256": {
+    "frontend/app/page.tsx": "71294bbd3a1e9dc137f6aba5671cb0121669c35be9b111ea07243d72e8ad95b3",
+    "frontend/app/layout.tsx": "7add19465b404d8a02f2a02fd02dea4ac5427c04601a8e7f55c8850891ecc922",
+    "frontend/app/globals.css": "835474643809b648395a15e7178480c02f71957b5cb4a22246d32a01d4a6c5f0",
+    "frontend/components/landing/hero-art.tsx": "97d8bef9fa73c0274d00ce729aa025f520ffa01f4f1abbe54c1710159227aaac",
+    "frontend/components/landing/motion-primitives.tsx": "80d3f161fc59475ce809387117982ccf215fa825cd513d9dcae4a442266963f3",
+    "frontend/components/landing/phone-showcase.tsx": "e069e7b1cb1dce8f7c2b00e7e357321a3014272afe9937e2ad4329d518aaf09a",
+    "frontend/components/landing/site-header.tsx": "53b126b4f52217ca82c89512e6ac6c808f80627512292f956114af63bf8fc023"
+  },
+  "comparison": {
+    "width": 1440,
+    "height": 5065,
+    "differingChannels": 0,
+    "method": "Three identical full-page captures per state, strict cold/client comparison after discovery, services, companion and campus operations CSS. No masks or tolerance.",
+    "followUp": "Strict comparison passed again after source formatting and rebuild; first cold capture settling timeout is documented in the research log."
+  }
+}

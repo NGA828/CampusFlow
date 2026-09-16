@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { Badge, Button, Card, ErrorNote, Eyebrow, H2, H3, KeyValue, Loading, Screen, SectionTitle, Small, Stat, Title } from '@/components/ui';
+import { AdaptiveRow, Badge, Button, Card, ErrorNote, Eyebrow, H2, H3, KeyValue, Loading, Screen, SectionTitle, Small, Stat, Title } from '@/components/ui';
 import { ApiError, campusApi, queueApi } from '@/lib/api';
 import { useLoader } from '@/lib/auth';
 import { colors, dayName, formatClock, spacing } from '@/lib/theme';
@@ -64,15 +64,15 @@ export default function RoomDetailScreen() {
             ) : (
               <Small style={{ marginTop: 4 }}>No teaching session right now.</Small>
             )}
-            <View style={styles.stats}>
+            <AdaptiveRow style={styles.stats}>
               <Stat label="Open" value={availability.is_open ? 'yes' : 'no'} />
               <Stat label="Next free" value={availability.next_free_at ? formatClock(availability.next_free_at) : 'now'} />
               <Stat label="In room" value={availability.occupancy ? `${availability.occupancy.inside}/${availability.occupancy.capacity}` : 'no counter'} />
-            </View>
-            <View style={styles.actions}>
+            </AdaptiveRow>
+            <AdaptiveRow style={styles.actions}>
               <Button label="Navigate here" onPress={() => router.push(`/student/navigate/${encodeURIComponent(room_.code)}` as any)} style={{ flex: 1 }} />
               {room_.requires_admission ? <Button label="Join queue" variant="secondary" loading={busy} onPress={() => void joinQueue()} style={{ flex: 1 }} /> : null}
-            </View>
+            </AdaptiveRow>
           </Card>
 
           {availability.free_slots.length > 0 ? (
@@ -121,8 +121,8 @@ export default function RoomDetailScreen() {
 const styles = StyleSheet.create({
   header: { padding: spacing.lg },
   padded: { paddingHorizontal: spacing.lg },
-  stats: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  stats: { marginTop: spacing.md },
+  actions: { marginTop: spacing.lg },
   weekRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
   weekDay: { width: 34 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

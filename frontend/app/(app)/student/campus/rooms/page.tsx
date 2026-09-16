@@ -1,232 +1,368 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useAsync, useDebounced, formatDuration } from '@/lib/hooks';
-import { campusApi, studentApi } from '@/lib/api/endpoints';
-import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, Field, Input, Select, Toggle } from '@/components/ui/kit';
-import { PageHeader } from '@/components/layout/app-shell';
-
-const ROOM_TYPES = [
-  { value: '', label: 'Any type' },
-  { value: 'lecture', label: 'Lecture theatre' },
-  { value: 'lab', label: 'Laboratory' },
-  { value: 'study', label: 'Study space' },
-  { value: 'library', label: 'Library' },
-  { value: 'meeting', label: 'Meeting room' },
-  { value: 'auditorium', label: 'Auditorium' },
-  { value: 'office', label: 'Office' },
-  { value: 'service', label: 'Service desk' },
-];
+import { useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { WorkspaceIcon } from "@/components/layout/workspace-visual";
+import { useAsync, useDebounced } from "@/lib/hooks";
+import { campusApi, studentApi } from "@/lib/api/endpoints";
+import {
+  Badge,
+  Button,
+  CardSkeleton,
+  EmptyState,
+  ErrorState,
+  Field,
+  Input,
+  Select,
+} from "@/components/ui/kit";
+import { PageHeader } from "@/components/layout/app-shell";
+import s from "@/components/layout/student-discovery.module.css";
 
 export default function RoomsPage() {
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounced(search, 300);
-  const [buildingId, setBuildingId] = useState('');
-  const [roomType, setRoomType] = useState('');
-  const [minCapacity, setMinCapacity] = useState('');
-  const [accessibleOnly, setAccessibleOnly] = useState(false);
-  const [freeOnly, setFreeOnly] = useState(false);
-
-  const buildings = useAsync(() => campusApi.buildings(), []);
+  const [search, setSearch] = useState("");
+  const query = useDebounced(search, 300);
+  const [type, setType] = useState("");
+  const [admission, setAdmission] = useState("");
+  const [capacity, setCapacity] = useState("");
+  const [page, setPage] = useState(1);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [view, setView] = useState<"grid" | "list">("grid");
   const queues = useAsync(() => studentApi.queueBoard(), []);
-
   const rooms = useAsync(
     () =>
       campusApi.rooms({
-        q: debouncedSearch || undefined,
-        building_id: buildingId || undefined,
-        room_type: roomType || undefined,
-        min_capacity: minCapacity ? Number(minCapacity) : undefined,
-        accessible: accessibleOnly ? true : undefined,
-        limit: 60,
+        q: query || undefined,
+        type: type || undefined,
+        admission_required: admission || undefined,
+        per_page: 12,
+        page,
       }),
-    [debouncedSearch, buildingId, roomType, minCapacity, accessibleOnly],
+    [query, type, admission, page],
   );
-
-  const queueByRoom = useMemo(() => {
-    const map = new Map<string, { id: string; waiting: number; room_code: string }>();
-    for (const queue of queues.data?.queues ?? []) map.set(queue.room_id, { id: queue.id, waiting: queue.waiting, room_code: queue.room_code });
-    return map;
-  }, [queues.data]);
-
   const items = rooms.data?.items ?? [];
-  const visible = freeOnly ? items : items;
+  const visible = items.filter(
+    (room) => !capacity || room.capacity >= Number(capacity),
+  );
+  const meta = rooms.data?.meta;
+  const reset = () => {
+    setSearch("");
+    setType("");
+    setAdmission("");
+    setCapacity("");
+    setPage(1);
+  };
 
   return (
-    <div>
+    <div className={s.page}>
       <PageHeader
         title="Find a room"
-        description="Availability is calculated from the master timetable and live queues — never a stored flag. Search by name, code, building, type or accessibility."
+        description="Explore campus spaces, then check a room’s schedule before you go."
       />
-
-      <Card className="mb-4">
-        <div className="grid gap-4 lg:grid-cols-4">
-          <div className="lg:col-span-2">
-            <Field label="Search" htmlFor="room-search">
+      <section className={s.hero} aria-label="Room discovery">
+        <div>
+          <p className={s.eyebrow}>Your campus, a little closer</p>
+          <h2>
+            A place to focus.
+            <br />A space to find your people.
+          </h2>
+          <p className={s.muted}>
+            From lecture halls to quiet study spaces. Find the right room, see
+            what’s scheduled and plan your way there.
+          </p>
+        </div>
+        <Image
+          src="/images/campus-workspace.webp"
+          alt=""
+          width={440}
+          height={310}
+          className={s.heroArt}
+        />
+      </section>
+      <div className={s.split}>
+        <aside className={s.rail} aria-label="Room filters">
+          <button
+            className={s.filterToggle}
+            aria-expanded={filtersOpen}
+            aria-controls="room-filter-fields"
+            onClick={() => setFiltersOpen((v) => !v)}
+          >
+            Filter rooms{" "}
+            <span aria-hidden="true">{filtersOpen ? "−" : "+"}</span>
+          </button>
+          <div
+            id="room-filter-fields"
+            className={s.filterFields}
+            data-open={filtersOpen}
+          >
+            <div className={s.toolbar}>
+              <h2>Narrow your search</h2>
+              <button type="button" className={s.link} onClick={reset}>
+                Reset
+              </button>
+            </div>
+            <Field label="Room type" htmlFor="room-type">
+              <Select
+                id="room-type"
+                value={type}
+                onChange={(e) => {
+                  setType(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All room types</option>
+                {[
+                  "lecture",
+                  "hall",
+                  "lab",
+                  "study",
+                  "library",
+                  "meeting",
+                  "auditorium",
+                  "office",
+                  "service",
+                ].map((t) => (
+                  <option key={t} value={t}>
+                    {t === "lab"
+                      ? "Laboratory"
+                      : t.charAt(0).toUpperCase() + t.slice(1)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Admission" htmlFor="room-admission">
+              <Select
+                id="room-admission"
+                value={admission}
+                onChange={(e) => {
+                  setAdmission(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">Any policy</option>
+                <option value="true">Queue required</option>
+              </Select>
+            </Field>
+            <Field label="Minimum seats on this page" htmlFor="room-capacity">
               <Input
-                id="room-search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Room code, name or department (e.g. B204, lab, library)"
+                id="room-capacity"
+                type="number"
+                min={1}
+                value={capacity}
+                placeholder="Any capacity"
+                onChange={(e) => setCapacity(e.target.value)}
               />
             </Field>
+            <div className={s.railNote}>
+              <WorkspaceIcon name="room" size={22} aria-hidden="true" />
+              <p className="mt-3 text-sm font-semibold">Check before you go</p>
+              <p className={s.muted}>
+                Availability is shown on each room’s detail page. A room listed
+                here is not necessarily free right now.
+              </p>
+              <Link href="/student/campus/map" className={s.link}>
+                Explore the map <WorkspaceIcon name="arrow" size={15} />
+              </Link>
+            </div>
           </div>
-          <Field label="Building" htmlFor="room-building">
-            <Select id="room-building" value={buildingId} onChange={(event) => setBuildingId(event.target.value)}>
-              <option value="">All buildings</option>
-              {(buildings.data?.buildings ?? []).map((building) => (
-                <option key={building.id} value={building.id}>
-                  {building.code} · {building.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Room type" htmlFor="room-type">
-            <Select id="room-type" value={roomType} onChange={(event) => setRoomType(event.target.value)}>
-              {ROOM_TYPES.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Minimum capacity" htmlFor="room-capacity">
-            <Input
-              id="room-capacity"
-              type="number"
-              min={1}
-              value={minCapacity}
-              onChange={(event) => setMinCapacity(event.target.value)}
-              placeholder="e.g. 30"
-            />
-          </Field>
-          <div className="lg:col-span-2">
-            <Toggle checked={accessibleOnly} onChange={setAccessibleOnly} label="Step-free access only" description="Excludes rooms that are not marked as accessible." />
-            <Toggle checked={freeOnly} onChange={setFreeOnly} label="Show free rooms first" description="Sort rooms with no current session to the top." />
-          </div>
-        </div>
-      </Card>
-
-      {rooms.error ? <ErrorState message={rooms.error} onRetry={rooms.reload} /> : null}
-      {rooms.loading ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <CardSkeleton rows={3} />
-          <CardSkeleton rows={3} />
-          <CardSkeleton rows={3} />
-        </div>
-      ) : items.length === 0 ? (
-        <EmptyState
-          title="No rooms match those filters"
-          description="Try clearing the search box or widening the capacity filter."
-          action={
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setSearch('');
-                setBuildingId('');
-                setRoomType('');
-                setMinCapacity('');
-                setAccessibleOnly(false);
-              }}
+        </aside>
+        <section aria-label="Room results" aria-busy={rooms.loading}>
+          <div className={s.toolbar}>
+            <div className={s.search}>
+              <Field label="Search rooms" htmlFor="room-search">
+                <Input
+                  id="room-search"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Search by room name or code"
+                />
+              </Field>
+            </div>
+            <div
+              className="flex gap-1"
+              role="group"
+              aria-label="Results layout"
             >
-              Reset filters
-            </Button>
-          }
-        />
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {visible.map((room) => {
-            const queue = queueByRoom.get(room.id);
-            return (
-              <Card key={room.id} className="flex flex-col">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[15px] font-semibold text-ink-900">{room.code}</p>
-                    <p className="truncate text-[13px] text-ink-600">{room.name}</p>
-                  </div>
-                  {room.requires_admission ? <Badge tone="warning">Admission</Badge> : <Badge tone="neutral">{room.room_type}</Badge>}
-                </div>
-
-                <dl className="mt-3 grid grid-cols-2 gap-2 text-[12.5px]">
-                  <div>
-                    <dt className="text-ink-500">Building</dt>
-                    <dd className="font-medium text-ink-700">
-                      {room.building_code ? `${room.building_code} · ${room.building_name}` : '—'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-ink-500">Floor</dt>
-                    <dd className="font-medium text-ink-700">{room.floor_name ?? '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-ink-500">Capacity</dt>
-                    <dd className="tnum font-medium text-ink-700">{room.capacity} seats</dd>
-                  </div>
-                  <div>
-                    <dt className="text-ink-500">Queue</dt>
-                    <dd className="font-medium text-ink-700">{queue ? `${queue.waiting} waiting` : 'Not controlled'}</dd>
-                  </div>
-                </dl>
-
-                {room.amenities?.length ? (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {room.amenities.slice(0, 3).map((amenity) => (
-                      <Badge key={amenity} tone="neutral">
-                        {amenity.replaceAll('_', ' ')}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : null}
-
-                <div className="mt-auto flex flex-wrap gap-2 pt-4">
-                  <Link href={`/student/campus/rooms/${room.code}`}>
-                    <Button variant="secondary" size="sm">
-                      Details
-                    </Button>
-                  </Link>
-                  <Link href={`/student/campus/map?route=${encodeURIComponent(room.code)}`}>
-                    <Button size="sm">Navigate</Button>
-                  </Link>
-                  {room.requires_admission && queue ? (
-                    <Link href="/student/services/queues">
-                      <Button variant="signal" size="sm">
-                        Queue
-                      </Button>
-                    </Link>
-                  ) : null}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {queues.data?.queues.length ? (
-        <Card className="mt-4">
-          <p className="text-[13px] font-semibold text-ink-800">Live queues right now</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {queues.data.queues
-              .filter((queue) => queue.waiting > 0)
-              .slice(0, 6)
-              .map((queue) => (
-                <Link
-                  key={queue.id}
-                  href="/student/services/queues"
-                  className="flex items-center justify-between rounded-[10px] border border-ink-100 px-3 py-2 text-[12.5px] hover:border-brand-200 hover:bg-brand-50/40"
-                >
-                  <span className="font-medium text-ink-800">
-                    {queue.room_code} · {queue.room_name}
-                  </span>
-                  <span className="tnum text-ink-500">
-                    {queue.waiting} waiting · {formatDuration(queue.waiting * queue.avg_service_seconds)}
-                  </span>
-                </Link>
-              ))}
+              <button
+                className={s.chip}
+                aria-label="Grid view"
+                aria-pressed={view === "grid"}
+                onClick={() => setView("grid")}
+              >
+                <WorkspaceIcon name="grid" size={17} />
+              </button>
+              <button
+                className={s.chip}
+                aria-label="List view"
+                aria-pressed={view === "list"}
+                onClick={() => setView("list")}
+              >
+                <WorkspaceIcon name="list" size={17} />
+              </button>
+            </div>
           </div>
-        </Card>
-      ) : null}
+          {rooms.loading ? (
+            <div className={s.grid}>
+              <CardSkeleton rows={5} />
+              <CardSkeleton rows={5} />
+            </div>
+          ) : rooms.error ? (
+            <ErrorState message={rooms.error} onRetry={rooms.reload} />
+          ) : (
+            <>
+              <div className={s.toolbar}>
+                <p className={s.muted} role="status">
+                  {visible.length} rooms shown
+                  {meta
+                    ? ` · ${meta.total} matching rooms across all pages`
+                    : ""}
+                </p>
+              </div>
+              {visible.length === 0 ? (
+                <EmptyState
+                  title="No rooms match those filters"
+                  description={
+                    capacity
+                      ? "Try lowering the seat count, or check another page of results."
+                      : "Try another room name, code or room type."
+                  }
+                  action={
+                    <Button variant="secondary" onClick={reset}>
+                      Reset filters
+                    </Button>
+                  }
+                />
+              ) : (
+                <div
+                  className={view === "grid" ? s.grid : `${s.stack} ${s.list}`}
+                >
+                  {visible.map((room) => {
+                    const queue = queues.data?.queues.find(
+                      (q) => q.room_id === room.id,
+                    );
+                    const kind = (
+                      room.room_type ??
+                      room.type ??
+                      "Room"
+                    ).replaceAll("_", " ");
+                    return (
+                      <article key={room.id} className={s.roomCard}>
+                        <div className={s.roomTile}>
+                          <div>
+                            <p className={s.eyebrow}>{kind}</p>
+                            <p className={s.roomCode}>{room.code}</p>
+                          </div>
+                          <WorkspaceIcon
+                            name="room"
+                            size={38}
+                            strokeWidth={1.2}
+                            aria-hidden="true"
+                          />
+                        </div>
+                        <div className={s.roomBody}>
+                          <div>
+                            <h3>{room.name}</h3>
+                            <p className={s.muted}>
+                              {room.building_name ??
+                                room.building_code ??
+                                "Building not listed"}
+                            </p>
+                          </div>
+                          <dl className={s.facts}>
+                            <div>
+                              <dt>Capacity</dt>
+                              <dd>
+                                {room.capacity == null
+                                  ? "Not listed"
+                                  : `${room.capacity} seats`}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Floor</dt>
+                              <dd>{room.floor_name ?? "Not listed"}</dd>
+                            </div>
+                            <div>
+                              <dt>Admission</dt>
+                              <dd>
+                                {room.requires_admission
+                                  ? "Queue required"
+                                  : "No admission queue"}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Queue snapshot</dt>
+                              <dd>
+                                {queues.loading
+                                  ? "Checking…"
+                                  : queues.error
+                                    ? "Unavailable"
+                                    : queue
+                                      ? `${queue.waiting} waiting`
+                                      : "No queue listed"}
+                              </dd>
+                            </div>
+                          </dl>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(room.amenities ?? room.features ?? [])
+                              .slice(0, 3)
+                              .map((a) => (
+                                <Badge key={a} tone="neutral">
+                                  {a.replaceAll("_", " ")}
+                                </Badge>
+                              ))}
+                          </div>
+                          <div className={s.actions}>
+                            <Link
+                              className={s.link}
+                              href={`/student/campus/rooms/${encodeURIComponent(room.code)}`}
+                            >
+                              View room <WorkspaceIcon name="arrow" size={15} />
+                            </Link>
+                            <Link
+                              className={s.link}
+                              href={`/student/campus/map?route=${encodeURIComponent(room.code)}`}
+                            >
+                              Plan route
+                            </Link>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+              {meta && meta.total_pages > 1 ? (
+                <nav className={s.pagination} aria-label="Room pages">
+                  <span>
+                    Page {meta.page} of {meta.total_pages}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => p - 1)}
+                    >
+                      Previous page
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={page >= meta.total_pages}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      Next page
+                    </Button>
+                  </div>
+                </nav>
+              ) : null}
+            </>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Badge, Card, ErrorNote, Eyebrow, H3, Loading, Screen, Small, Title } from '@/components/ui';
+import { AdaptiveRow, Badge, Card, ErrorNote, Eyebrow, H3, Loading, Screen, Small, Title } from '@/components/ui';
 import { studentApi } from '@/lib/api';
 import { useLoader } from '@/lib/auth';
 import { colors, dayName, formatClock, spacing } from '@/lib/theme';
@@ -99,7 +99,7 @@ export default function TimetableScreen() {
             </Small>
 
             {entry.room_code ? (
-              <View style={styles.actions}>
+              <AdaptiveRow style={styles.actions}>
                 <Pressable onPress={() => router.push(`/student/navigate/${encodeURIComponent(entry.room_code ?? '')}` as any)} style={styles.action}>
                   <Ionicons name="navigate-outline" size={16} color={colors.brand700} />
                   <Small style={{ color: colors.brand700, fontWeight: '600' }}>Navigate</Small>
@@ -110,7 +110,7 @@ export default function TimetableScreen() {
                     <Small style={{ color: colors.ink600, fontWeight: '600' }}>Room details</Small>
                   </Pressable>
                 ) : null}
-              </View>
+              </AdaptiveRow>
             ) : null}
           </Card>
         ))}
@@ -135,6 +135,6 @@ const styles = StyleSheet.create({
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   badges: { flexDirection: 'row', gap: spacing.xs, alignItems: 'center' },
-  actions: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.md },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actions: { marginTop: spacing.md },
+  action: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 6 },
 });

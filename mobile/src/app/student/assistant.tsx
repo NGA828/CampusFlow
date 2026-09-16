@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Badge, Card, Eyebrow, H3, Screen, Small, Title } from '@/components/ui';
 import { ApiError, assistantApi } from '@/lib/api';
@@ -57,14 +57,15 @@ export default function AssistantScreen() {
 
   return (
     <Screen scroll={false}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }} keyboardVerticalOffset={90}>
+      <View style={{ flex: 1 }}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.thread} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Eyebrow>Campus assistant</Eyebrow>
           <Title style={{ marginTop: 2 }}>Ask CampusFlow</Title>
           <Small style={{ marginTop: 4 }}>Answers come from controlled backend tools evaluated against your own account — never from direct database access.</Small>
         </View>
 
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.thread} keyboardShouldPersistTaps="handled">
+
           {turns.length === 0 ? (
             <Card>
               <H3>Things I can do</H3>
@@ -73,7 +74,7 @@ export default function AssistantScreen() {
                 {SUGGESTIONS.map((suggestion) => (
                   <Pressable key={suggestion} onPress={() => void send(suggestion)} style={styles.suggestion}>
                     <Ionicons name="sparkles-outline" size={16} color={colors.brand700} />
-                    <Small style={{ color: colors.brand700, fontWeight: '600' }}>{suggestion}</Small>
+                    <Small style={{ color: colors.brand700, fontWeight: '600', flexShrink: 1 }}>{suggestion}</Small>
                   </Pressable>
                 ))}
               </View>
@@ -83,7 +84,7 @@ export default function AssistantScreen() {
           {turns.map((turn) => (
             <View key={turn.id} style={[styles.bubbleRow, turn.role === 'user' ? styles.bubbleRowUser : null]}>
               <View style={[styles.bubble, turn.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant]}>
-                {turn.error ? <Text style={[font.body, { color: colors.coral600 }]}>{turn.error}</Text> : <Text style={[font.body, styles.bubbleText]}>{turn.content}</Text>}
+                {turn.error ? <Text style={[font.body, { color: colors.coral600 }]}>{turn.error}</Text> : <Text style={[font.body, styles.bubbleText, turn.role === 'user' && { color: colors.white }]}>{turn.content}</Text>}
                 {turn.tools && turn.tools.length > 0 ? (
                   <View style={styles.tools}>
                     {turn.tools.map((tool) => (
@@ -124,7 +125,7 @@ export default function AssistantScreen() {
             <Ionicons name="arrow-up" size={20} color={colors.white} />
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Screen>
   );
 }
@@ -157,12 +158,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.control,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    fontSize: font.body.fontSize,
+    fontSize: 16,
     color: colors.ink800,
   },
   send: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: 23,
     backgroundColor: colors.brand600,
     alignItems: 'center',

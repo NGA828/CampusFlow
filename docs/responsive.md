@@ -1,108 +1,229 @@
-# Responsive behaviour
+# Responsive web and mobile guide
 
-CampusFlow is a responsive web app **and** a native mobile app, and both are built so the same
-screen works from a 320 px phone through to a wide desktop display. This document records the
-breakpoints, the patterns, and the audit that was run against the code.
+Updated 2026-09-15. This replaces the older static-only audit. CampusFlow retains its
+Next.js/Tailwind web workspaces and its separate Expo/React Native companion; a small browser
+window does **not** gain mobile-only capabilities.
 
-## 1. Breakpoints
+## What changed
 
-Tailwind's default scale is used unchanged (confirmed in the compiled stylesheet, where these four
-media queries are emitted):
+### Web
 
-| Token | Width | What changes |
+- The desktop shell uses `264px minmax(0,1fr)`, with shrinkable content capped at 1600px.
+  Nested grid/flex children can shrink. Long values wrap instead of enlarging the whole page.
+- Dense split panes (map, assistant, admin dashboard, queue and office operations) stack until
+  `xl`, when there is room for both panes beside the sidebar.
+- The landing header moves account creation into the section menu on phones. The phone
+  showcase uses a **container query**, showing its side devices only when its own container
+  is at least 720px wide. Code examples scroll locally, not at page level.
+- Admin searches can shrink below their preferred width, filter/toolbars and pagination wrap.
+  Tables retain all columns in a labelled, keyboard-focusable horizontal scroll region.
+  Table headers stay on one line; prose wrapping must not squeeze columns into vertical letters.
+- Selecting the timetable's week grid on a phone creates a local 720px scroll surface. The
+  default phone view remains the day list; users keep their explicit view choice.
+- Notifications anchor to the viewport on phones and to the bell on wider screens; their
+  height is bounded on short landscape screens. Both disclosure buttons expose expanded state
+  and support Escape. The workspace drawer provides account access at every width.
+- Dialogs are portalled outside grid/animation ancestors. The **whole dialog**, including header
+  and footer, is capped by `dvh`; only its content scrolls. Actions remain visible, focus stays
+  within the dialog, Escape closes it, and focus returns to the trigger. Typing no longer resets
+  focus when a parent rerenders with a new callback.
+- Shared buttons/tabs/toggles have a 44px minimum height (48px large buttons); icon buttons have
+  a 44px minimum width. Heights are minimums, not fixed boxes that clip multi-line labels.
+- Phone form fields use 16px text. `any-pointer: coarse` also covers touch-enabled tablets and
+  laptops. Inline prose links are excluded from blanket target enlargement.
+- Viewport zoom is unrestricted; `viewport-fit=cover`, safe-area padding and bottom-navigation
+  clearance are included. Shared CSS honours reduced motion.
+- Browser API requests default to `/api/v1`, using the existing same-origin proxy. Server
+  rendering still uses the internal API origin; no browser is sent to sandbox localhost.
+
+### Mobile (native app and its Expo web rendering)
+
+- `Screen` no longer applies `flex: 1` to unbounded ScrollView content. Scroll content grows
+  naturally, so long forms and the last card remain reachable. Non-scrolling chat remains flex-based.
+- Content is centred at a readable 720dp maximum; auth forms use 560dp. Avoid stretching a form
+  edge-to-edge on tablets simply because there is more room.
+- `AdaptiveRow` measures its **actual container** with `onLayout` and combines it with the live
+  `fontScale` from `useWindowDimensions`. Stat and action groups reflow from several columns to
+  one when space or text size demands it. It is used in student, staff and admin screens.
+- Keyboard avoidance wraps the scroll surface, rather than sitting inside it. The offset comes
+  from Expo Router's header context instead of a hard-coded chat offset. Chat's explanatory header
+  is part of the scrolling thread so it does not consume the composer on short screens.
+- Standalone screens reserve the bottom safe area. Tab screens let the tab bar own that inset,
+  avoiding duplicate padding. Native headers own the top inset when shown.
+- Buttons have 48dp minimum targets, vertical padding and wrapping, centred labels. Section
+  headings and badges can wrap; key/value text can shrink without colliding.
+- Tab labels remain below their icons, bar height responds to font scale and bottom safe area,
+  and the bar hides while the keyboard is open.
+- The camera frame follows available width with a 4:3 aspect ratio and a 360dp cap. Its permission
+  fallback can grow with text rather than clipping inside a fixed-height camera surface.
+- `orientation: default` permits portrait and landscape. **Rebuild/install the native app** to
+  apply that configuration; a JavaScript refresh alone does not update the native orientation policy.
+
+## Recommended framework strategy
+
+**Keep Tailwind CSS 4 for web.** Use its mobile-first responsive variants and existing CampusFlow
+components/tokens. CSS Modules are a good option for complex component-specific rules. Adding
+Bootstrap or Material UI alongside the current kit would duplicate resets, spacing and components;
+a migration is not needed to solve these problems.
+
+**Keep React Native StyleSheet and Flexbox for mobile.** Tailwind CSS itself does not lay out native
+views. NativeWind could be considered if utility-style authoring becomes a team-wide requirement,
+but it is not needed here and should not be introduced just to gain breakpoints. Prefer existing
+`Screen`, `AdaptiveRow`, `Button` and `Stat` primitives over per-screen device detection.
+
+## Breakpoints and flexible layout recipes
+
+| Web token | Minimum width at default root font | Appropriate use |
 | --- | --- | --- |
-| `sm` | ≥ 40 rem (640 px) | Small buttons regain their compact height, modals become centred dialogs, 2-column grids start |
-| `md` | ≥ 48 rem (768 px) | The timetable offers the week grid, room/office cards go 2-up, hero overlay chips appear |
-| `lg` | ≥ 64 rem (1024 px) | The sidebar replaces the mobile top-bar drawer + bottom navigation, fixed-track layouts (`lg:grid-cols-[320px_1fr]`) switch on |
-| `xl` | ≥ 80 rem (1280 px) | 3–4 column card and analytics grids |
+| base | Any width; tested down to 320px | One column, wrapping controls, phone navigation |
+| `sm` | 40rem / 640px | Two-column forms when content fits; centred dialogs |
+| `md` | 48rem / 768px | Timetable grid default; larger card groups |
+| `lg` | 64rem / 1024px | Desktop sidebar; not automatically enough room for dense split panes |
+| `xl` | 80rem / 1280px | Dense split panes and multi-column analytics |
 
-Page viewport is set in `frontend/app/layout.tsx` (`width=device-width, initial-scale=1,
-maximumScale=5`) so browser zoom is never blocked.
+Break at the point **content stops fitting**, not at a particular phone brand. Test widths between
+breakpoints too. Do not use user-agent detection or cache window dimensions at app startup.
 
-## 2. Application shell
+```css
+/* Example for new reusable card groups, not a replacement for every existing grid. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
+}
+.toolbar { display: flex; flex-wrap: wrap; gap: .75rem; }
+.toolbar > * { min-width: 0; }
+.detail { display: grid; gap: 1rem; }
+@media (min-width: 80rem) {
+  .detail { grid-template-columns: minmax(0, 1fr) 22rem; }
+}
+@media (any-pointer: coarse) {
+  .icon-action { min-width: 44px; min-height: 44px; }
+}
+```
 
-`components/layout/app-shell.tsx` renders **one** navigation model at a time:
+Use `min-height` rather than fixed height for text controls. Use `rem`, percentages, `minmax` and
+`clamp()` where appropriate. Retain local scrolling for genuinely two-dimensional data such as
+maps and tables; do not hide rows/columns or set `body { overflow-x: hidden }` to hide layout bugs.
+For fixed chrome, reserve its height plus `env(safe-area-inset-bottom)` in content. Use `dvh` for
+height-constrained overlays and test both mobile browser chrome and the software keyboard.
 
-- **≥ 1024 px** — a 264 px sticky sidebar (`lg:grid lg:grid-cols-[264px_1fr]`) with the full,
-  role-aware navigation list.
-- **< 1024 px** — a sticky top bar with a hamburger, a 2-column drawer listing every destination
-  (capped at `max-h-[70dvh]` and scrollable so a 21-item admin menu stays reachable on a short
-  screen), plus a fixed bottom navigation with the five primary destinations
-  (`Dashboard · Timetable · Map · Queue · Assistant`) and `pb-[env(safe-area-inset-bottom)]` for
-  notched devices.
-- `main` reserves `pb-24` below the content so the fixed bottom bar never covers the last card.
+```tsx
+// Native: margin/padding belongs on the outer row; children get measured widths.
+<AdaptiveRow minItemWidth={140} style={{ marginTop: 12 }}>
+  <Stat label="People ahead" value={snapshot.people_ahead} />
+  <Stat label="Estimated wait" value={snapshot.eta_label} />
+</AdaptiveRow>
+```
 
-## 3. Content patterns
+Keep native font scaling enabled. Don't reduce text size or cap accessibility scaling to make a
+row fit: reduce the column count instead. Use FlatList for very large native lists rather than
+putting thousands of cards in a ScrollView.
 
-| Concern | Pattern used everywhere |
-| --- | --- |
-| Multi-column layouts | Single column by default, columns added at `sm:`/`md:`/`lg:`/`xl:`. No page has a fixed multi-column grid without a breakpoint gate. |
-| Wide tables | `components/admin/table.tsx` renders a `min-w-[680px]` table inside `overflow-x-auto`, so the table scrolls inside its card instead of forcing the page to scroll sideways. |
-| Toolbars and filters | `flex flex-wrap` with `min-w-[220px] flex-1` search fields, so controls stack on phones. |
-| Maps and plans | Both map components render SVG with a `viewBox` (`h-full w-full`), so a floor plan or route scales to the container instead of pixel-fitting. |
-| Timetable | The 5-day grid needs room, so it is the default ≥ 768 px (`useMediaQuery('(min-width: 768px)')`) and the stacked day list is the default below that; the segmented control always wins once tapped. |
-| Modals | Bottom-sheet style below `sm` (`items-end rounded-t-2xl`) and centred dialog at `sm`+, with the body capped at `max-h-[70vh]` and internally scrollable. |
-| Popovers | The notification popover is `w-[340px] max-w-[calc(100vw-2rem)]` so it cannot exceed a narrow viewport. |
-| Long values | `KeyValue` keeps right-aligned values but allows them to shrink and wrap (`min-w-0 break-words`); identifiers in tables are truncated or shown via `min-w-0` wrappers. |
-| Touch targets | Buttons are 40 px (`md`), 48 px (`lg`) and 40 px (`icon`); the compact `sm` size used inside dense admin rows grows to 40 px below `sm` (`max-sm:h-10`). Bottom-navigation items are ~44 px tall. |
-| Typography | Page titles are 22 px and lift to 26 px at `sm`; body text stays ≥ 13 px with `leading-relaxed` so it survives 200 % zoom. |
+## Responsive images and maps
 
-## 4. Landing page
+- Use `next/image` for web photos, with explicit intrinsic dimensions or `fill` inside a sized
+  `position: relative` wrapper. Always give `fill` images an accurate `sizes` expression, e.g.
+  `sizes="(min-width: 80rem) 40vw, (min-width: 48rem) 50vw, 100vw"`.
+- Existing landing photos already use Next Image and `sizes`. Keep that pipeline: its generated
+  `srcset` lets the browser choose an appropriate resource. Do not download a desktop-size photo
+  for every phone. Lazy-load below-the-fold images; only preload a measured LCP image.
+- Standard `<img>`/video media are constrained to `max-width: 100%; height: auto`. Reserve aspect
+  ratio/dimensions to prevent layout shift. Use `object-fit: cover` for decorative crops and
+  `contain` for floor plans/diagrams where cropping would remove information.
+- Keep meaningful alt text; use empty alt text for purely decorative imagery. Do not bake important
+  text or interactive actions into an image.
+- Preserve SVG `viewBox` sizing for floor plans/routes. Map canvases need a sized container and
+  resize handling; never apply blanket image CSS to map canvases or stretch spatial coordinates.
+- In native screens, use the already-installed `expo-image` when adding photos: set a bounded
+  width/aspectRatio, `contentFit`, a placeholder and an appropriate source resolution/cache policy.
+  Provide local `@2x`/`@3x` assets where useful. No new native photo component was needed in this pass.
 
-- Hero: single column with the product mock below the copy; at `lg` it becomes
-  `lg:grid-cols-[1.05fr_1fr]`. The full-bleed photograph is a `next/image` with `fill` and
-  `sizes="100vw"`, so the browser downloads an appropriately sized file per viewport.
-- Floating data chips are `hidden md:block` (they would crowd a phone) and the statistics grid is
-  2 columns → 4 at `sm`.
-- The mobile-app showcase drops from three device frames to one below `sm`; the 232 px frame fits
-  a 320 px viewport with page padding.
-- All motion collapses to static content under `prefers-reduced-motion`, and the animated counters
-  are server-rendered with their real values so the page reads without JavaScript.
+## Verification and how to rerun
 
-## 5. Mobile app (Expo)
+From the repository root:
 
-- Every screen is a `ScrollView` (or a flex container for the chat) with pull-to-refresh, so
-  content adapts to any phone height; there are no fixed-height content areas apart from the QR
-  camera viewport.
-- Layouts use React Native flexbox with `flex: 1` content and `flexShrink` on long values, so text
-  wraps rather than clipping.
-- `Screen` centres content in a `maxWidth: 720` column, so tablets get a readable column instead of
-  edge-to-edge cards.
-- Safe areas come from `SafeAreaProvider` + `SafeAreaView` (top/left/right) and the tab bar handles
-  the home-indicator inset.
-- Camera, location and notification permission strings live in `app.json` for both platforms; the
-  scanner has a manual-entry fallback when a camera is unavailable or denied.
+```sh
+npm run check                       # PHP parsing, API/platform contracts, both client typechecks
+npm --prefix frontend run lint
+npm --prefix frontend run build
+npm --prefix mobile run test:responsive  # Node 22.18+; pure width/font-scale policy tests
 
-## 6. Audit record
+# In a separate terminal, start the actual web app (backend optional for isolated layout fixtures):
+HOSTNAME=0.0.0.0 npm --prefix frontend run dev
 
-Run against the working tree on 2026-09-10:
+# In your test terminal:
+cd frontend
+npx playwright install --with-deps chromium
+npm run test:responsive -- layout.spec.ts
+```
 
-1. **Breakpoint coverage** — every page/component was scanned for Tailwind responsive variants; the
-   only components with none are layout-neutral (e.g. `motion-primitives`) or use a JS media query
-   instead (the timetable's grid/list switch).
-2. **Fixed sizes** — all fixed pixel widths were reviewed; the remaining ones are either inside
-   `overflow-x-auto`, clamped (`max-w-[calc(100vw-2rem)]`), or hidden below their breakpoint
-   (`hidden md:block`).
-3. **Fixed-track grids** — none exist without a breakpoint gate; the timetable week grid uses
-   `minmax(0,1fr)` for its day columns and is only the default on wider screens.
-4. **Compiled CSS** — the production stylesheet contains the `40rem`/`48rem`/`64rem`/`80rem` media
-   queries and the specific responsive utilities (`264px` sidebar, `56px` timetable axis,
-   `100vw - 2rem` popover clamp, `70dvh` drawer, `100dvh` chat height).
-5. **Gates** — `npx tsc --noEmit` (web and mobile) and `npx next build` are green after the changes.
+The browser tests intercept API calls **inside the tests only**, for long-name fixtures, populated
+admin tables, representative student data and deliberate error states. They do not prove backend
+integration or authorization. `RESPONSIVE_BASE_URL` overrides the default web URL.
 
-Fixes applied during this audit:
+Optional rendering checks for the separate mobile client:
 
-| Fix | File |
-| --- | --- |
-| Notification popover could exceed a ≤ 340 px viewport | `components/layout/app-shell.tsx` |
-| Mobile navigation drawer could not scroll when the menu was taller than the viewport (admin) | `components/layout/app-shell.tsx` |
-| Compact (`sm`) buttons were 32 px tall on touch screens | `components/ui/kit.tsx` |
-| Assistant chat height assumed desktop chrome | `app/(app)/assistant/page.tsx` |
-| Timetable defaulted to the week grid on phones | `app/(app)/timetable/page.tsx` |
-| `KeyValue` values could not wrap unbroken strings | `components/ui/kit.tsx`, `mobile/src/components/ui.tsx` |
-| Tablet layouts stretched edge to edge | `mobile/src/components/ui.tsx` |
+```sh
+cd mobile
+EXPO_PUBLIC_API_URL=/api/v1 npx expo export --platform web
+# Serve dist with an HTML-aware static server on a separate port, e.g. npx serve dist -l 3101.
+# Then, from frontend:
+RESPONSIVE_MOBILE_URL=http://127.0.0.1:3101 npm run test:responsive
+```
 
-**Verification scope, stated honestly:** this environment has no browser or headless renderer, so
-the audit is static (class-by-class review), build-level (compiled CSS inspected) and
-type-level — not a screenshot comparison at each viewport. Re-running the checklist in a real
-browser or DevTools device toolbar is the remaining confirmation step.
+Use `/api/v1` only for the mobile **web** export served behind a same-origin API proxy. Native
+phones still need `EXPO_PUBLIC_API_URL` pointing to a reachable HTTPS/LAN API, never localhost.
+
+### Results from this pass
+
+- `npm run check`: passed; 125 PHP files parsed, 199 routes checked, no contract/platform problems;
+  both clients typecheck.
+- Web ESLint and production build: passed.
+- Expo SDK 57 web export: passed (the expected web push-notification support warning remains).
+- Native sizing policy: 3 tests passed, including 220 width/font-scale/item-count combinations.
+- Chromium: 21 web tests passed across 320, 360, 390, 430, 768, 1024, 1280 and 1920px widths and
+  844×390 landscape; tests include local table scrolling, popover containment, modal bounds/actions,
+  keyboard focus/typing, live resizing, 200% root text size, and touch tablet form sizing.
+- Expo **React Native Web rendering**: 5 additional tests passed at 320×568, 390×844, 768×1024,
+  844×390 and 1280×800. Auth forms scroll to their final actions; student cards and the chat composer
+  stay within the viewport. No page-level JavaScript errors in those test flows.
+- Initial browser failures exposed real landing intrinsic-width overflow and a table-header
+  over-wrapping issue; both were corrected rather than hiding page overflow.
+- Screenshots inspected: phone landing, phone native-rendered login, phone admin table and short
+  landscape dialog. Artifacts live in ignored scratch/test output, not the app or Git.
+
+The default browser CDN/system-package downloads were unavailable in this sandbox. Tests ran
+against Chromium 153 from an external, temporary browser package via
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`; that package is **not** an application dependency.
+
+### Review scores (engineering self-review, not user research)
+
+Dimensions, in order: visual quality / usability / hierarchy / consistency / responsiveness /
+accessibility / interaction / performance / CampusFlow relevance / originality. Existing visual
+identity is preserved. Scores for unrendered native views are provisional code-review scores.
+
+| Shared surface / affected screens | Scores | Mean | Evidence |
+| --- | --- | --- | --- |
+| Landing and account entry | 9/9/9/9/9/8/8/8/9/8 | 8.6 | Browser matrix; phone landing screenshot |
+| Role shells and admin users/table/dialog patterns | 8/9/9/9/9/8/9/8/9/8 | 8.6 | All nine viewport sizes; modal interactions and phone/landscape screenshots |
+| Student dashboard, timetable, map, assistant, offices | 8/9/9/9/9/8/8/8/9/8 | 8.5 | 320px representative rendered states; grid scrolling; shared constraints |
+| Admin alerts/dashboard/services/settings; staff queue/office detail | 8/8/8/9/8/8/8/8/9/8 | 8.2 | Shared pattern adoption and code review; not every populated detail page rendered |
+| Native auth, student dashboard and assistant | 8/9/9/9/9/8/8/8/9/8 | 8.5 | Expo web render tests; auth screenshot; native hardware confirmation pending |
+| Native student map/queue/scan/timetable/room/offices/navigation; staff desk/line/office; admin monitoring/alerts | 8/8/8/9/8/8/8/8/9/8 | 8.2 | Adaptive row policy tests and code review; native hardware confirmation pending |
+
+### Still required before a full device sign-off
+
+- Safari/iOS and Firefox; real iPhone/Android small and large screens, iPad/tablet split-screen.
+- Native rebuild, portrait↔landscape rotation, notches/home indicators, keyboard show/hide, Android
+  resize behaviour, screen-reader navigation and OS Dynamic Type at 100%, 150%, 200% and maximum.
+- Actual browser 200–400% page zoom and native maximum text sizes. Root-font scaling in automation
+  is useful but is not equivalent to every browser zoom or OS text-scaling implementation.
+- Camera permission fallback/scan flow in both orientations, live map resizing, native navigation,
+  poor network, real API data and long localized strings. Test every role's populated detail flows.
+- Backend tests/integration against running Laravel and PostgreSQL were not run in this UI pass.
+- Existing mobile dependency audit reports 14 moderate findings. No forced dependency upgrades were
+  mixed into this responsiveness change; review them separately.
+
+Research sources and pre-implementation comparison:
+[responsive-foundation.md](design-decisions/responsive-foundation.md).

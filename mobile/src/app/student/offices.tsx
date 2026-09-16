@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { Badge, Button, Card, ErrorNote, Eyebrow, H3, ListRow, Loading, Screen, Small, Stat, Title } from '@/components/ui';
+import { AdaptiveRow, Badge, Button, Card, ErrorNote, Eyebrow, H3, ListRow, Loading, Screen, Small, Stat, Title } from '@/components/ui';
 import { officeApi } from '@/lib/api';
 import { useLoader } from '@/lib/auth';
 import { colors, formatClock, spacing } from '@/lib/theme';
@@ -61,11 +61,11 @@ export default function OfficesScreen() {
               <Badge tone={summary.is_open_now ? 'mint' : 'neutral'}>{summary.is_open_now ? 'open now' : 'closed'}</Badge>
             </View>
 
-            <View style={styles.stats}>
+            <AdaptiveRow style={styles.stats}>
               <Stat label="Waiting" value={summary.counts.waiting} />
               <Stat label="In service" value={summary.counts.in_service} />
               <Stat label="Wait" value={`${summary.estimated_wait_minutes}m`} tone="mint" />
-            </View>
+            </AdaptiveRow>
 
             <View style={{ marginTop: spacing.md }}>
               <Small>
@@ -105,5 +105,5 @@ const styles = StyleSheet.create({
   header: { padding: spacing.lg },
   padded: { paddingHorizontal: spacing.lg },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  stats: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  stats: { marginTop: spacing.md },
 });

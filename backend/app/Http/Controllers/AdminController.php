@@ -26,6 +26,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Support\Access\Roles;
+use App\Support\CampusConfiguration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -63,7 +64,7 @@ class AdminController extends Controller
 
     private function paginate($query, Request $request, callable $transform = null): array
     {
-        $perPage = min((int) ($request->query('per_page', 20)), 100);
+        $perPage = max(1, min((int) ($request->query('per_page', 20)), 100));
         $paged   = $query->paginate($perPage);
         $items   = collect($paged->items());
         if ($transform) $items = $items->map($transform);
@@ -94,7 +95,7 @@ class AdminController extends Controller
         $todayOfficeCompleted= OfficeTicket::where('status', 'completed')->whereDate('completed_at', now()->today())->count();
         $buildingsCount      = Building::count();
         $roomsCount          = Room::count();
-        $queues = RoomQueue::with('room')
+        $queues = RoomQueue::with('room.floor.building')
             ->get()
             ->map(fn ($queue) => [
                 'queue_id' => $queue->id,
@@ -194,11 +195,12 @@ class AdminController extends Controller
 
     public function users(Request $request): JsonResponse
     {
+        $request->validate(['q' => 'nullable|string|max:255', 'role' => 'nullable|in:admin,staff,student,visitor', 'per_page' => 'nullable|integer|min:1|max:100', 'page' => 'nullable|integer|min:1']);
         $query = User::query();
 
         if ($role = $request->query('role'))     $query->where('role', $role);
         if ($q    = $request->query('q'))        $query->where(fn($sq) =>
-            $sq->where('name', 'ilike', "%{$q}%")->orWhere('email', 'ilike', "%{$q}%")
+            $sq->where('name', 'ilike', "%{$q}%")->orWhere('email', 'ilike', "%{$q}%")->orWhere('registration_no', 'ilike', "%{$q}%")
         );
 
         return $this->ok($this->paginate($query->orderBy('name'), $request));
@@ -237,12 +239,18 @@ class AdminController extends Controller
 
         $request->validate([
             'name'       => 'sometimes|string|max:255',
-            'role'       => 'sometimes|in:admin,staff,student,visitor',
+            'role'       => 'prohibited',
             'department' => 'sometimes|nullable|string',
             'status'     => 'sometimes|in:active,suspended',
         ]);
 
-        $user->update($request->only(['name', 'role', 'department', 'status']));
+        if ($request->input('status') === 'suspended') {
+            if ($user->id === $request->user()->id) return $this->fail('You cannot suspend your own account.', 409);
+            if ($user->role === Roles::ADMIN && !User::where('role', Roles::ADMIN)->where('status', 'active')->where('id', '!=', $user->id)->exists())
+                return $this->fail('This is the last active administrator.', 409);
+        }
+        // status is intentionally not globally mass-assignable on User.
+        $user->forceFill($request->only(['name', 'department', 'status']))->save();
 
         return $this->ok(['user' => $user->fresh()]);
     }
@@ -294,6 +302,10 @@ class AdminController extends Controller
     public function deleteUser(Request $request, User $user): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
+        if ($user->id === $request->user()->id) return $this->fail('You cannot deactivate your own account.', 409);
+        if ($user->role === Roles::ADMIN && !User::where('role', Roles::ADMIN)->where('status', 'active')->where('id', '!=', $user->id)->exists())
+            return $this->fail('This is the last active administrator.', 409);
+        $user->tokens()->delete();
         $user->delete();
         return response()->json(['success' => true, 'message' => 'User deleted'], 200);
     }
@@ -312,7 +324,15 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $assignments = StaffAssignment::with(['user'])->get();
-        return $this->ok(['assignments' => $assignments]);
+        $scopes = [];
+        foreach (['building' => Building::class, 'floor' => Floor::class, 'room' => Room::class,
+            'office' => Office::class, 'course' => Course::class] as $kind => $model) {
+            $scopes[$kind] = $model::orderBy('name')->get()->map(fn ($row) => [
+                'id' => $row->id, 'label' => trim(($row->code ?? '') . ' · ' . $row->name, ' ·'),
+            ])->values();
+        }
+        return $this->ok(['assignments' => $assignments, 'scopes' => $scopes,
+            'people' => User::whereIn('role', ['staff', 'admin'])->orderBy('name')->get(['id', 'name', 'email'])]);
     }
 
     public function createStaffAssignment(Request $request): JsonResponse
@@ -320,9 +340,17 @@ class AdminController extends Controller
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $request->validate([
             'user_id'    => 'required|uuid|exists:users,id',
-            'scope_type' => 'required|string',
-            'scope_id'   => 'required|string',
+            'scope_type' => 'required|in:building,floor,room,office,course',
+            'scope_id'   => 'required|uuid',
+            'role_in_scope' => 'nullable|string|max:100',
+            'can_manage_timetable' => 'sometimes|boolean', 'can_publish_content' => 'sometimes|boolean',
+            'can_call_tickets' => 'sometimes|boolean',
         ]);
+        $target = User::findOrFail($request->input('user_id'));
+        abort_unless(in_array($target->role, ['staff', 'admin'], true), 422, 'Choose a staff or administrator account.');
+        $models = ['building' => Building::class, 'floor' => Floor::class, 'room' => Room::class, 'office' => Office::class, 'course' => Course::class];
+        $model = $models[$request->input('scope_type')];
+        abort_unless($model::whereKey($request->input('scope_id'))->exists(), 422, 'The selected scope does not exist.');
         $a = StaffAssignment::create($request->only(['user_id', 'scope_type', 'scope_id', 'role_in_scope', 'can_manage_timetable', 'can_publish_content', 'can_call_tickets']));
         return $this->ok(['assignment' => $a], 201);
     }
@@ -339,16 +367,17 @@ class AdminController extends Controller
     public function buildings(Request $request): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        $q = Building::query();
-        if ($search = $request->query('q')) $q->where('name', 'ilike', "%{$search}%");
-        return $this->ok($this->paginate($q->orderBy('name'), $request, fn($b) => $b->toApiArray()));
+        $request->validate(['q' => 'nullable|string|max:120', 'building_id' => 'nullable|uuid', 'floor_id' => 'nullable|uuid', 'page' => 'sometimes|integer|min:1', 'per_page' => 'sometimes|integer|min:1']);
+        $q = Building::withCount('floors');
+        $search = trim((string) $request->query('q', ''));
+        if ($search !== '') $q->where(fn ($q) => $q->where('name', 'ilike', "%{$search}%")->orWhere('code', 'ilike', "%{$search}%"));
+        return $this->ok($this->paginate($q->orderBy('name')->orderBy('id'), $request, fn($b) => $b->toApiArray()));
     }
 
     public function createBuilding(Request $request): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        $request->validate(['code' => 'required|string|unique:buildings,code', 'name' => 'required|string']);
-        $b = Building::create($request->only(['code', 'name', 'short_name', 'description', 'address', 'lat', 'lng', 'footprint', 'image_url', 'status', 'is_public']));
+        $b = CampusConfiguration::create('building', CampusConfiguration::validate($request, 'building'));
         return $this->ok($b->toApiArray(), 201);
     }
 
@@ -356,15 +385,15 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $b = Building::findOrFail($id);
-        $b->update($request->only(['code', 'name', 'short_name', 'description', 'address', 'lat', 'lng', 'footprint', 'image_url', 'status', 'is_public']));
+        $b->update(CampusConfiguration::validate($request, 'building', $b));
         return $this->ok($b->fresh()->toApiArray());
     }
 
     public function deleteBuilding(Request $request, string $id): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        Building::findOrFail($id)->delete();
-        return response()->json(['success' => true]);
+        CampusConfiguration::remove(Building::findOrFail($id), 'building');
+        return $this->ok(['deleted' => $id]);
     }
 
     /* ─────────────────────────────────────── floors */
@@ -372,15 +401,22 @@ class AdminController extends Controller
     public function floors(Request $request): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        $q = Floor::with(['building'])->when($request->query('building_id'), fn($q, $id) => $q->where('building_id', $id));
-        return $this->ok($this->paginate($q->orderBy('level'), $request, fn($f) => $f->toApiArray()));
+        $request->validate(['q' => 'nullable|string|max:120', 'building_id' => 'nullable|uuid', 'floor_id' => 'nullable|uuid', 'page' => 'sometimes|integer|min:1', 'per_page' => 'sometimes|integer|min:1']);
+        $q = Floor::with('building')->withCount('rooms')->when($request->query('building_id'), fn($q, $id) => $q->where('building_id', $id));
+        $search = trim((string) $request->query('q', ''));
+        if ($search !== '') $q->where(function ($q) use ($search) {
+            $q->where('name', 'ilike', "%{$search}%")->orWhere('code', 'ilike', "%{$search}%");
+            if (filter_var($search, FILTER_VALIDATE_INT, ['options' => ['min_range' => -2147483648, 'max_range' => 2147483647]]) !== false) $q->orWhere('level', (int) $search);
+        });
+        return $this->ok($this->paginate($q->orderBy('level')->orderBy('id'), $request, fn($f) => array_merge($f->toApiArray(), [
+            'building_code' => $f->building?->code, 'building_name' => $f->building?->name, 'rooms_count' => (int) $f->rooms_count,
+        ])));
     }
 
     public function createFloor(Request $request): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        $request->validate(['building_id' => 'required|uuid|exists:buildings,id', 'level' => 'required|integer', 'name' => 'required|string']);
-        $f = Floor::create($request->only(['building_id', 'level', 'code', 'name', 'plan_url', 'plan_svg', 'plan_width_m', 'plan_height_m', 'status']));
+        $f = CampusConfiguration::create('floor', CampusConfiguration::validate($request, 'floor'));
         return $this->ok($f->toApiArray(), 201);
     }
 
@@ -388,15 +424,15 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $f = Floor::findOrFail($id);
-        $f->update($request->only(['level', 'code', 'name', 'plan_url', 'plan_svg', 'plan_width_m', 'plan_height_m', 'status']));
+        $f->update(CampusConfiguration::validate($request, 'floor', $f));
         return $this->ok($f->fresh()->toApiArray());
     }
 
     public function deleteFloor(Request $request, string $id): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        Floor::findOrFail($id)->delete();
-        return response()->json(['success' => true]);
+        CampusConfiguration::remove(Floor::findOrFail($id), 'floor');
+        return $this->ok(['deleted' => $id]);
     }
 
     /* ─────────────────────────────────────── rooms */
@@ -404,17 +440,19 @@ class AdminController extends Controller
     public function adminRooms(Request $request): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        $q = Room::with(['floor.building'])->when($request->query('q'), fn($q, $s) =>
-            $q->where('name', 'ilike', "%{$s}%")->orWhere('code', 'ilike', "%{$s}%")
-        );
-        return $this->ok($this->paginate($q->orderBy('code'), $request, fn($r) => $r->toApiArray()));
+        $request->validate(['q' => 'nullable|string|max:120', 'building_id' => 'nullable|uuid', 'floor_id' => 'nullable|uuid', 'page' => 'sometimes|integer|min:1', 'per_page' => 'sometimes|integer|min:1']);
+        $q = Room::with('floor.building')
+            ->when($request->query('floor_id'), fn ($q, $id) => $q->where('floor_id', $id))
+            ->when($request->query('building_id'), fn ($q, $id) => $q->whereHas('floor', fn ($q) => $q->where('building_id', $id)));
+        $search = trim((string) $request->query('q', ''));
+        if ($search !== '') $q->where(fn ($q) => $q->where('name', 'ilike', "%{$search}%")->orWhere('code', 'ilike', "%{$search}%"));
+        return $this->ok($this->paginate($q->orderBy('code')->orderBy('id'), $request, fn($r) => array_merge($r->toApiArray(), ['building_id' => $r->floor?->building_id])));
     }
 
     public function createRoom(Request $request): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        $request->validate(['floor_id' => 'required|uuid|exists:floors,id', 'code' => 'required|string', 'name' => 'required|string']);
-        $r = Room::create($request->only(['floor_id', 'code', 'name', 'type', 'capacity', 'area_m2', 'plan_x', 'plan_y', 'lat', 'lng', 'features', 'requires_admission', 'status', 'is_public', 'access_rule', 'image_url']));
+        $r = CampusConfiguration::create('room', CampusConfiguration::validate($request, 'room'));
         return $this->ok($r->toApiArray(), 201);
     }
 
@@ -422,15 +460,15 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $r = Room::findOrFail($id);
-        $r->update($request->only(['code', 'name', 'type', 'capacity', 'area_m2', 'plan_x', 'plan_y', 'lat', 'lng', 'features', 'requires_admission', 'status', 'is_public', 'access_rule', 'image_url']));
+        $r->update(CampusConfiguration::validate($request, 'room', $r));
         return $this->ok($r->fresh()->toApiArray());
     }
 
     public function deleteRoom(Request $request, string $id): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
-        Room::findOrFail($id)->delete();
-        return response()->json(['success' => true]);
+        CampusConfiguration::remove(Room::findOrFail($id), 'room');
+        return $this->ok(['deleted' => $id]);
     }
 
     /* ─────────────────────────────────────── QR nodes */
@@ -1022,9 +1060,11 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
 
+        $snapshot = $this->deriveAlerts();
+
         return $this->ok([
-            'alerts'       => $this->deriveAlerts(),
-            'counts'       => $this->alertCounts(),
+            'alerts'       => $snapshot,
+            'counts'       => $this->alertCounts($snapshot),
             'generated_at' => now()->toIso8601String(),
         ]);
     }
@@ -1066,15 +1106,16 @@ class AdminController extends Controller
         }
 
         // 3 — a desk closed with people still holding a ticket is the failure a student feels first.
-        $stranded = OfficeTicket::whereIn('status', ['waiting', 'called', 'approaching'])->count()
-            + OfficeTicket::where('status', 'in_service')->count();
+        $stranded = OfficeTicket::whereIn('status', ['waiting', 'called', 'approaching', 'in_service'])
+            ->whereHas('office', fn ($q) => $q->where('is_open', false)->where('status', 'active'))
+            ->count();
 
-        if ($stranded > 0 && Office::where('is_open', false)->where('status', 'active')->exists()) {
+        if ($stranded > 0) {
             $alerts[] = [
                 'key'      => 'offices_closed_with_line:' . $today,
                 'severity' => 'critical',
-                'title'    => $stranded . ' office tickets are unattended',
-                'detail'   => 'At least one active office is closed while tickets are still in the line.',
+                'title'    => $stranded . ' tickets remain at closed offices',
+                'detail'   => 'These tickets belong to active offices whose open switch is off. Review the remaining line and any service in progress.',
                 'target'   => '/admin/services',
             ];
         }
@@ -1141,6 +1182,15 @@ class AdminController extends Controller
             ];
         }
 
+        // The wire key is an opaque acknowledgement fingerprint, used unchanged by web and mobile.
+        // A changed reported condition must not inherit the previous mute. This is still a snapshot:
+        // an identical condition in the same bucket can match an earlier acknowledgement.
+        foreach ($alerts as &$alert) {
+            $condition = json_encode([$alert['severity'], $alert['title'], $alert['detail'], $alert['target'] ?? null]);
+            $alert['key'] .= ':' . substr(hash('sha256', $condition), 0, 16);
+        }
+        unset($alert);
+
         return array_values(array_filter(
             $alerts,
             fn (array $alert) => ! in_array($alert['key'], $muted, true)
@@ -1148,9 +1198,9 @@ class AdminController extends Controller
     }
 
     /** @return array{critical: int, warning: int, acknowledged: int} */
-    private function alertCounts(): array
+    private function alertCounts(?array $snapshot = null): array
     {
-        $alerts = collect($this->deriveAlerts());
+        $alerts = collect($snapshot ?? $this->deriveAlerts());
 
         return [
             'critical'     => $alerts->where('severity', 'critical')->count(),

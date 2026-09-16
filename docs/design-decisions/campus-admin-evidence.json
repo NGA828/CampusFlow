@@ -1,0 +1,207 @@
+{
+  "date": "2026-09-16",
+  "page": "/admin/campus",
+  "status": "implemented; fixture and visual reviewed; acceptance held on landing raster preservation",
+  "canonicalProgress": {
+    "completed": 25,
+    "total": 31,
+    "campusAccepted": false,
+    "pendingOtherAdmin": [
+      "services",
+      "academics",
+      "analytics",
+      "settings",
+      "spatial"
+    ],
+    "loginFinalAudit": "pending"
+  },
+  "tests": {
+    "campus": 41,
+    "campusAndDiscoveryStates": {
+      "passed": 46,
+      "duration": "3.1m"
+    },
+    "fullOriginal": {
+      "passed": 374,
+      "failed": 1,
+      "duration": "10.2m",
+      "failure": "landing: 31759 differing channels"
+    },
+    "isolatedLanding": {
+      "passed": 1,
+      "duration": "1.4m",
+      "differingChannels": 0
+    },
+    "isolatedRepeat": {
+      "failed": 1,
+      "differingChannels": 31759
+    },
+    "viewportRepaintExperiment": {
+      "isolatedPassed": 1,
+      "fullPassed": 374,
+      "fullFailed": 1,
+      "failure": "landing settling timeout",
+      "retained": false
+    },
+    "pausedClockExperiment": {
+      "failed": 3,
+      "retained": false
+    },
+    "note": "No single clean 375-case full suite. Strict assertions unchanged; ineffective stabilization experiments reverted."
+  },
+  "checks": {
+    "phpParsed": 127,
+    "phpSyntaxErrors": 0,
+    "routes": 199,
+    "webCalls": 185,
+    "mobileCalls": 82,
+    "testCalls": 123,
+    "rolePermissionPairs": 62,
+    "orphans": 0,
+    "problems": 0,
+    "webAndMobileTypecheck": "pass",
+    "lint": "pass",
+    "productionBuild": "pass",
+    "gitDiffCheck": "pass"
+  },
+  "backendRuntime": {
+    "available": false,
+    "newLaravelTests": 5,
+    "executed": 0,
+    "noCertification": [
+      "database execution",
+      "real authentication",
+      "global concurrency"
+    ]
+  },
+  "landingEvidence": "campus-admin-landing-preservation.json",
+  "screenshots": [
+    {
+      "state": "buildings",
+      "width": 320,
+      "height": 2178,
+      "sha256": "134048f2c848af12d46caaff060afb6e6d1ff63d8aebcafbd3ee42a1d0002ae5"
+    },
+    {
+      "state": "buildings",
+      "width": 768,
+      "height": 1815,
+      "sha256": "e64f5e9873fa1c157259217ba5621d8af043c232b4cc94c74056e2912404da58"
+    },
+    {
+      "state": "buildings",
+      "width": 1440,
+      "height": 1520,
+      "sha256": "fa2462a8262d2f162465d80fb28331888697b3fcba4c5c9b74e0b18cf674226f"
+    },
+    {
+      "state": "floors",
+      "width": 320,
+      "height": 1951,
+      "sha256": "4d49719a941fbe63e4ce101cc80b65083441c53d478c2bd6aa51c33e17b324ef"
+    },
+    {
+      "state": "floors",
+      "width": 768,
+      "height": 2084,
+      "sha256": "be99664c0d83454b86e3e23c58e957f3cfafb831ce1bc23cc938cd56adc75d8e"
+    },
+    {
+      "state": "floors",
+      "width": 1440,
+      "height": 1506,
+      "sha256": "557180d8bafc7200b941589c5321cb964ccb1e2f6550b43ed5ba6b8c44d73efd"
+    },
+    {
+      "state": "rooms",
+      "width": 320,
+      "height": 1932,
+      "sha256": "887911065b88e3262d0c00cd8b54631189a3e2f821b242ed1ac082bb1c32eb30"
+    },
+    {
+      "state": "rooms",
+      "width": 768,
+      "height": 1698,
+      "sha256": "5add749528f3afe4330bf5bca16bdb4da1a4160cccb98f906fa7e2eefc49e859"
+    },
+    {
+      "state": "rooms",
+      "width": 1440,
+      "height": 1255,
+      "sha256": "30786005420ea1cca4bf404b1a9285dbd759ba800941b0c333ad7d2f7fb65670"
+    },
+    {
+      "state": "floor-editor",
+      "width": 320,
+      "height": 1951,
+      "sha256": "9eaebcb5f9d861da95b884e178fec28df475ac339a9cefa7779070abed3fe8a6"
+    },
+    {
+      "state": "floor-editor",
+      "width": 768,
+      "height": 2084,
+      "sha256": "39146d1c862281e472382b70f7d167f2f3934ed24a12901095a6b570a7624998"
+    },
+    {
+      "state": "floor-editor",
+      "width": 1440,
+      "height": 1506,
+      "sha256": "643e5342775952ff5dc2f735816fa885c1ce3753a04a42f3d6e5600d5c83f92b"
+    },
+    {
+      "state": "room-editor",
+      "width": 320,
+      "height": 1932,
+      "sha256": "456b78c3348b6e38c2e7232be133cce203369a5079009e6eec2e557e22156ff7"
+    },
+    {
+      "state": "room-editor",
+      "width": 768,
+      "height": 1698,
+      "sha256": "d3f9d0036ceef6ca2ca3584e489c7a292190a56eb1a55236fb4ffb58e0227e3d"
+    },
+    {
+      "state": "room-editor",
+      "width": 1440,
+      "height": 1255,
+      "sha256": "6eb15ddfbb408bceeaca945c75a7789f5450668bad7bcf9405a2f17d4872a4a6"
+    },
+    {
+      "state": "empty",
+      "width": 320,
+      "height": 1369,
+      "sha256": "a5f2874b6c3a1d595a69c3a5fc520d0d96b7ea69c1c4b221a984b051fd3f8995"
+    },
+    {
+      "state": "empty",
+      "width": 768,
+      "height": 1486,
+      "sha256": "a5b28e0161ca81fc1d47527e8343614987564e6b5f0b20e890493de8e3adb2f4"
+    },
+    {
+      "state": "empty",
+      "width": 1440,
+      "height": 1242,
+      "sha256": "7ef29cfe13bc1ef960c8255b46c6294053b592474356f17720084127835da058"
+    },
+    {
+      "state": "error",
+      "width": 320,
+      "height": 1140,
+      "sha256": "55d589b3f7c730b97c6a2b2537055a8c5835935a0dec09cc6c73bda4b91bd311"
+    },
+    {
+      "state": "error",
+      "width": 768,
+      "height": 1368,
+      "sha256": "c463eeb8cb44e12fb76cad57fb38d0fc24637d273f3b8f68314408967eca75c9"
+    },
+    {
+      "state": "error",
+      "width": 1440,
+      "height": 1242,
+      "sha256": "57a8122e53699dd873a2d79f6e85a3348038aaf14473b1a785ec1c8a95cdab4d"
+    }
+  ],
+  "visualReview": "All21 captures reviewed in contact sheets; desktop building and mobile room/editor views inspected enlarged. Distinct record hierarchy, internal modal scroll, explicit empty/error states. No external source artwork shipped."
+}

@@ -5,7 +5,7 @@
 import { Platform, type TextStyle } from 'react-native';
 
 export const colors = {
-  ink50: '#f6f7fb',
+  ink50: '#f5f6fa',
   ink100: '#eceefa',
   ink200: '#d7dbeb',
   ink300: '#b3bad3',
@@ -36,14 +36,14 @@ export const colors = {
 } as const;
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 22, xxl: 32 } as const;
-export const radius = { control: 11, card: 16, pill: 999 } as const;
+export const radius = { control: 15, card: 22, pill: 999 } as const;
 
 export const font = {
-  title: { fontSize: 26, fontWeight: '700', letterSpacing: -0.4 } satisfies TextStyle,
-  h2: { fontSize: 19, fontWeight: '700' } satisfies TextStyle,
-  h3: { fontSize: 15.5, fontWeight: '600' } satisfies TextStyle,
-  body: { fontSize: 14.5, lineHeight: 21 } satisfies TextStyle,
-  small: { fontSize: 12.5, lineHeight: 18 } satisfies TextStyle,
+  title: { fontSize: 30, fontWeight: '700', letterSpacing: -0.8 } satisfies TextStyle,
+  h2: { fontSize: 21, fontWeight: '700' } satisfies TextStyle,
+  h3: { fontSize: 16, fontWeight: '600' } satisfies TextStyle,
+  body: { fontSize: 15, lineHeight: 23 } satisfies TextStyle,
+  small: { fontSize: 13, lineHeight: 19 } satisfies TextStyle,
   tiny: { fontSize: 11, letterSpacing: 0.4 } satisfies TextStyle,
   mono: { fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) } satisfies TextStyle,
 };
@@ -51,10 +51,10 @@ export const font = {
 export const shadow = {
   card: {
     shadowColor: '#101527',
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.045,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
+    elevation: 1,
   },
 } as const;
 

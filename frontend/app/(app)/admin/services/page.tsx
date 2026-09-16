@@ -362,7 +362,7 @@ export default function AdminServicesPage() {
           <Card>
             <SectionHeading title="Configure a room queue" description="Rooms that require admission can have a queue with proximity, capacity and no-show rules." />
             <div className="flex flex-wrap items-end gap-3">
-              <div className="min-w-[260px] flex-1">
+              <div className="min-w-0 basis-[260px] flex-1">
                 <Field label="Room" htmlFor="queue-room">
                   <Select id="queue-room" value={newQueueRoomId} onChange={(event) => setNewQueueRoomId(event.target.value)}>
                     <option value="">Select a room without a queue…</option>

@@ -91,8 +91,8 @@ export function FloorPlan({
     const room = rooms.find((candidate) => candidate.id === drag.roomId);
     if (!room) return;
     onMoveRoom(room, {
-      x: Math.max(0, Math.min(width - Number(room.plan_w), Math.round(x * 10) / 10)),
-      y: Math.max(0, Math.min(height - Number(room.plan_h), Math.round(y * 10) / 10)),
+      x: Math.max(0, Math.min(width - (Number(room.plan_w) || 0), Math.round(x * 10) / 10)),
+      y: Math.max(0, Math.min(height - (Number(room.plan_h) || 0), Math.round(y * 10) / 10)),
     });
   };
 
@@ -109,14 +109,14 @@ export function FloorPlan({
       >
         <rect x={0} y={0} width={width} height={height} fill="#fbfbfe" />
 
-        {/* Corridor band: the graph spine sits in the middle of most floors. */}
-        <rect x={0} y={height / 2 - 3} width={width} height={6} fill="#f0f2f9" />
-
+        {/* Never draw assumed corridors or room outlines absent from the published payload. */}
         {rooms.map((room) => {
+          if (typeof room.plan_x !== 'number' || typeof room.plan_y !== 'number' || !Number.isFinite(room.plan_x) || !Number.isFinite(room.plan_y)) return null;
           const x = Number(room.plan_x);
           const y = Number(room.plan_y);
           const w = Number(room.plan_w);
           const h = Number(room.plan_h);
+          const hasOutline = Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0;
           const isSelected = room.id === selectedRoomId;
           const isHighlighted = highlightRoomIds.includes(room.id);
           const isBusy = busy.has(room.id) || busy.has(room.code);
@@ -139,7 +139,7 @@ export function FloorPlan({
               }}
               className={cx(onSelectRoom && 'cursor-pointer', editable && onMoveRoom && 'cursor-move')}
             >
-              <rect
+              {hasOutline ? <rect
                 x={x}
                 y={y}
                 width={w}
@@ -149,7 +149,8 @@ export function FloorPlan({
                 stroke={isSelected ? '#4340e0' : isHighlighted ? '#f9a92c' : '#c6cde2'}
                 strokeWidth={isSelected || isHighlighted ? 0.5 : 0.3}
               />
-              {w >= 5 && h >= 4 ? (
+              : <><circle cx={x} cy={y} r={0.9} fill={fill} stroke="#637356" strokeWidth={0.25} /><text x={x + 1.4} y={y + 0.4} style={{ fontSize: 1.2, fontWeight: 600 }} className="fill-ink-800">{room.code}</text></>}
+              {hasOutline && w >= 5 && h >= 4 ? (
                 <>
                   <text x={x + w / 2} y={y + h / 2 - 0.6} textAnchor="middle" style={{ fontSize: Math.min(1.5, w / 5), fontWeight: 600 }} className="fill-ink-800">
                     {room.code}
@@ -159,7 +160,7 @@ export function FloorPlan({
                   </text>
                 </>
               ) : null}
-              {room.requires_admission ? <circle cx={x + w - 1} cy={y + 1} r={0.7} fill="#f9a92c" /> : null}
+              {room.requires_admission ? <circle cx={hasOutline ? x + w - 1 : x} cy={y + 1} r={0.7} fill="#f9a92c" /> : null}
 
               {isHovered ? (
                 <g>

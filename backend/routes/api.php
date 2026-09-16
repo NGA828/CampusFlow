@@ -254,7 +254,7 @@ Route::middleware(['auth:sanctum', 'role:staff,admin'])->prefix('staff')->group(
     // The staff campus surface is a *status correction* on a room they are attached to — the web console's
     // `rooms.update.own_scope`. Capacity, admission rules, visibility and geometry belong to
     // `rooms.manage`, which staff do not hold, and the spatial graph is not reachable from here at all.
-    Route::get('/rooms', [CampusController::class, 'rooms'])->middleware('permission:campus.view.private');
+    Route::get('/rooms', [StaffController::class, 'rooms'])->middleware('permission:campus.view.private');
     Route::patch('/rooms/{room}', [StaffController::class, 'updateRoom'])->middleware('permission:rooms.update.own_scope');
 });
 

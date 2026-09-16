@@ -1,132 +1,46 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
-
-import { Badge, Button, Card, ErrorNote, Eyebrow, H3, KeyValue, Loading, Screen, Small, Stat, Title } from '@/components/ui';
+import { View } from 'react-native';
+import { AdaptiveRow, Badge, Button, Card, ErrorNote, KeyValue, Loading, Screen, SectionTitle, Small, Stat } from '@/components/ui';
+import { HeroPanel, IconTile, Notice, PageIntro } from '@/components/visual';
 import { adminApi } from '@/lib/api';
 import { useAuth, useLoader } from '@/lib/auth';
-import { formatClock, spacing } from '@/lib/theme';
+import { formatClock } from '@/lib/theme';
 
-/**
- * Monitoring, sized for a glance.
- *
- * The numbers here are read live from the same tables the console edits — open lines, people waiting,
- * tickets served today, the no-show rate the last sweep produced — so a phone and a laptop can never show
- * two different truths. There is no "create room" shortcut and no user table: those actions are web-scoped
- * by policy, and a summary is the most this client is offered.
- */
 export default function AdminMonitoringScreen() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { signOut } = useAuth();
   const monitoring = useLoader(() => adminApi.monitoring(), []);
   const alerts = useLoader(() => adminApi.alerts(), []);
-
-  if (monitoring.loading && !monitoring.data) return <Loading label="Reading the campus…" />;
-
   const data = monitoring.data;
-  const firing = alerts.data?.alerts ?? [];
-  const counts = alerts.data?.counts ?? { critical: 0, warning: 0, acknowledged: 0 };
+  const counts = alerts.data?.counts;
 
-  return (
-    <Screen
-      onRefresh={() => {
-        monitoring.reload();
-        alerts.reload();
-      }}
-      refreshing={monitoring.loading}
-    >
-      <View style={styles.header}>
-        <Eyebrow>Administration · mobile</Eyebrow>
-        <Title style={{ marginTop: 2 }}>{data ? 'Campus is running' : 'Campus'}</Title>
-        <Small style={{ marginTop: 4 }}>
-          {user?.name ?? 'Administrator'} · read at {data ? formatClock(data.generated_at) : '—'}
-        </Small>
-      </View>
-
-      {monitoring.error ? (
-        <View style={styles.padded}>
-          <ErrorNote message={monitoring.error} onRetry={monitoring.reload} />
+  return <Screen bottomSafeArea={false} onRefresh={() => { void monitoring.reload(); void alerts.reload(); }} refreshing={monitoring.loading || alerts.loading}>
+    <PageIntro eyebrow="Administration · monitoring" title="Campus, at a glance." description="A clear view of the services keeping your campus moving." icon="analytics-outline" />
+    <View style={{ paddingHorizontal: 20, gap: 20 }}>
+      {monitoring.loading && !data ? <Loading label="Reading the campus…" /> : null}
+      {monitoring.error ? <ErrorNote message={monitoring.error} onRetry={monitoring.reload} /> : null}
+      {data ? <>
+        <HeroPanel eyebrow={`Campus snapshot · ${formatClock(data.generated_at)}`} title={data.platform.unacknowledged_alerts > 0 ? `${data.platform.unacknowledged_alerts} alerts need review` : 'No unacknowledged alerts'} description="A snapshot of campus data. Pull to refresh for the latest service state." icon={data.platform.unacknowledged_alerts > 0 ? 'shield-outline' : 'shield-checkmark-outline'}>
+          <Button label="Open alert centre" variant="secondary" onPress={() => router.push('/admin/alerts' as any)} />
+        </HeroPanel>
+        <AdaptiveRow><Stat label="Queues open" value={data.queues.open} tone="brand" /><Stat label="Desks open" value={data.offices.open} tone="mint" /></AdaptiveRow>
+        <Card>
+          <SectionTitle title="Room queues" action={<IconTile name="people-outline" size={38} />} />
+          <AdaptiveRow><Stat label="Waiting now" value={data.queues.waiting_now} tone="signal" /><Stat label="Served today" value={data.queues.served_today} tone="mint" /></AdaptiveRow>
+          <View style={{ marginTop: 16 }}><KeyValue label="Tickets issued today" value={data.queues.issued_today} /><KeyValue label="No-show rate" value={data.queues.no_show_rate_today === null ? 'No tickets issued yet' : `${Math.round(data.queues.no_show_rate_today * 100)}%`} /></View>
+        </Card>
+        <Card>
+          <SectionTitle title="Service offices" action={<IconTile name="business-outline" tone="mint" size={38} />} />
+          <AdaptiveRow><Stat label="Waiting now" value={data.offices.waiting_now} /><Stat label="Completed today" value={data.offices.completed_today} tone="mint" /></AdaptiveRow>
+        </Card>
+        <View>
+          <SectionTitle title="Attention centre" action={counts ? <Badge tone={counts.critical > 0 ? 'coral' : 'brand'}>{counts.critical} critical</Badge> : undefined} />
+          {alerts.error ? <ErrorNote message={alerts.error} onRetry={alerts.reload} /> : counts ? <Notice icon="notifications-outline" title={`${counts.critical} critical · ${counts.warning} warning`} tone={counts.critical > 0 ? 'coral' : counts.warning > 0 ? 'signal' : 'mint'}>Review each condition in Alerts. Acknowledging it does not resolve the underlying issue.</Notice> : <Loading label="Checking alerts…" />}
         </View>
-      ) : null}
-
-      {data ? (
-        <View style={styles.padded}>
-          <Card>
-            <H3>Room queues</H3>
-            <View style={styles.stats}>
-              <Stat label="Open lines" value={data.queues.open} />
-              <Stat label="Waiting now" value={data.queues.waiting_now} tone={data.queues.waiting_now > 40 ? 'signal' : 'neutral'} />
-              <Stat label="Issued today" value={data.queues.issued_today} />
-              <Stat label="Served today" value={data.queues.served_today} tone="mint" />
-            </View>
-            {data.queues.no_show_rate_today !== null ? (
-              <Small style={{ marginTop: spacing.sm }}>
-                No-show rate today: {Math.round(data.queues.no_show_rate_today * 100)}% of tickets issued.
-              </Small>
-            ) : (
-              <Small style={{ marginTop: spacing.sm }}>No tickets issued yet today, so there is no no-show rate to report.</Small>
-            )}
-          </Card>
-
-          <Card style={{ marginTop: spacing.md }}>
-            <H3>Service offices</H3>
-            <View style={styles.stats}>
-              <Stat label="Desks open" value={data.offices.open} />
-              <Stat label="Waiting now" value={data.offices.waiting_now} />
-              <Stat label="Completed today" value={data.offices.completed_today} tone="mint" />
-            </View>
-          </Card>
-
-          <Card style={{ marginTop: spacing.md }}>
-            <H3>Platform</H3>
-            <KeyValue label="Active queues" value={data.platform.active_queues} />
-            <KeyValue label="Walks today" value={data.platform.navigation_today} />
-            <KeyValue label="Accounts" value={data.platform.users} />
-            <KeyValue
-              label="Unacknowledged alerts"
-              value={data.platform.unacknowledged_alerts}
-              tone={data.platform.unacknowledged_alerts > 0 ? 'coral' : 'mint'}
-            />
-          </Card>
-
-          <View style={{ marginTop: spacing.md }}>
-            <Card style={styles.alerts}>
-              <View style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Title style={{ fontSize: 16 }}>{firing.length} thing{firing.length === 1 ? '' : 's'} need attention</Title>
-                  <Small>
-                    {counts.critical} critical · {counts.warning} warning
-                  </Small>
-                </View>
-                <Badge tone={counts.critical > 0 ? 'coral' : counts.warning > 0 ? 'signal' : 'mint'}>
-                  {counts.critical > 0 ? 'critical' : counts.warning > 0 ? 'watch' : 'clear'}
-                </Badge>
-              </View>
-              <View style={styles.actions}>
-                <Button label="Read and acknowledge" onPress={() => router.push('/admin/alerts' as any)} />
-                <Small style={{ marginTop: spacing.sm }}>Each alert names the console screen that fixes it.</Small>
-              </View>
-            </Card>
-          </View>
-
-          <Small style={{ marginTop: spacing.lg }}>
-            Configuration lives on the web console — open /admin on a computer to change rooms, plans, geofences, queue policy, users or roles.
-          </Small>
-
-          <View style={{ marginTop: spacing.lg }}>
-            <Button label="Sign out of this device" variant="danger" onPress={() => void signOut()} />
-            <Small style={{ marginTop: spacing.sm }}>The token is revoked on the server, not just cleared from the phone.</Small>
-          </View>
-        </View>
-      ) : null}
-    </Screen>
-  );
+        <Card><SectionTitle title="Across the platform" action={<IconTile name="grid-outline" size={34} />} /><KeyValue label="Active queues" value={data.platform.active_queues} /><KeyValue label="Walks today" value={data.platform.navigation_today} /><KeyValue label="Campus accounts" value={data.platform.users} /></Card>
+      </> : null}
+      <Notice icon="desktop-outline" title="Monitor here. Configure on the web.">Buildings, users, policies and campus setup remain in your administration console.</Notice>
+      <Button label="Sign out of this device" variant="secondary" onPress={() => void signOut()} />
+    </View>
+  </Screen>;
 }
-
-const styles = StyleSheet.create({
-  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  padded: { paddingHorizontal: spacing.lg, marginTop: spacing.md, paddingBottom: spacing.xl },
-  stats: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.md },
-  row: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
-  actions: { marginTop: spacing.md },
-  alerts: { backgroundColor: '#fff8ec' },
-});

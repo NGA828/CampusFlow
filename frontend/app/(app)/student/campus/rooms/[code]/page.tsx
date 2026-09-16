@@ -1,257 +1,430 @@
-'use client';
+"use client";
 
-import { use, useState } from 'react';
-import Link from 'next/link';
-import { useAsync, dayName, formatClock } from '@/lib/hooks';
-import { campusApi, queueApi, studentApi } from '@/lib/api/endpoints';
-import { Badge, Button, Card, CardSkeleton, ErrorState, KeyValue, Progress, SectionHeading } from '@/components/ui/kit';
-import { PageHeader } from '@/components/layout/app-shell';
-import { useToast } from '@/components/ui/toast';
-import { ApiError } from '@/lib/api/client';
+import { use, useState } from "react";
+import Link from "next/link";
+import { WorkspaceIcon } from "@/components/layout/workspace-visual";
+import { useAsync, dayName, formatClock, formatDate } from "@/lib/hooks";
+import { campusApi, queueApi, studentApi } from "@/lib/api/endpoints";
+import {
+  Badge,
+  Button,
+  CardSkeleton,
+  ErrorState,
+  KeyValue,
+  Progress,
+} from "@/components/ui/kit";
+import { PageHeader } from "@/components/layout/app-shell";
+import { useToast } from "@/components/ui/toast";
+import { ApiError } from "@/lib/api/client";
+import s from "@/components/layout/student-discovery.module.css";
 
-export default function RoomDetailPage({ params }: { params: Promise<{ code: string }> }) {
+const clock = (time: string) => formatClock(`2000-01-01T${time}`);
+
+export default function RoomDetailPage({
+  params,
+}: {
+  params: Promise<{ code: string }>;
+}) {
   const { code } = use(params);
   const toast = useToast();
   const [joining, setJoining] = useState(false);
-
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joined, setJoined] = useState(false);
+  const [schedule, setSchedule] = useState<"today" | "week">("today");
   const room = useAsync(() => campusApi.room(code), [code]);
-
-  if (room.error) {
+  const breadcrumb = [
+    { label: "Rooms", href: "/student/campus/rooms" },
+    { label: code },
+  ];
+  if (room.loading || !room.data || room.error)
     return (
-      <div>
-        <PageHeader title="Room" breadcrumb={[{ label: 'Rooms', href: '/student/campus/rooms' }, { label: code }]} />
-        <ErrorState message={room.error} onRetry={room.reload} />
+      <div className={s.page}>
+        <PageHeader title="Room" breadcrumb={breadcrumb} />
+        {room.loading ? (
+          <CardSkeleton rows={8} />
+        ) : (
+          <ErrorState
+            message={room.error ?? "Room details are unavailable."}
+            onRetry={room.reload}
+          />
+        )}
       </div>
     );
-  }
-
-  if (room.loading || !room.data) {
-    return (
-      <div>
-        <PageHeader title="Room" breadcrumb={[{ label: 'Rooms', href: '/student/campus/rooms' }, { label: code }]} />
-        <CardSkeleton rows={6} />
-      </div>
-    );
-  }
-
-  const { room: details, availability, week } = room.data;
-
+  const { room: details, availability: a, week } = room.data;
+  const occupancy = a.occupancy;
+  const kind = (details.room_type ?? details.type ?? "Room").replaceAll(
+    "_",
+    " ",
+  );
   const joinQueue = async () => {
+    if (joining) return;
     setJoining(true);
+    setJoinError(null);
     try {
-      const queues = await studentApi.queueBoard();
-      const queue = queues.queues.find((candidate) => candidate.room_id === details.id);
-      if (!queue) {
-        toast.error('No queue configured', 'This room does not use admission queues.');
-        return;
-      }
+      const board = await studentApi.queueBoard();
+      const queue = board.queues.find((q) => q.room_id === details.id);
+      if (!queue)
+        throw new Error("No admission queue is configured for this room.");
       await queueApi.join(queue.id, {});
-      toast.success('You joined the queue', 'Open the queue screen to follow your position.');
+      setJoined(true);
+      toast.success(
+        "You joined the queue",
+        "Open your queue screen to follow your position.",
+      );
     } catch (error) {
-      const message = error instanceof ApiError ? (error.firstError ?? error.message) : 'Could not join the queue.';
-      toast.error('Could not join', message);
+      const message =
+        error instanceof ApiError
+          ? (error.firstError ?? error.message)
+          : error instanceof Error
+            ? error.message
+            : "Could not join the queue.";
+      setJoinError(message);
     } finally {
       setJoining(false);
     }
   };
 
-  const occupancy = availability.occupancy;
-  const occupancyPct = occupancy && occupancy.capacity > 0 ? (occupancy.inside / occupancy.capacity) * 100 : 0;
-
   return (
-    <div>
-      <PageHeader
-        title={`${details.code} · ${details.name}`}
-        description={details.description ?? `${details.room_type} in ${details.building_name ?? 'campus'}`}
-        breadcrumb={[{ label: 'Rooms', href: '/student/campus/rooms' }, { label: details.code }]}
-        actions={
-          <>
-            <Link href={`/student/campus/map?route=${encodeURIComponent(details.code)}`}>
-              <Button size="sm">Navigate here</Button>
-            </Link>
-            {details.requires_admission ? (
-              <Button variant="signal" size="sm" loading={joining} onClick={() => void joinQueue()}>
-                Join queue
-              </Button>
-            ) : null}
-          </>
-        }
-      />
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <Card>
-            <SectionHeading title="Availability today" description={availability.headline} />
-            <div className="grid gap-4 sm:grid-cols-3">
+    <div className={s.page}>
+      <PageHeader title="Room details" breadcrumb={breadcrumb} />
+      <section className={s.detailHero} aria-label="Room identity">
+        <div className={s.roomSymbol}>
+          <WorkspaceIcon
+            name="room"
+            size={65}
+            strokeWidth={1}
+            aria-hidden="true"
+          />
+        </div>
+        <div>
+          <p className={s.eyebrow}>
+            {kind} / {details.code}
+          </p>
+          <h2>{details.name}</h2>
+          <p className={s.muted}>
+            {[
+              details.building_name ?? details.building_code,
+              details.floor_name,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "Location details not listed"}
+          </p>
+          {details.description ? (
+            <p className={s.muted}>{details.description}</p>
+          ) : null}
+        </div>
+        <div className={s.actions}>
+          <Link
+            className={s.link}
+            href={`/student/campus/map?route=${encodeURIComponent(details.code)}`}
+          >
+            Plan route here <WorkspaceIcon name="arrow" size={17} />
+          </Link>
+        </div>
+      </section>
+      <div className={s.detailColumns}>
+        <div className={s.stack}>
+          <section className={s.availability} aria-label="Current availability">
+            <div className={s.toolbar}>
+              <p className={s.eyebrow}>Availability today</p>
+              <span className={s.muted}>
+                {formatDate(`${a.date}T12:00:00`, {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                })}
+              </span>
+            </div>
+            <Badge
+              tone={
+                !a.is_open
+                  ? "neutral"
+                  : a.is_available_now
+                    ? "success"
+                    : "warning"
+              }
+            >
+              {!a.is_open
+                ? "Closed"
+                : a.is_available_now
+                  ? "Available now"
+                  : "In use"}
+            </Badge>
+            <h2>{a.headline || "Check today’s schedule"}</h2>
+            {a.current_session ? (
+              <p className={s.muted}>
+                {a.current_session.course_code} ·{" "}
+                {a.current_session.course_title} · until{" "}
+                {clock(a.current_session.ends_at)}
+              </p>
+            ) : (
+              <p className={s.muted}>
+                {a.reason ??
+                  "Availability is calculated from campus schedules and admission data."}
+              </p>
+            )}
+            <div className={s.availabilityStats}>
               <div>
-                <p className="text-[12px] text-ink-500">Status</p>
-                <p className="mt-1">
-                  <Badge tone={availability.is_available_now ? 'success' : 'warning'}>{availability.is_available_now ? 'Available now' : 'In use'}</Badge>
-                </p>
+                Scheduled sessions<strong>{a.session_count}</strong>
               </div>
               <div>
-                <p className="text-[12px] text-ink-500">Scheduled today</p>
-                <p className="tnum mt-1 text-[13.5px] font-medium text-ink-800">
-                  {availability.session_count === 0
-                    ? 'Nothing booked'
-                    : `${availability.busy[0].starts_at}–${availability.busy[availability.busy.length - 1].ends_at}`}
-                </p>
-              </div>
-              <div>
-                <p className="text-[12px] text-ink-500">Next free</p>
-                <p className="tnum mt-1 text-[13.5px] font-medium text-ink-800">
-                  {availability.next_free_at ? formatClock(`2000-01-01T${availability.next_free_at}`) : availability.is_available_now ? 'Now' : '—'}
-                </p>
+                Next available
+                <strong>
+                  {!a.is_open
+                    ? "Not open"
+                    : a.is_available_now
+                      ? "Now"
+                      : a.next_free_at
+                        ? clock(a.next_free_at)
+                        : "Not listed"}
+                </strong>
               </div>
             </div>
-
-            {availability.current_session ? (
-              <div className="mt-4 rounded-[12px] border border-signal-200 bg-signal-50 px-4 py-3">
-                <p className="text-[13px] font-medium text-signal-700">In use by {availability.current_session.course_code}</p>
-                <p className="mt-0.5 text-[12.5px] text-signal-700/90">
-                  {availability.current_session.course_title} · until {formatClock(`2000-01-01T${availability.current_session.ends_at}`)} (
-                  {availability.current_session.session_type})
+          </section>
+          <section className={s.panel} aria-label="Room schedule">
+            <div className={s.toolbar}>
+              <div>
+                <h2>Make room in your day</h2>
+                <p className={s.muted}>
+                  Your guide to the room’s teaching schedule.
                 </p>
               </div>
-            ) : null}
-
-            {availability.free_slots.length > 0 ? (
-              <div className="mt-4">
-                <p className="mb-2 text-[12.5px] font-medium text-ink-600">Free slots today</p>
-                <div className="flex flex-wrap gap-2">
-                  {availability.free_slots.map((slot) => (
-                    <span key={`${slot.starts_at}-${slot.ends_at}`} className="tnum rounded-full border border-mint-200 bg-mint-50 px-3 py-1.5 text-[12.5px] font-medium text-mint-700">
-                      {formatClock(`2000-01-01T${slot.starts_at}`)} – {formatClock(`2000-01-01T${slot.ends_at}`)}
-                    </span>
-                  ))}
-                </div>
+              <div
+                className="flex gap-2"
+                role="group"
+                aria-label="Schedule view"
+              >
+                <button
+                  className={s.chip}
+                  aria-pressed={schedule === "today"}
+                  onClick={() => setSchedule("today")}
+                >
+                  Today
+                </button>
+                <button
+                  className={s.chip}
+                  aria-pressed={schedule === "week"}
+                  onClick={() => setSchedule("week")}
+                >
+                  This week
+                </button>
               </div>
-            ) : null}
-
-            {availability.busy.length > 0 ? (
-              <div className="mt-4">
-                <p className="mb-2 text-[12.5px] font-medium text-ink-600">Scheduled sessions</p>
-                <ul className="space-y-1.5">
-                  {availability.busy.map((slot) => (
-                    <li key={`${slot.starts_at}-${slot.ends_at}`} className="flex items-center justify-between rounded-[10px] bg-ink-50 px-3 py-2 text-[12.5px]">
-                      <span className="font-medium text-ink-700">
-                        {slot.course_code ?? 'Reserved'} {slot.course_title ? `· ${slot.course_title}` : ''}
+            </div>
+            {schedule === "today" ? (
+              <>
+                <h3 className={s.eyebrow}>Free slots today</h3>
+                {a.free_slots.length ? (
+                  <div className={s.slotRow}>
+                    {a.free_slots.map((slot, i) => (
+                      <span className={s.slot} key={i}>
+                        {clock(slot.starts_at)} – {clock(slot.ends_at)}
                       </span>
-                      <span className="tnum text-ink-500">
-                        {formatClock(`2000-01-01T${slot.starts_at}`)}–{formatClock(`2000-01-01T${slot.ends_at}`)}
-                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={s.muted}>No free slots are listed for today.</p>
+                )}
+                {!a.is_open && a.free_slots.length > 0 ? (
+                  <p className={s.muted}>
+                    Schedule gaps do not override the room’s closed status.
+                  </p>
+                ) : null}
+                <ul className={s.agenda}>
+                  {a.busy.map((slot, i) => (
+                    <li key={i}>
+                      <time>
+                        {clock(slot.starts_at)}
+                        <br />
+                        {clock(slot.ends_at)}
+                      </time>
+                      <div>
+                        <strong>
+                          {slot.course_code ?? "Reserved session"}
+                        </strong>
+                        <p>{slot.course_title}</p>
+                        <p className={s.muted}>{slot.session_type}</p>
+                      </div>
                     </li>
                   ))}
                 </ul>
-              </div>
-            ) : null}
-          </Card>
-
-          <Card>
-            <SectionHeading title="This week" description="Recurring sessions from the master timetable" />
-            {week.length === 0 ? (
-              <p className="text-[13px] text-ink-500">No recurring sessions are scheduled in this room this term.</p>
-            ) : (
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {week.map((entry, index) => (
-                  <li key={`${entry.day_of_week}-${entry.starts_at}-${index}`} className="rounded-[10px] border border-ink-100 px-3 py-2">
-                    <p className="text-[13px] font-medium text-ink-800">{dayName(entry.day_of_week)}</p>
-                    <p className="tnum text-[12.5px] text-ink-500">
-                      {formatClock(`2000-01-01T${entry.starts_at}`)} – {formatClock(`2000-01-01T${entry.ends_at}`)} · {entry.session_type}
-                    </p>
-                    <p className="mt-0.5 text-[12.5px] text-ink-600">
-                      {entry.course_code} · {entry.course_title}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <Card>
-            <SectionHeading title="Room details" />
-            <dl className="divide-y divide-ink-50">
-              <KeyValue label="Building" value={`${details.building_code ?? '—'} · ${details.building_name ?? ''}`} />
-              <KeyValue label="Floor" value={details.floor_name ?? '—'} />
-              <KeyValue label="Type" value={details.room_type} />
-              <KeyValue label="Capacity" value={`${details.capacity} seats`} mono />
-              <KeyValue label="Admission" value={details.requires_admission ? 'Controlled queue' : 'Walk in'} />
-              <KeyValue label="Plan position" value={`x ${details.plan_x} · y ${details.plan_y}`} mono />
-            </dl>
-
-            {details.accessibility?.length ? (
-              <div className="mt-4">
-                <p className="mb-2 text-[12.5px] font-medium text-ink-600">Accessibility</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {details.accessibility.map((feature) => (
-                    <Badge key={feature} tone="success">
-                      {feature.replaceAll('_', ' ')}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {details.amenities?.length ? (
-              <div className="mt-4">
-                <p className="mb-2 text-[12.5px] font-medium text-ink-600">Facilities</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {details.amenities.map((amenity) => (
-                    <Badge key={amenity} tone="neutral">
-                      {amenity.replaceAll('_', ' ')}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </Card>
-
-          <Card>
-            <SectionHeading title="Live occupancy" description="Checked-in and admitted people vs capacity" />
-            {occupancy ? (
-              <>
-                <div className="flex items-baseline justify-between">
-                  <p className="tnum text-2xl font-semibold text-ink-900">
-                    {occupancy.inside}
-                    <span className="text-[14px] font-normal text-ink-500"> / {occupancy.capacity}</span>
+                {!a.busy.length ? (
+                  <p className={`${s.muted} mt-5`}>
+                    {a.session_count > 0
+                      ? "Session details are not available."
+                      : "No teaching sessions are scheduled today."}
                   </p>
-                  <p className="tnum text-[12.5px] text-ink-500">{Math.round(occupancyPct)}% full</p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <p className={`${s.muted} mb-4`}>
+                  Recurring sessions from the master timetable. This is not a
+                  booking form.
+                </p>
+                {week.length ? (
+                  [...new Set(week.map((e) => e.day_of_week))]
+                    .sort((x, y) => x - y)
+                    .map((day) => (
+                      <div className={s.weekDay} key={day}>
+                        <h3>{dayName(day)}</h3>
+                        {week
+                          .filter((e) => e.day_of_week === day)
+                          .sort((x, y) =>
+                            x.starts_at.localeCompare(y.starts_at),
+                          )
+                          .map((entry, i) => (
+                            <p key={entry.id ?? i}>
+                              <span className={s.muted}>
+                                {clock(entry.starts_at)} –{" "}
+                                {clock(entry.ends_at)}
+                              </span>
+                              <br />
+                              {entry.course_code ?? "Reserved"} ·{" "}
+                              {entry.course_title ?? entry.session_type}
+                            </p>
+                          ))}
+                      </div>
+                    ))
+                ) : (
+                  <p className={s.muted}>
+                    No recurring sessions are scheduled in this room this term.
+                  </p>
+                )}
+              </>
+            )}
+          </section>
+        </div>
+        <aside className={s.stack} aria-label="Room information and admission">
+          <section className={s.panel}>
+            <h2>Before you arrive</h2>
+            <dl className="divide-y divide-ink-50">
+              <KeyValue
+                label="Capacity"
+                value={
+                  details.capacity == null
+                    ? "Not listed"
+                    : `${details.capacity} seats`
+                }
+              />
+              <KeyValue label="Room type" value={kind} />
+              <KeyValue
+                label="Admission"
+                value={
+                  details.requires_admission
+                    ? "Queue required"
+                    : "No admission queue"
+                }
+              />
+              <KeyValue
+                label="Floor"
+                value={details.floor_name ?? "Not listed"}
+              />
+            </dl>
+            {(details.amenities ?? details.features ?? []).length ? (
+              <>
+                <p className={`${s.eyebrow} mt-5`}>Facilities</p>
+                <div className={s.slotRow}>
+                  {(details.amenities ?? details.features ?? []).map((f) => (
+                    <Badge key={f} tone="neutral">
+                      {f.replaceAll("_", " ")}
+                    </Badge>
+                  ))}
                 </div>
-                <div className="mt-2">
-                  <Progress value={occupancyPct} tone={occupancyPct > 85 ? 'signal' : 'brand'} />
+              </>
+            ) : null}
+            {details.accessibility?.length ? (
+              <>
+                <p className={`${s.eyebrow} mt-5`}>Accessibility</p>
+                <div className={s.slotRow}>
+                  {details.accessibility.map((f) => (
+                    <Badge key={f} tone="success">
+                      {f.replaceAll("_", " ")}
+                    </Badge>
+                  ))}
                 </div>
               </>
             ) : (
-              <p className="text-[13px] text-ink-500">
-                This room has no admission counter, so nobody is tracking how many people are inside it. Rooms that
-                need one are configured under administration → services.
+              <p className={`${s.muted} mt-4`}>
+                Accessibility information has not been listed for this room.
               </p>
             )}
-
-            {availability.queue?.id ? (
-              <div className="mt-4 rounded-[12px] bg-ink-50 px-4 py-3 text-[12.5px]">
-                <p className="font-medium text-ink-700">Admission queue</p>
-                <p className="mt-0.5 text-ink-500">
-                  {availability.queue?.waiting ?? 0} waiting · {availability.queue.is_active ? 'open' : 'closed'}
-                  {availability.queue.requires_proximity ? ' · proximity check on arrival' : ''}
+          </section>
+          <section className={s.panel}>
+            <h2>Admission & occupancy</h2>
+            {occupancy ? (
+              <>
+                <p className="mt-4 text-3xl font-semibold">
+                  {occupancy.inside}
+                  <span className="text-sm font-normal text-ink-500">
+                    {" "}
+                    / {occupancy.capacity} admitted
+                  </span>
                 </p>
-                <Link href="/student/services/queues" className="mt-2 inline-block text-[12.5px] font-medium text-brand-600 hover:text-brand-700">
-                  Open queue screen →
-                </Link>
-              </div>
+                <Progress
+                  value={
+                    occupancy.capacity > 0
+                      ? (occupancy.inside / occupancy.capacity) * 100
+                      : 0
+                  }
+                />
+                <p className={s.muted}>
+                  Checked-in people against the admission limit, not a seat
+                  reservation.
+                </p>
+              </>
+            ) : (
+              <p className={s.muted}>
+                Live occupancy is not tracked for this room.
+              </p>
+            )}
+            {a.queue ? (
+              <p className={`${s.muted} mt-4`}>
+                {a.queue.waiting} waiting · queue{" "}
+                {a.queue.is_active ? "open" : "closed"}
+                {a.queue.requires_proximity
+                  ? " · proximity check required"
+                  : ""}
+              </p>
             ) : null}
-          </Card>
-
-          <Card>
-            <SectionHeading title="Plan" description="Where this room sits on the floor" />
-            <Link href={`/map`} className="flex items-center justify-between rounded-[10px] border border-ink-100 px-4 py-3 text-[13px] hover:border-brand-200">
-              <span className="text-ink-700">Open in the campus map</span>
-              <span className="text-brand-600">→</span>
+            {joinError ? (
+              <p role="alert" className={`${s.inlineError} mt-4`}>
+                {joinError}
+              </p>
+            ) : null}
+            {joined ? (
+              <p role="status" className={`${s.muted} mt-4`}>
+                You joined the queue. Follow your ticket below.
+              </p>
+            ) : details.requires_admission ? (
+              <Button
+                className="mt-4"
+                loading={joining}
+                onClick={() => void joinQueue()}
+              >
+                Join queue
+              </Button>
+            ) : null}
+            {details.requires_admission || a.queue ? (
+              <Link href="/student/services/queues" className={s.link}>
+                Open queue screen <WorkspaceIcon name="arrow" size={15} />
+              </Link>
+            ) : null}
+          </section>
+          <section className={s.panel}>
+            <WorkspaceIcon name="pin" size={22} aria-hidden="true" />
+            <h2 className="mt-3">Find your way</h2>
+            <p className={s.muted}>
+              {details.building_name ?? "Campus map"}
+              {details.floor_name ? ` · ${details.floor_name}` : ""}
+            </p>
+            <Link
+              href={`/student/campus/map?route=${encodeURIComponent(details.code)}`}
+              className={s.link}
+            >
+              Open in the campus map <WorkspaceIcon name="arrow" size={15} />
             </Link>
-          </Card>
-        </div>
+          </section>
+        </aside>
       </div>
     </div>
   );

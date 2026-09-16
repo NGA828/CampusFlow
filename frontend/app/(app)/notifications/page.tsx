@@ -1,155 +1,89 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useAsync, relativeTime } from '@/lib/hooks';
+import { useAsync } from '@/lib/hooks';
 import { meApi } from '@/lib/api/endpoints';
 import { useAuth } from '@/lib/auth/auth-context';
-import { useRealtimeEvent } from '@/lib/realtime/realtime-context';
-import { Badge, Button, Card, CardSkeleton, EmptyState, ErrorState, Tabs } from '@/components/ui/kit';
-import { PageHeader } from '@/components/layout/app-shell';
-import { useToast } from '@/components/ui/toast';
-import type { NotificationRow } from '@/lib/api/types';
+import { useRealtime, useRealtimeEvent } from '@/lib/realtime/realtime-context';
+import { notificationHref } from '@/lib/companion-links';
+import { Button, CardSkeleton, Input } from '@/components/ui/kit';
+import { WorkspaceIcon, type WorkspaceIconName } from '@/components/layout/workspace-visual';
+import { CompanionHeading, Empty, Feedback, ReadError, errorMessage, momentLabel } from '@/components/layout/student-companion';
+import s from '@/components/layout/student-companion.module.css';
 
-const LINK_FOR_TYPE: Record<string, string> = {
-  'queue.ticket_issued': '/student/services/queues',
-  'queue.called': '/student/services/queues',
-  'queue.position_updated': '/student/services/queues',
-  'queue.no_show': '/student/services/queues',
-  'office.ticket_issued': '/student/services/offices',
-  'office.called': '/student/services/offices',
-  'office.approaching': '/student/services/offices',
-  'navigation.:id': '/navigate',
-  'event.reminder': '/student/campus/events',
-  'class.reminder': '/student/timetable',
-};
-
+const ICONS: Record<string, WorkspaceIconName> = { queue: 'queue', office: 'office', class: 'calendar', event: 'calendar', announcement: 'bulletin', navigation: 'compass' };
 export default function NotificationsPage() {
-  const toast = useToast();
   const { user } = useAuth();
-  const [tab, setTab] = useState<'all' | 'unread'>('all');
-
-  const notifications = useAsync(() => meApi.notifications({ per_page: 50 }), []);
-
-  useRealtimeEvent(user ? `user:${user.id}` : null, () => notifications.reload(), []);
-
-  const items = useMemo(() => {
-    const list = notifications.data?.items ?? [];
-    return tab === 'unread' ? list.filter((item) => !item.read_at) : list;
-  }, [notifications.data, tab]);
-
-  const unread = notifications.data?.unread ?? 0;
-
-  const markAll = async () => {
+  const { connected } = useRealtime();
+  const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [search, setSearch] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
+  const [confirmedUnread, setConfirmedUnread] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState<{ error?: boolean; message: string } | null>(null);
+  const lock = useRef(false);
+  const notifications = useAsync(() => meApi.notifications({ page, per_page: 20 }), [page]);
+  const reloadNotifications = notifications.reload;
+  function refresh() {
+    if (lock.current) return;
+    setConfirmed(new Set()); setConfirmedUnread(null); notifications.reload();
+  }
+  useEffect(() => {
+    const changed = () => {
+      if (lock.current) return;
+      setConfirmed(new Set()); setConfirmedUnread(null); reloadNotifications();
+    };
+    window.addEventListener('campusflow:notifications-changed', changed);
+    return () => window.removeEventListener('campusflow:notifications-changed', changed);
+  }, [reloadNotifications]);
+  useRealtimeEvent(user ? `user:${user.id}` : null, refresh);
+  const unread = confirmedUnread ?? notifications.data?.unread;
+  const items = (notifications.data?.items ?? []).filter(item => (filter === 'all' || (!item.read_at && !confirmed.has(item.id))) && `${item.title} ${item.body}`.toLowerCase().includes(search.trim().toLowerCase()));
+  const meta = notifications.loading || notifications.error ? undefined : notifications.data?.meta;
+  async function mark(id?: string) {
+    if (lock.current) return;
+    lock.current = true; setBusy(id ?? 'all'); setFeedback(null);
     try {
-      await meApi.readAllNotifications();
-      toast.success('All notifications marked as read');
-      notifications.reload();
-    } catch {
-      toast.error('Could not mark notifications as read');
-    }
-  };
-
-  const open = async (notification: NotificationRow) => {
-    if (!notification.read_at) {
-      try {
-        await meApi.readNotification(notification.id);
-        notifications.reload();
-      } catch {
-        /* non-fatal */
-      }
-    }
-  };
-
-  const linkFor = (notification: NotificationRow): string | null => {
-    if (notification.type.startsWith('queue.')) return '/student/services/queues';
-    if (notification.type.startsWith('office.')) return '/student/services/offices';
-    if (notification.type.startsWith('navigation.')) return '/navigate';
-    if (notification.type.startsWith('event.')) return '/student/campus/events';
-    if (notification.type.startsWith('class.')) return '/student/timetable';
-    if (notification.type.startsWith('announcement.')) return '/student/announcements';
-    return LINK_FOR_TYPE[notification.type] ?? null;
-  };
-
-  return (
-    <div>
-      <PageHeader
-        title="Notifications"
-        description="Queue calls, class reminders, event updates and announcements — delivered in real time."
-        actions={
-          unread > 0 ? (
-            <Button variant="secondary" size="sm" onClick={() => void markAll()}>
-              Mark all as read
-            </Button>
-          ) : null
-        }
-      />
-
-      <div className="mb-4">
-        <Tabs
-          value={tab}
-          onChange={setTab}
-          tabs={[
-            { value: 'all', label: 'All', count: notifications.data?.items.length },
-            { value: 'unread', label: 'Unread', count: unread },
-          ]}
-        />
-      </div>
-
-      {notifications.error ? <ErrorState message={notifications.error} onRetry={notifications.reload} /> : null}
-      {notifications.loading ? (
-        <CardSkeleton rows={5} />
-      ) : items.length === 0 ? (
-        <EmptyState
-          title={tab === 'unread' ? 'You are all caught up' : 'No notifications yet'}
-          description="When something needs your attention, it will appear here and can also arrive as a push notification."
-        />
-      ) : (
-        <ul className="space-y-2">
-          {items.map((notification) => {
-            const href = linkFor(notification);
-            const body = (
-              <Card
-                className={`transition-colors ${notification.read_at ? '' : 'border-brand-200 bg-brand-50/40'}`}
-                as="div"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {!notification.read_at ? <span className="h-2 w-2 rounded-full bg-brand-600" /> : null}
-                      <p className="text-[13.5px] font-semibold text-ink-900">{notification.title}</p>
-                      {notification.priority !== 'normal' ? (
-                        <Badge tone={notification.priority === 'urgent' ? 'danger' : 'warning'}>{notification.priority}</Badge>
-                      ) : null}
-                      <Badge tone="neutral">{notification.type.split('.')[0]}</Badge>
-                    </div>
-                    <p className="mt-1 text-[13px] leading-relaxed text-ink-600">{notification.body}</p>
-                  </div>
-                  <span className="whitespace-nowrap text-[12px] text-ink-400">{relativeTime(notification.created_at)}</span>
-                </div>
-              </Card>
-            );
-
-            return (
-              <li key={notification.id}>
-                {href ? (
-                  <Link href={href} onClick={() => void open(notification)}>
-                    {body}
-                  </Link>
-                ) : (
-                  <button type="button" className="block w-full text-left" onClick={() => void open(notification)}>
-                    {body}
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      <p className="mt-4 text-[12px] text-ink-400">
-        Push delivery is used on the mobile app when you allow notifications; the web app always receives them live over the realtime socket.
-      </p>
+      const result = id ? await meApi.readNotification(id) : await meApi.readAllNotifications();
+      if (!Number.isFinite(result.unread) || result.unread < 0) throw new Error('The server did not confirm the read status. Refresh and try again.');
+      setConfirmed(current => new Set([...current, ...(id ? [id] : (notifications.data?.items ?? []).map(item => item.id))]));
+      setConfirmedUnread(result.unread);
+      setFeedback({ message: id ? 'Notification marked as read.' : 'All notifications in your account are marked as read.' });
+    } catch (error) { setFeedback({ error: true, message: errorMessage(error, 'The read status could not be saved. Please try again.') }); }
+    finally { lock.current = false; setBusy(null); }
+  }
+  function changePage(next: number) {
+    if (lock.current) return;
+    setPage(next); setConfirmed(new Set()); setConfirmedUnread(null); setFeedback(null);
+  }
+  return <div className={s.page}>
+    <CompanionHeading eyebrow="Your workspace · activity inbox" title="Notifications" description="Campus updates, in one place. Read what matters, then carry on with your day." actions={<><Button variant="secondary" disabled={!!busy || notifications.loading} onClick={refresh}>Refresh inbox</Button><Button disabled={!!busy || notifications.loading || !!notifications.error || !unread} loading={busy === 'all'} onClick={() => void mark()}>Mark all as read</Button></>} />
+    <div className={s.inboxLayout}>
+      <section className={s.inbox} aria-label="Notification inbox" aria-busy={notifications.loading}>
+        <div className={s.inboxToolbar}>
+          <div className={s.sectionHead}><h2>Your updates</h2><span className={s.status}>{notifications.loading || notifications.error || unread === undefined ? 'Unread count unavailable' : `${unread} unread overall`}</span></div>
+          <Input aria-label="Search this notification page" placeholder="Search this page of updates…" value={search} onChange={e => setSearch(e.target.value)} />
+          <div className={s.filters} aria-label="Filter notifications"><button aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All on this page</button><button aria-pressed={filter === 'unread'} onClick={() => setFilter('unread')}>Unread on this page</button></div>
+        </div>
+        <div aria-live="polite">{feedback && <Feedback error={feedback.error}>{feedback.message}</Feedback>}</div>
+        {notifications.loading ? <CardSkeleton rows={7} /> : notifications.error ? <ReadError message={notifications.error} retry={refresh} /> : items.length ? <ul className={s.noticeList}>{items.map(item => {
+          const isUnread = !item.read_at && !confirmed.has(item.id);
+          const category = item.type.split('.')[0];
+          const href = user ? notificationHref(item.type, user.role_code) : null;
+          return <li key={item.id} className={s.notice} data-unread={isUnread}>
+            <span className={s.noticeIcon}><WorkspaceIcon name={ICONS[category] ?? 'bulletin'} size={20} /></span>
+            <div><div className={s.noticeMeta}><span>{category}</span><span aria-hidden="true">·</span><time dateTime={item.created_at}>{momentLabel(item.created_at)}</time><span className={s.status} data-tone={isUnread ? undefined : 'quiet'}>{isUnread ? 'Unread' : 'Read'}</span>{['urgent', 'critical', 'high'].includes(item.priority) && <span className={s.status} data-tone="attention">{item.priority} priority</span>}</div>
+              <h2>{item.title}</h2><p>{item.body}</p>
+              <div className={s.actions}>{isUnread && <Button variant="secondary" size="sm" disabled={!!busy} loading={busy === item.id} aria-label={`Mark ${item.title} as read`} onClick={() => void mark(item.id)}>Mark as read</Button>}{href && <Link className={s.link} href={href}>Open {category === 'class' ? 'timetable' : category === 'navigation' ? 'campus map' : category === 'queue' ? 'queue board' : category === 'office' ? 'office services' : `${category}s`} <WorkspaceIcon name="arrow" size={15} /></Link>}</div>
+            </div>
+          </li>;
+        })}</ul> : <Empty title={search ? 'No matching updates' : filter === 'unread' ? 'No unread updates on this page' : 'No notifications yet'}>{search ? 'Try a different title or word. Search applies only to the current page.' : filter === 'unread' ? 'Other pages may still contain unread updates. Use All on this page to see the full list.' : 'Updates will appear here when the campus system sends them to your account.'}</Empty>}
+        <footer className={s.inboxFoot}><p>{meta ? `Page ${meta.page} of ${Math.max(1, meta.total_pages)} · ${meta.total} total` : 'Your personal campus updates'}</p>{meta && meta.total_pages > 1 && <div className={s.actions}><Button variant="secondary" size="sm" disabled={!!busy || notifications.loading || page <= 1} onClick={() => changePage(page - 1)}>Previous page</Button><Button variant="secondary" size="sm" disabled={!!busy || notifications.loading || page >= meta.total_pages} onClick={() => changePage(page + 1)}>Next page</Button></div>}</footer>
+      </section>
+      <aside className={s.inboxNote}><WorkspaceIcon name="bulletin" size={26} /><h2>A quieter inbox.</h2><p>Marking an update as read keeps it here for later. Opening a linked workspace doesn’t change its read status.</p><div className={s.unreadTotal}><strong>{notifications.loading || notifications.error ? '—' : unread ?? '—'}</strong><span>unread across your account</span></div><p>Search and the unread filter apply to the current page. “Mark all” applies to every notification in your account.</p></aside>
     </div>
-  );
+    <p className={s.connection}>{connected ? 'Connected to campus updates. Refresh to confirm the latest inbox state.' : 'Live connection unavailable. Use Refresh inbox to check for new updates.'} Browser push delivery is not configured.</p>
+  </div>;
 }
