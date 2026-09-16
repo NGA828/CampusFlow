@@ -158,6 +158,7 @@ export default function MapPage() {
                   buildings={rows}
                   selectedBuildingId={selected?.id}
                   onSelectBuilding={setBuildingId}
+                  onOpenBuilding={() => setMode("indoor")}
                   height={410}
                   markers={
                     fix &&

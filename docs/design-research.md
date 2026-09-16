@@ -117,6 +117,10 @@ for browse entries, on the shot tags/titles visible in the listing.
 - **As built:** `components/maps/campus-map.tsx` renders building footprints from the API polygon
   data; `components/maps/floor-plan.tsx` renders rooms, graph nodes/edges, QR anchors and the
   computed route as SVG. Outdoor routing uses real lat/lng; indoor routing uses floor-plan metres.
+- **Refresh:** the map now adds orientation and scale context, status legend, label visibility,
+  reset/zoom controls, a selected-destination card, stronger route contrast, and a direct
+  transition into the selected building's floor plans. The refresh decision record is in
+  [`design-decisions/campus-map-refresh.md`](design-decisions/campus-map-refresh.md).
 
 ### 4.4 Navigation + live tracking (`/navigate`)
 
@@ -278,7 +282,7 @@ first viewport, state coverage, contrast, 360 px reflow, token reuse).
 | --- | --- | --- |
 | Dashboard | 8.4 | Next-class hero + ticket strip; trimmed from week view |
 | Timetable | 8.6 | Week grid ≥ 768 px, stacked timeline below |
-| Campus map | 8.2 | SVG plans + buildings layer, marker selection |
+| Campus map | 8.6 | SVG plans + selected destination context, status legend, orientation, scale, route contrast |
 | Navigation / live | 8.5 | Step list + banner; off-route state explained with countdown |
 | Rooms + detail | 8.7 | Dual-encoded availability, slot timeline |
 | QR scan | 8.3 | Error taxonomy surfaced with plain language |

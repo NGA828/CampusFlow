@@ -7,7 +7,7 @@
  * returns for `/floors/:id/plan`. The same component renders the interactive student view
  * (tap a room, follow a route) and the administrator's spatial editor.
  */
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { cx } from '@/components/ui/kit';
 import type { FloorPlanPayload, NavigationNode, Room, Route } from '@/lib/api/types';
 
@@ -59,6 +59,7 @@ export function FloorPlan({
 }: FloorPlanProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ roomId: string; offsetX: number; offsetY: number } | null>(null);
+  const planId = useId().replace(/:/g, '');
 
   const width = Number(plan.floor.plan_width) || 40;
   const height = Number(plan.floor.plan_height) || 30;
@@ -97,7 +98,7 @@ export function FloorPlan({
   };
 
   return (
-    <div className={cx('overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-white', className)}>
+    <div className={cx('relative overflow-hidden rounded-[var(--radius-card)] border border-ink-200 bg-[#edf2ed] shadow-[var(--shadow-card)]', className)}>
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="h-full max-h-[70vh] w-full touch-none"
@@ -107,7 +108,24 @@ export function FloorPlan({
         onPointerUp={() => setDrag(null)}
         onPointerLeave={() => setDrag(null)}
       >
-        <rect x={0} y={0} width={width} height={height} fill="#fbfbfe" />
+        <defs>
+          <linearGradient id={`${planId}-surface`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#fbfcf8" />
+            <stop offset="1" stopColor="#edf3ec" />
+          </linearGradient>
+          <pattern id={`${planId}-grid`} width="2" height="2" patternUnits="userSpaceOnUse">
+            <path d="M2 0H0V2" fill="none" stroke="#d7e2d6" strokeWidth="0.06" />
+          </pattern>
+          <filter id={`${planId}-shadow`} x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="0.35" stdDeviation="0.35" floodColor="#243a32" floodOpacity="0.18" />
+          </filter>
+        </defs>
+        <rect x={0} y={0} width={width} height={height} fill={`url(#${planId}-surface)`} />
+        <rect x={0} y={0} width={width} height={height} fill={`url(#${planId}-grid)`} opacity="0.8" />
+        <rect x={0.7} y={0.7} width={width - 1.4} height={height - 1.4} rx="1.5" fill="none" stroke="#bfd1c0" strokeWidth="0.18" strokeDasharray="0.8 0.7" />
+        <text x="1.7" y="2.5" fill="#6b8172" style={{ fontSize: 1.05, letterSpacing: 0.18, fontWeight: 700 }}>
+          {plan.building.code} · {plan.floor.name.toUpperCase()}
+        </text>
 
         {/* Never draw assumed corridors or room outlines absent from the published payload. */}
         {rooms.map((room) => {
@@ -148,6 +166,7 @@ export function FloorPlan({
                 fill={fill}
                 stroke={isSelected ? '#4340e0' : isHighlighted ? '#f9a92c' : '#c6cde2'}
                 strokeWidth={isSelected || isHighlighted ? 0.5 : 0.3}
+                filter={isSelected ? `url(#${planId}-shadow)` : undefined}
               />
               : <><circle cx={x} cy={y} r={0.9} fill={fill} stroke="#637356" strokeWidth={0.25} /><text x={x + 1.4} y={y + 0.4} style={{ fontSize: 1.2, fontWeight: 600 }} className="fill-ink-800">{room.code}</text></>}
               {hasOutline && w >= 5 && h >= 4 ? (
@@ -232,7 +251,10 @@ export function FloorPlan({
           : null}
 
         {routePaths.map((path, index) => (
-          <path key={index} d={path} fill="none" stroke="#f9a92c" strokeWidth={0.9} strokeLinecap="round" strokeLinejoin="round" className="route-dash" />
+          <g key={index}>
+            <path d={path} fill="none" stroke="#fff5d8" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+            <path d={path} fill="none" stroke="#e3890c" strokeWidth={0.9} strokeLinecap="round" strokeLinejoin="round" className="route-dash" />
+          </g>
         ))}
 
         {marker ? (
@@ -248,7 +270,20 @@ export function FloorPlan({
         ) : null}
       </svg>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-ink-100 px-4 py-2 text-[11px] text-ink-500">
+      <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-3">
+        <div className="pointer-events-auto rounded-[11px] border border-white/75 bg-white/92 px-3 py-2 shadow-[var(--shadow-card)] backdrop-blur-sm">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-mint-700">{editable ? 'Spatial editor' : 'Indoor map'}</p>
+          <p className="mt-0.5 text-[12px] font-semibold text-ink-800">{plan.building.code} · {plan.floor.name}</p>
+          <p className="mt-0.5 text-[10px] text-ink-500">{rooms.length} rooms · {width} × {height} {plan.floor.plan_units}</p>
+        </div>
+        <div className="pointer-events-auto flex items-center gap-2 rounded-[11px] border border-white/75 bg-white/92 px-2.5 py-2 text-[10px] text-ink-500 shadow-[var(--shadow-card)] backdrop-blur-sm">
+          <span className="text-[14px] font-bold text-brand-700">N</span>
+          <span className="h-4 w-px bg-ink-200" />
+          <span>{showGraph ? `${navigationNodes.length} nodes` : showQr ? `${qrNodes.length} anchors` : 'Published plan'}</span>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-ink-100 bg-white/80 px-4 py-2 text-[11px] text-ink-500">
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm bg-ink-300" /> Room
         </span>
