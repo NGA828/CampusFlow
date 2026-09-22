@@ -1,4 +1,5 @@
 # Expo HAS CHANGED
+php artisan serve --host=0.0.0.0 --port=8000
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
 
