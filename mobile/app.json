@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "dev.campusflow.app",
       "infoPlist": {
@@ -58,7 +58,7 @@
       "expo-notifications"
     ],
     "extra": {
-      "apiUrl": "http://127.0.0.1:8001/api/v1"
+      "apiUrl": "http://192.168.2.182:8001/api/v1"
     },
     "experiments": {
       "typedRoutes": true,
