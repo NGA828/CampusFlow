@@ -113,7 +113,7 @@ export default function NavigateScreen() {
 
   const route: MobileRoute | undefined = session?.route;
   const currentStepIndex = progress?.navigation.current_step_index ?? 0;
-  const currentStep = route?.steps[currentStepIndex];
+  const currentStep = route?.steps?.[currentStepIndex];
 
   return (
     <Screen>
@@ -159,7 +159,7 @@ export default function NavigateScreen() {
               />
               <H2>{currentStep?.instruction ?? 'Start walking'}</H2>
               <Small style={{ marginTop: 4 }}>
-                Step {Math.min(currentStepIndex + 1, route.steps.length)} of {route.steps.length}
+                Step {Math.min(currentStepIndex + 1, route.steps?.length ?? 0)} of {route.steps?.length ?? 0}
                 {currentStep?.floor_name ? ` · ${currentStep.floor_name}` : ''}
               </Small>
               <View style={{ marginTop: spacing.md }}>
@@ -211,7 +211,7 @@ export default function NavigateScreen() {
 
             <Card style={{ marginTop: spacing.lg }}>
               <SectionTitle title="Steps" />
-              {route.steps.map((step, index) => (
+              {route.steps?.map((step, index) => (
                 <View key={`${step.index}-${index}`} style={[styles.step, index === currentStepIndex ? styles.stepActive : null]}>
                   <Ionicons
                     name={step.kind === 'stairs' ? 'trending-up-outline' : step.kind === 'elevator' ? 'swap-vertical-outline' : 'arrow-forward-outline'}
@@ -227,8 +227,8 @@ export default function NavigateScreen() {
                 </View>
               ))}
               <View style={{ marginTop: spacing.md }}>
-                <KeyValue label="Origin" value={route.origin.label} />
-                <KeyValue label="Destination" value={route.destination.label} />
+                <KeyValue label="Origin" value={route.origin?.label ?? 'Unknown'} />
+                <KeyValue label="Destination" value={route.destination?.label ?? 'Unknown'} />
                 <KeyValue label="Accessible" value={route.accessible ? 'yes — step-free' : 'standard'} tone={route.accessible ? 'mint' : undefined} />
               </View>
             </Card>
