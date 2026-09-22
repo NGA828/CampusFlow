@@ -16,12 +16,12 @@ import next from 'next';
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME ?? '0.0.0.0';
 const port = Number(process.env.PORT ?? 3000);
-const apiTarget = process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8001';
+const apiTarget = process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8000';
 
 const proxy = httpProxy.createProxyServer({ target: apiTarget, ws: true, changeOrigin: true, xfwd: true });
 
 proxy.on('error', (error, _request, response) => {
-  const message = `The API is not reachable at ${apiTarget} (${error.message}). Start it with \`php backend/artisan serve --host=0.0.0.0 --port=8001\`.`;
+  const message = `The API is not reachable at ${apiTarget} (${error.message}). Start it with \`php backend/artisan serve --host=0.0.0.0 --port=8000\`.`;
   if (response && 'writeHead' in response && !response.headersSent) {
     response.writeHead(502, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ success: false, message, code: 'API_UNAVAILABLE' }));

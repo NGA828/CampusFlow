@@ -50,7 +50,7 @@ import type {
   User,
 } from './types';
 
-export const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'http://127.0.0.1:8001/api/v1').replace(/\/$/, '');
+export const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
 
 const TOKEN_KEY = 'campusflow.token';
 

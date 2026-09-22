@@ -76,7 +76,7 @@ export interface RequestOptions {
  * Server components run inside our own Node process, so a relative base cannot be fetched.
  * The internal origin targets Laravel for server-rendered requests.
  */
-const INTERNAL_API_ORIGIN = (process.env.API_INTERNAL_URL ?? process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8001').replace(/\/$/, '');
+const INTERNAL_API_ORIGIN = (process.env.API_INTERNAL_URL ?? process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8000').replace(/\/$/, '');
 
 function resolveBase(): string {
   if (typeof window !== 'undefined') return API_BASE;
