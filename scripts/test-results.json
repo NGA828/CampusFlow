@@ -1,0 +1,3682 @@
+[
+  {
+    "id": "PM-01",
+    "folder": "01 - System & Health",
+    "name": "API Health Check",
+    "method": "GET",
+    "path": "/health",
+    "reqBody": null,
+    "status": 200,
+    "duration": 8,
+    "size": 128,
+    "response": {
+      "success": true,
+      "data": {
+        "status": "ok",
+        "database": {
+          "engine": "PostgreSQL 18.3",
+          "latency_ms": 1
+        },
+        "time": "2026-09-16T14:08:31.325Z"
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Response time is less than 200ms",
+        "passed": true
+      },
+      {
+        "name": "Database latency is reported",
+        "passed": true
+      },
+      {
+        "name": "System status is \"ok\"",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-02",
+    "folder": "01 - System & Health",
+    "name": "Public Campus Overview",
+    "method": "GET",
+    "path": "/public/overview",
+    "reqBody": null,
+    "status": 200,
+    "duration": 6,
+    "size": 2849,
+    "response": {
+      "success": true,
+      "data": {
+        "stats": {
+          "buildings": 5,
+          "rooms": 30,
+          "offices": 5,
+          "seats": 1273
+        },
+        "buildings": [
+          {
+            "id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "code": "A",
+            "name": "Halden Hall",
+            "description": "Engineering and computing: lecture theatres, hardware labs and the robotics workshop.",
+            "lat": 52.24465,
+            "lng": 4.45015,
+            "status": "operational"
+          },
+          {
+            "id": "c08656a2-dd23-4e01-b091-7107577f3819",
+            "code": "B",
+            "name": "Brixner Building",
+            "description": "Sciences: chemistry, physics and biology teaching labs with shared study rooms.",
+            "lat": 52.24405,
+            "lng": 4.4532,
+            "status": "operational"
+          },
+          {
+            "id": "b551f50e-ac1c-47d1-a6b7-e7ef0ab4c2a2",
+            "code": "C",
+            "name": "Caven Library & Study Centre",
+            "description": "Library, quiet study rooms and group work pods with controlled admission.",
+            "lat": 52.24335,
+            "lng": 4.45195,
+            "status": "operational"
+          },
+          {
+            "id": "9ab7fe21-2901-4d9b-a84f-aa20392d7400",
+            "code": "D",
+            "name": "Dunmore Administration",
+            "description": "Student services, registrar and the principal’s office.",
+            "lat": 52.2439,
+            "lng": 4.44955,
+            "status": "operational"
+          },
+          {
+            "id": "af1158bb-af94-4a0f-a5c2-76e8d4718f03",
+            "code": "E",
+            "name": "Ellsworth Student Union",
+            "description": "Canteen, student association desks and event spaces.",
+            "lat": 52.2429,
+            "lng": 4.4538,
+            "status": "limited"
+          }
+        ],
+        "events": [
+          {
+            "id": "4c46f835-6d6b-42ca-90ab-d39f111549b8",
+            "title": "Study Skills Workshop",
+            "description": "Evidence-based techniques for exam preparation.",
+            "category": "academic",
+            "starts_at": "2026-09-17T16:05:57.924Z",
+            "ends_at": "2026-09-17T18:05:57.924Z",
+            "venue": "Caven Library, Group Pod 1",
+            "building_id": "b551f50e-ac1c-47d1-a6b7-e7ef0ab4c2a2"
+          },
+          {
+            "id": "d7f3a7b8-4ea3-43fb-8e73-cdb7613b267b",
+            "title": "Wellbeing Drop-in",
+            "description": "No appointment needed — talk to a student counsellor.",
+            "category": "wellbeing",
+            "starts_at": "2026-09-18T15:05:57.924Z",
+            "ends_at": "2026-09-18T18:05:57.924Z",
+            "venue": "Dunmore Administration, D-110",
+            "building_id": "af1158bb-af94-4a0f-a5c2-76e8d4718f03"
+          },
+          {
+            "id": "1f9e36d1-4856-41b6-bdfe-6dbd6b952bae",
+            "title": "Campus Career Fair",
+            "description": "Meet 24 employers from the region, bring your CV.",
+            "category": "career",
+            "starts_at": "2026-09-19T18:05:57.924Z",
+            "ends_at": "2026-09-19T23:05:57.924Z",
+            "venue": "Ellsworth Student Union, Event Hall",
+            "building_id": "af1158bb-af94-4a0f-a5c2-76e8d4718f03"
+          }
+        ],
+        "announcements": [
+          {
+            "id": "98da8266-2de8-4cd4-a559-c675895abc27",
+            "title": "Library extends opening hours during exams",
+            "body": "Caven Library is open until 23:00 from Monday. Group pods can be reserved through CampusFlow.",
+            "priority": "normal",
+            "published_at": "2026-09-15T14:05:57.928Z"
+          },
+          {
+            "id": "ff845851-8d75-4338-b0f8-0a64fd265cb6",
+            "title": "Lift maintenance in Halden Hall",
+            "body": "The Halden Hall lift is being serviced on Friday between 08:00 and 12:00. Accessible routes via Brixner are available.",
+            "priority": "high",
+            "published_at": "2026-09-16T09:05:57.928Z"
+          }
+        ],
+        "campus": {
+          "name": "Northfield University",
+          "timezone": "UTC"
+        }
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns campus facts and stats",
+        "passed": true
+      },
+      {
+        "name": "Campus name matches Northfield University",
+        "passed": true
+      },
+      {
+        "name": "Stats contain building and room counts",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-03",
+    "folder": "02 - Auth & Identity",
+    "name": "Student Account Login",
+    "method": "POST",
+    "path": "/auth/login",
+    "reqBody": {
+      "email": "student@campusflow.dev",
+      "password": "CampusFlow2026!"
+    },
+    "status": 200,
+    "duration": 96,
+    "size": 686,
+    "response": {
+      "success": true,
+      "data": {
+        "token": "NlMmkJ3MOf1_6o1lfBPOZyWK2DpSGbsS2sv7u6HsaIM",
+        "expires_at": "2026-10-16T14:08:31.426Z",
+        "user": {
+          "id": "09127793-15ba-4869-853c-a1f23c6cec68",
+          "name": "Sofia Alvarez",
+          "email": "student@campusflow.dev",
+          "role_code": "student",
+          "status": "active",
+          "registration_no": "2026-0101",
+          "department": "Computer Science",
+          "phone": null,
+          "avatar_url": null,
+          "email_verified_at": "2026-09-16T14:05:57.063Z",
+          "last_login_at": "2026-09-16T14:08:12.401Z",
+          "created_at": "2026-09-16T14:05:57.063Z",
+          "permissions": [
+            "timetable.view.own",
+            "room.search",
+            "queue.join",
+            "queue.view.own",
+            "office.request",
+            "office.view.own",
+            "navigation.use",
+            "assistant.use",
+            "notifications.view.own",
+            "profile.manage.own"
+          ]
+        }
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns JWT Bearer auth token",
+        "passed": true
+      },
+      {
+        "name": "User role is \"student\"",
+        "passed": true
+      },
+      {
+        "name": "Returns student permissions array",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-04",
+    "folder": "02 - Auth & Identity",
+    "name": "Administrator Account Login",
+    "method": "POST",
+    "path": "/auth/login",
+    "reqBody": {
+      "email": "admin@campusflow.dev",
+      "password": "CampusFlow2026!"
+    },
+    "status": 200,
+    "duration": 97,
+    "size": 907,
+    "response": {
+      "success": true,
+      "data": {
+        "token": "PdJNehtHouM95W37aFTMTjh71zBBMp68r1iKa1PmBdA",
+        "expires_at": "2026-10-16T14:08:31.524Z",
+        "user": {
+          "id": "a6306ef7-c2cc-4a59-90f5-2d7aedfba0c0",
+          "name": "Amara Osei",
+          "email": "admin@campusflow.dev",
+          "role_code": "admin",
+          "status": "active",
+          "registration_no": null,
+          "department": "Facilities & IT",
+          "phone": null,
+          "avatar_url": null,
+          "email_verified_at": "2026-09-16T14:05:57.051Z",
+          "last_login_at": "2026-09-16T14:08:12.498Z",
+          "created_at": "2026-09-16T14:05:57.051Z",
+          "permissions": [
+            "timetable.view.own",
+            "room.search",
+            "queue.join",
+            "queue.view.own",
+            "office.request",
+            "office.view.own",
+            "navigation.use",
+            "assistant.use",
+            "notifications.view.own",
+            "profile.manage.own",
+            "timetable.manage",
+            "content.publish",
+            "queue.operate",
+            "queue.monitor",
+            "office.operate",
+            "office.monitor",
+            "users.manage",
+            "campus.manage",
+            "spatial.manage",
+            "queues.manage",
+            "offices.manage",
+            "academics.manage",
+            "events.manage",
+            "analytics.view"
+          ]
+        }
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns JWT Bearer auth token",
+        "passed": true
+      },
+      {
+        "name": "User role is \"admin\"",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-05",
+    "folder": "02 - Auth & Identity",
+    "name": "Get Current User Profile",
+    "method": "GET",
+    "path": "/auth/me",
+    "reqBody": null,
+    "status": 200,
+    "duration": 4,
+    "size": 609,
+    "response": {
+      "success": true,
+      "data": {
+        "user": {
+          "id": "09127793-15ba-4869-853c-a1f23c6cec68",
+          "name": "Sofia Alvarez",
+          "email": "student@campusflow.dev",
+          "role_code": "student",
+          "status": "active",
+          "registration_no": "2026-0101",
+          "department": "Computer Science",
+          "phone": null,
+          "avatar_url": null,
+          "email_verified_at": "2026-09-16T14:05:57.063Z",
+          "last_login_at": "2026-09-16T14:08:31.428Z",
+          "created_at": "2026-09-16T14:05:57.063Z",
+          "permissions": [
+            "timetable.view.own",
+            "room.search",
+            "queue.join",
+            "queue.view.own",
+            "office.request",
+            "office.view.own",
+            "navigation.use",
+            "assistant.use",
+            "notifications.view.own",
+            "profile.manage.own"
+          ]
+        },
+        "assignments": []
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns active student profile",
+        "passed": true
+      },
+      {
+        "name": "Registration number is present",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-06",
+    "folder": "03 - Campus & Spatial Data",
+    "name": "List Campus Buildings",
+    "method": "GET",
+    "path": "/buildings",
+    "reqBody": null,
+    "status": 200,
+    "duration": 5,
+    "size": 3874,
+    "response": {
+      "success": true,
+      "data": {
+        "buildings": [
+          {
+            "id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "code": "A",
+            "name": "Halden Hall",
+            "description": "Engineering and computing: lecture theatres, hardware labs and the robotics workshop.",
+            "campus_name": "Northfield University",
+            "address": "A Wing, Northfield University, Northfield",
+            "lat": 52.24465,
+            "lng": 4.45015,
+            "footprint": [
+              [
+                4.449637,
+                52.244403
+              ],
+              [
+                4.450663,
+                52.244403
+              ],
+              [
+                4.450663,
+                52.244897
+              ],
+              [
+                4.449637,
+                52.244897
+              ],
+              [
+                4.449637,
+                52.244403
+              ]
+            ],
+            "has_elevator": true,
+            "is_public": true,
+            "opening_hours": {
+              "friday": "07:30-20:00",
+              "monday": "07:30-21:00",
+              "sunday": "closed",
+              "tuesday": "07:30-21:00",
+              "saturday": "09:00-17:00",
+              "thursday": "07:30-21:00",
+              "wednesday": "07:30-21:00"
+            },
+            "status": "operational",
+            "created_at": "2026-09-16T14:05:57.069Z",
+            "updated_at": "2026-09-16T14:05:57.069Z",
+            "floors_count": 3,
+            "rooms_count": 9
+          },
+          {
+            "id": "c08656a2-dd23-4e01-b091-7107577f3819",
+            "code": "B",
+            "name": "Brixner Building",
+            "description": "Sciences: chemistry, physics and biology teaching labs with shared study rooms.",
+            "campus_name": "Northfield University",
+            "address": "B Wing, Northfield University, Northfield",
+            "lat": 52.24405,
+            "lng": 4.4532,
+            "footprint": [
+              [
+                4.452687,
+                52.243803
+              ],
+              [
+                4.453713,
+                52.243803
+              ],
+              [
+                4.453713,
+                52.244297
+              ],
+              [
+                4.452687,
+                52.244297
+              ],
+              [
+                4.452687,
+                52.243803
+              ]
+            ],
+            "has_elevator": true,
+            "is_public": true,
+            "opening_hours": {
+              "friday": "07:30-20:00",
+              "monday": "07:30-21:00",
+              "sunday": "closed",
+              "tuesday": "07:30-21:00",
+              "saturday": "09:00-17:00",
+              "thursday": "07:30-21:00",
+              "wednesday": "07:30-21:00"
+            },
+            "status": "operational",
+            "created_at": "2026-09-16T14:05:57.090Z",
+            "updated_at": "2026-09-16T14:05:57.090Z",
+            "floors_count": 2,
+            "rooms_count": 6
+          },
+          {
+            "id": "b551f50e-ac1c-47d1-a6b7-e7ef0ab4c2a2",
+            "code": "C",
+            "name": "Caven Library & Study Centre",
+            "description": "Library, quiet study rooms and group work pods with controlled admission.",
+            "campus_name": "Northfield University",
+            "address": "C Wing, Northfield University, Northfield",
+            "lat": 52.24335,
+            "lng": 4.45195,
+            "footprint": [
+              [
+                4.451437,
+                52.243103
+              ],
+              [
+                4.452463,
+                52.243103
+              ],
+              [
+                4.452463,
+                52.243597
+              ],
+              [
+                4.451437,
+                52.243597
+              ],
+              [
+                4.451437,
+                52.243103
+              ]
+            ],
+            "has_elevator": true,
+            "is_public": true,
+            "opening_hours": {
+              "friday": "07:30-20:00",
+              "monday": "07:30-21:00",
+              "sunday": "closed",
+              "tuesday": "07:30-21:00",
+              "saturday": "09:00-17:00",
+              "thursday": "07:30-21:00",
+              "wednesday": "07:30-21:00"
+            },
+            "status": "operational",
+            "created_at": "2026-09-16T14:05:57.104Z",
+            "updated_at": "2026-09-16T14:05:57.104Z",
+            "floors_count": 2,
+            "rooms_count": 6
+          },
+          {
+            "id": "9ab7fe21-2901-4d9b-a84f-aa20392d7400",
+            "code": "D",
+            "name": "Dunmore Administration",
+            "description": "Student services, registrar and the principal’s office.",
+            "campus_name": "Northfield University",
+            "address": "D Wing, Northfield University, Northfield",
+            "lat": 52.2439,
+            "lng": 4.44955,
+            "footprint": [
+              [
+                4.449037,
+                52.243653
+              ],
+              [
+                4.450063,
+                52.243653
+              ],
+              [
+                4.450063,
+                52.244147
+              ],
+              [
+                4.449037,
+                52.244147
+              ],
+              [
+                4.449037,
+                52.243653
+              ]
+            ],
+            "has_elevator": false,
+            "is_public": true,
+            "opening_hours": {
+              "friday": "07:30-20:00",
+              "monday": "07:30-21:00",
+              "sunday": "closed",
+              "tuesday": "07:30-21:00",
+              "saturday": "09:00-17:00",
+              "thursday": "07:30-21:00",
+              "wednesday": "07:30-21:00"
+            },
+            "status": "operational",
+            "created_at": "2026-09-16T14:05:57.107Z",
+            "updated_at": "2026-09-16T14:05:57.107Z",
+            "floors_count": 2,
+            "rooms_count": 6
+          },
+          {
+            "id": "af1158bb-af94-4a0f-a5c2-76e8d4718f03",
+            "code": "E",
+            "name": "Ellsworth Student Union",
+            "description": "Canteen, student association desks and event spaces.",
+            "campus_name": "Northfield University",
+            "address": "E Wing, Northfield University, Northfield",
+            "lat": 52.2429,
+            "lng": 4.4538,
+            "footprint": [
+              [
+                4.453287,
+                52.242653
+              ],
+              [
+                4.454313,
+                52.242653
+              ],
+              [
+                4.454313,
+                52.243147
+              ],
+              [
+                4.453287,
+                52.243147
+              ],
+              [
+                4.453287,
+                52.242653
+              ]
+            ],
+            "has_elevator": false,
+            "is_public": true,
+            "opening_hours": {
+              "friday": "07:30-20:00",
+              "monday": "07:30-21:00",
+              "sunday": "closed",
+              "tuesday": "07:30-21:00",
+              "saturday": "09:00-17:00",
+              "thursday": "07:30-21:00",
+              "wednesday": "07:30-21:00"
+            },
+            "status": "limited",
+            "created_at": "2026-09-16T14:05:57.109Z",
+            "updated_at": "2026-09-16T14:05:57.109Z",
+            "floors_count": 1,
+            "rooms_count": 3
+          }
+        ]
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns list of campus buildings",
+        "passed": true
+      },
+      {
+        "name": "At least 3 buildings in database",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-07",
+    "folder": "03 - Campus & Spatial Data",
+    "name": "Search Available Rooms",
+    "method": "GET",
+    "path": "/rooms?min_capacity=20",
+    "reqBody": null,
+    "status": 200,
+    "duration": 76,
+    "size": 16101,
+    "response": {
+      "success": true,
+      "data": {
+        "items": [
+          {
+            "id": "1d3c7f26-edce-4cb6-b236-f2abe0e54da6",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+            "code": "A101",
+            "name": "Lecture Theatre 1",
+            "room_type": "lecture",
+            "capacity": 180,
+            "description": null,
+            "requires_admission": false,
+            "admission_policy": {},
+            "plan_x": 6,
+            "plan_y": 6,
+            "plan_w": 20,
+            "plan_h": 12,
+            "lat": 52.244542,
+            "lng": 4.450385,
+            "amenities": [
+              "projector",
+              "hearing_loop"
+            ],
+            "accessibility": [
+              "step_free",
+              "reserved_seating"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.110Z",
+            "updated_at": "2026-09-16T14:05:57.110Z",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_level": 0,
+            "floor_name": "Ground floor",
+            "availability": {
+              "room_id": "1d3c7f26-edce-4cb6-b236-f2abe0e54da6",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 180
+              },
+              "queue": {
+                "id": null,
+                "waiting": 0,
+                "requires_proximity": false,
+                "is_active": false
+              },
+              "headline": "Available now"
+            }
+          },
+          {
+            "id": "6a9edc3f-22aa-4b5e-ba8c-41e7fa095bfc",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+            "code": "A104",
+            "name": "Robotics Workshop",
+            "room_type": "lab",
+            "capacity": 32,
+            "description": null,
+            "requires_admission": true,
+            "admission_policy": {},
+            "plan_x": 32,
+            "plan_y": 6,
+            "plan_w": 16,
+            "plan_h": 12,
+            "lat": 52.244542,
+            "lng": 4.450737,
+            "amenities": [
+              "power",
+              "tools"
+            ],
+            "accessibility": [
+              "step_free"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.120Z",
+            "updated_at": "2026-09-16T14:05:57.120Z",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_level": 0,
+            "floor_name": "Ground floor",
+            "availability": {
+              "room_id": "6a9edc3f-22aa-4b5e-ba8c-41e7fa095bfc",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 32
+              },
+              "queue": {
+                "id": "209ca767-ea97-47bb-b88b-058481a9ac4c",
+                "waiting": 0,
+                "requires_proximity": true,
+                "is_active": true
+              },
+              "headline": "Available now"
+            }
+          },
+          {
+            "id": "1e662e40-e9ca-4892-95a0-2d357fc380bf",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "floor_id": "69395211-1869-4299-90c1-d451458eecb9",
+            "code": "A201",
+            "name": "Computing Lab 1",
+            "room_type": "lab",
+            "capacity": 40,
+            "description": null,
+            "requires_admission": false,
+            "admission_policy": {},
+            "plan_x": 6,
+            "plan_y": 6,
+            "plan_w": 18,
+            "plan_h": 10,
+            "lat": 52.244551,
+            "lng": 4.45037,
+            "amenities": [
+              "workstations"
+            ],
+            "accessibility": [
+              "step_free",
+              "adjustable_desk"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.130Z",
+            "updated_at": "2026-09-16T14:05:57.130Z",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_level": 1,
+            "floor_name": "First floor",
+            "availability": {
+              "room_id": "1e662e40-e9ca-4892-95a0-2d357fc380bf",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [
+                {
+                  "room_id": "1e662e40-e9ca-4892-95a0-2d357fc380bf",
+                  "starts_at": "11:00",
+                  "ends_at": "12:30",
+                  "course_code": "CS201",
+                  "course_title": "Data Structures & Algorithms",
+                  "session_type": "lab",
+                  "reason": "class",
+                  "lecturer": "Dr Ravi Menon"
+                }
+              ],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "11:00"
+                },
+                {
+                  "starts_at": "12:30",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 40
+              },
+              "queue": {
+                "id": null,
+                "waiting": 0,
+                "requires_proximity": false,
+                "is_active": false
+              },
+              "headline": "Available now"
+            }
+          },
+          {
+            "id": "c9427acd-bdda-496d-bcd3-10cca4b05c15",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "floor_id": "69395211-1869-4299-90c1-d451458eecb9",
+            "code": "A204",
+            "name": "Software Studio",
+            "room_type": "lab",
+            "capacity": 28,
+            "description": null,
+            "requires_admission": true,
+            "admission_policy": {},
+            "plan_x": 30,
+            "plan_y": 6,
+            "plan_w": 16,
+            "plan_h": 10,
+            "lat": 52.244551,
+            "lng": 4.450708,
+            "amenities": [
+              "power",
+              "whiteboard"
+            ],
+            "accessibility": [
+              "step_free"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.134Z",
+            "updated_at": "2026-09-16T14:05:57.134Z",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_level": 1,
+            "floor_name": "First floor",
+            "availability": {
+              "room_id": "c9427acd-bdda-496d-bcd3-10cca4b05c15",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 28
+              },
+              "queue": {
+                "id": "fe2f2fbe-7614-4fc0-822a-1cced1cd659c",
+                "waiting": 0,
+                "requires_proximity": true,
+                "is_active": true
+              },
+              "headline": "Available now"
+            }
+          },
+          {
+            "id": "29abbbaa-64aa-4c3d-b684-0e76e1b8bd30",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "floor_id": "69395211-1869-4299-90c1-d451458eecb9",
+            "code": "A210",
+            "name": "Seminar Room 2",
+            "room_type": "meeting",
+            "capacity": 20,
+            "description": null,
+            "requires_admission": false,
+            "admission_policy": {},
+            "plan_x": 6,
+            "plan_y": 22,
+            "plan_w": 12,
+            "plan_h": 8,
+            "lat": 52.244416,
+            "lng": 4.450326,
+            "amenities": [
+              "video_conf"
+            ],
+            "accessibility": [
+              "step_free"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.140Z",
+            "updated_at": "2026-09-16T14:05:57.140Z",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_level": 1,
+            "floor_name": "First floor",
+            "availability": {
+              "room_id": "29abbbaa-64aa-4c3d-b684-0e76e1b8bd30",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 20
+              },
+              "queue": {
+                "id": null,
+                "waiting": 0,
+                "requires_proximity": false,
+                "is_active": false
+              },
+              "headline": "Available now"
+            }
+          },
+          {
+            "id": "91a84996-5085-40d4-86bb-4caac4d7374e",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "floor_id": "d7820003-933b-42be-9db6-676fc3686431",
+            "code": "A301",
+            "name": "Networks Lab",
+            "room_type": "lab",
+            "capacity": 30,
+            "description": null,
+            "requires_admission": false,
+            "admission_policy": {},
+            "plan_x": 8,
+            "plan_y": 6,
+            "plan_w": 18,
+            "plan_h": 10,
+            "lat": 52.244551,
+            "lng": 4.450399,
+            "amenities": [
+              "rack_access"
+            ],
+            "accessibility": [
+              "step_free"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.144Z",
+            "updated_at": "2026-09-16T14:05:57.144Z",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_level": 2,
+            "floor_name": "Second floor",
+            "availability": {
+              "room_id": "91a84996-5085-40d4-86bb-4caac4d7374e",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 30
+              },
+              "queue": {
+                "id": null,
+                "waiting": 0,
+                "requires_proximity": false,
+                "is_active": false
+              },
+              "headline": "Available now"
+            }
+          },
+          {
+            "id": "d9db757f-77c7-4fe0-acd8-72dcdd57ac95",
+            "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+            "floor_id": "420b5986-16bb-4794-96fe-d025a1b072fb",
+            "code": "B101",
+            "name": "Chemistry Lab",
+            "room_type": "lab",
+            "capacity": 36,
+            "description": null,
+            "requires_admission": false,
+            "admission_policy": {},
+            "plan_x": 6,
+            "plan_y": 6,
+            "plan_w": 18,
+            "plan_h": 10,
+            "lat": 52.243951,
+            "lng": 4.45342,
+            "amenities": [
+              "fume_hood"
+            ],
+            "accessibility": [
+              "step_free"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.155Z",
+            "updated_at": "2026-09-16T14:05:57.155Z",
+            "building_code": "B",
+            "building_name": "Brixner Building",
+            "floor_level": 0,
+            "floor_name": "Ground floor",
+            "availability": {
+              "room_id": "d9db757f-77c7-4fe0-acd8-72dcdd57ac95",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": false,
+              "next_free_at": "17:00",
+              "current_session": {
+                "room_id": "d9db757f-77c7-4fe0-acd8-72dcdd57ac95",
+                "starts_at": "14:00",
+                "ends_at": "17:00",
+                "course_code": "PHYS220",
+                "course_title": "Experimental Physics",
+                "session_type": "lab",
+                "reason": "class",
+                "lecturer": "Dr Yusuf Karim"
+              },
+              "busy": [
+                {
+                  "room_id": "d9db757f-77c7-4fe0-acd8-72dcdd57ac95",
+                  "starts_at": "14:00",
+                  "ends_at": "17:00",
+                  "course_code": "PHYS220",
+                  "course_title": "Experimental Physics",
+                  "session_type": "lab",
+                  "reason": "class",
+                  "lecturer": "Dr Yusuf Karim"
+                }
+              ],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "14:00"
+                },
+                {
+                  "starts_at": "17:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 36
+              },
+              "queue": {
+                "id": null,
+                "waiting": 0,
+                "requires_proximity": false,
+                "is_active": false
+              },
+              "headline": "PHYS220 until 17:00"
+            }
+          },
+          {
+            "id": "d9892020-2cf9-4f36-8d2f-8dc978bb83a4",
+            "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+            "floor_id": "420b5986-16bb-4794-96fe-d025a1b072fb",
+            "code": "B110",
+            "name": "Science Lecture Hall",
+            "room_type": "lecture",
+            "capacity": 140,
+            "description": null,
+            "requires_admission": false,
+            "admission_policy": {},
+            "plan_x": 28,
+            "plan_y": 6,
+            "plan_w": 16,
+            "plan_h": 12,
+            "lat": 52.243942,
+            "lng": 4.453728,
+            "amenities": [
+              "projector"
+            ],
+            "accessibility": [
+              "step_free"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.159Z",
+            "updated_at": "2026-09-16T14:05:57.159Z",
+            "building_code": "B",
+            "building_name": "Brixner Building",
+            "floor_level": 0,
+            "floor_name": "Ground floor",
+            "availability": {
+              "room_id": "d9892020-2cf9-4f36-8d2f-8dc978bb83a4",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 140
+              },
+              "queue": {
+                "id": null,
+                "waiting": 0,
+                "requires_proximity": false,
+                "is_active": false
+              },
+              "headline": "Available now"
+            }
+          },
+          {
+            "id": "79eec8ba-d540-4fe5-9969-e5811400d02e",
+            "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+            "floor_id": "28d5bf6b-d231-4b85-9bf3-16a6ab84af16",
+            "code": "B201",
+            "name": "Physics Lab",
+            "room_type": "lab",
+            "capacity": 30,
+            "description": null,
+            "requires_admission": false,
+            "admission_policy": {},
+            "plan_x": 6,
+            "plan_y": 6,
+            "plan_w": 16,
+            "plan_h": 10,
+            "lat": 52.243951,
+            "lng": 4.453405,
+            "amenities": [
+              "optical_bench"
+            ],
+            "accessibility": [
+              "step_free"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.164Z",
+            "updated_at": "2026-09-16T14:05:57.164Z",
+            "building_code": "B",
+            "building_name": "Brixner Building",
+            "floor_level": 1,
+            "floor_name": "First floor",
+            "availability": {
+              "room_id": "79eec8ba-d540-4fe5-9969-e5811400d02e",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 30
+              },
+              "queue": {
+                "id": null,
+                "waiting": 0,
+                "requires_proximity": false,
+                "is_active": false
+              },
+              "headline": "Available now"
+            }
+          },
+          {
+            "id": "b006a567-734f-4107-9998-18a0c148db54",
+            "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+            "floor_id": "28d5bf6b-d231-4b85-9bf3-16a6ab84af16",
+            "code": "B212",
+            "name": "Tutorial Room",
+            "room_type": "meeting",
+            "capacity": 24,
+            "description": null,
+            "requires_admission": false,
+            "admission_policy": {},
+            "plan_x": 26,
+            "plan_y": 20,
+            "plan_w": 12,
+            "plan_h": 8,
+            "lat": 52.243834,
+            "lng": 4.453669,
+            "amenities": [
+              "whiteboard"
+            ],
+            "accessibility": [
+              "step_free"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.175Z",
+            "updated_at": "2026-09-16T14:05:57.175Z",
+            "building_code": "B",
+            "building_name": "Brixner Building",
+            "floor_level": 1,
+            "floor_name": "First floor",
+            "availability": {
+              "room_id": "b006a567-734f-4107-9998-18a0c148db54",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [
+                {
+                  "room_id": "b006a567-734f-4107-9998-18a0c148db54",
+                  "starts_at": "09:00",
+                  "ends_at": "10:00",
+                  "course_code": "MATH204",
+                  "course_title": "Linear Algebra",
+                  "session_type": "tutorial",
+                  "reason": "class",
+                  "lecturer": "Prof. Lena Fischer"
+                }
+              ],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "09:00"
+                },
+                {
+                  "starts_at": "10:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 24
+              },
+              "queue": {
+                "id": null,
+                "waiting": 0,
+                "requires_proximity": false,
+                "is_active": false
+              },
+              "headline": "Available now"
+            }
+          },
+          {
+            "id": "54718cd7-1572-4ca2-8e96-8a96614c15e0",
+            "building_id": "b551f50e-ac1c-47d1-a6b7-e7ef0ab4c2a2",
+            "floor_id": "73893164-4830-40ae-a89f-bbd20d8e6dcb",
+            "code": "C101",
+            "name": "Library Reading Room",
+            "room_type": "library",
+            "capacity": 120,
+            "description": null,
+            "requires_admission": false,
+            "admission_policy": {},
+            "plan_x": 6,
+            "plan_y": 6,
+            "plan_w": 22,
+            "plan_h": 14,
+            "lat": 52.243233,
+            "lng": 4.452199,
+            "amenities": [
+              "silent_zone"
+            ],
+            "accessibility": [
+              "step_free"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.179Z",
+            "updated_at": "2026-09-16T14:05:57.179Z",
+            "building_code": "C",
+            "building_name": "Caven Library & Study Centre",
+            "floor_level": 0,
+            "floor_name": "Ground floor",
+            "availability": {
+              "room_id": "54718cd7-1572-4ca2-8e96-8a96614c15e0",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 120
+              },
+              "queue": {
+                "id": null,
+                "waiting": 0,
+                "requires_proximity": false,
+                "is_active": false
+              },
+              "headline": "Available now"
+            }
+          },
+          {
+            "id": "35392cd7-a17a-4016-92b1-f490e44a30b7",
+            "building_id": "b551f50e-ac1c-47d1-a6b7-e7ef0ab4c2a2",
+            "floor_id": "de66b604-d958-4010-b86d-81d3ef6ad88c",
+            "code": "C201",
+            "name": "Silent Study",
+            "room_type": "study",
+            "capacity": 60,
+            "description": null,
+            "requires_admission": false,
+            "admission_policy": {},
+            "plan_x": 6,
+            "plan_y": 6,
+            "plan_w": 20,
+            "plan_h": 12,
+            "lat": 52.243242,
+            "lng": 4.452185,
+            "amenities": [
+              "silent_zone",
+              "task_light"
+            ],
+            "accessibility": [
+              "step_free"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.192Z",
+            "updated_at": "2026-09-16T14:05:57.192Z",
+            "building_code": "C",
+            "building_name": "Caven Library & Study Centre",
+            "floor_level": 1,
+            "floor_name": "Study level",
+            "availability": {
+              "room_id": "35392cd7-a17a-4016-92b1-f490e44a30b7",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 60
+              },
+              "queue": {
+                "id": null,
+                "waiting": 0,
+                "requires_proximity": false,
+                "is_active": false
+              },
+              "headline": "Available now"
+            }
+          },
+          {
+            "id": "6e4bbc41-cb91-4434-96c9-c07718b0d6d5",
+            "building_id": "af1158bb-af94-4a0f-a5c2-76e8d4718f03",
+            "floor_id": "5bc061e6-0e70-406a-8a8c-90d0cb67fee9",
+            "code": "E101",
+            "name": "Canteen",
+            "room_type": "other",
+            "capacity": 220,
+            "description": null,
+            "requires_admission": false,
+            "admission_policy": {},
+            "plan_x": 5,
+            "plan_y": 5,
+            "plan_w": 24,
+            "plan_h": 14,
+            "lat": 52.242792,
+            "lng": 4.454049,
+            "amenities": [],
+            "accessibility": [
+              "step_free"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.234Z",
+            "updated_at": "2026-09-16T14:05:57.234Z",
+            "building_code": "E",
+            "building_name": "Ellsworth Student Union",
+            "floor_level": 0,
+            "floor_name": "Ground floor",
+            "availability": {
+              "room_id": "6e4bbc41-cb91-4434-96c9-c07718b0d6d5",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 220
+              },
+              "queue": {
+                "id": null,
+                "waiting": 0,
+                "requires_proximity": false,
+                "is_active": false
+              },
+              "headline": "Available now"
+            }
+          },
+          {
+            "id": "6a177d00-0d81-42e4-843f-ad562546a251",
+            "building_id": "af1158bb-af94-4a0f-a5c2-76e8d4718f03",
+            "floor_id": "5bc061e6-0e70-406a-8a8c-90d0cb67fee9",
+            "code": "E120",
+            "name": "Event Hall",
+            "room_type": "auditorium",
+            "capacity": 150,
+            "description": null,
+            "requires_admission": false,
+            "admission_policy": {},
+            "plan_x": 20,
+            "plan_y": 21,
+            "plan_w": 14,
+            "plan_h": 10,
+            "lat": 52.242666,
+            "lng": 4.454196,
+            "amenities": [
+              "stage",
+              "sound_system"
+            ],
+            "accessibility": [
+              "step_free"
+            ],
+            "status": "available",
+            "photo_url": null,
+            "created_at": "2026-09-16T14:05:57.241Z",
+            "updated_at": "2026-09-16T14:05:57.241Z",
+            "building_code": "E",
+            "building_name": "Ellsworth Student Union",
+            "floor_level": 0,
+            "floor_name": "Ground floor",
+            "availability": {
+              "room_id": "6a177d00-0d81-42e4-843f-ad562546a251",
+              "date": "2026-09-16",
+              "is_open": true,
+              "opens_at": "08:00",
+              "closes_at": "20:00",
+              "is_available_now": true,
+              "next_free_at": null,
+              "current_session": null,
+              "busy": [],
+              "free_slots": [
+                {
+                  "starts_at": "08:00",
+                  "ends_at": "20:00"
+                }
+              ],
+              "occupancy": {
+                "admitted": 0,
+                "capacity": 150
+              },
+              "queue": {
+                "id": null,
+                "waiting": 0,
+                "requires_proximity": false,
+                "is_active": false
+              },
+              "headline": "Available now"
+            }
+          }
+        ],
+        "meta": {
+          "page": 1,
+          "per_page": 24,
+          "total": 14,
+          "total_pages": 1
+        },
+        "query": {
+          "min_capacity": 20,
+          "page": 1,
+          "per_page": 24
+        }
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns paginated rooms array",
+        "passed": true
+      },
+      {
+        "name": "Items contain availability status",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-08",
+    "folder": "04 - Student Services",
+    "name": "Get Personal Timetable",
+    "method": "GET",
+    "path": "/me/timetable",
+    "reqBody": null,
+    "status": 200,
+    "duration": 8,
+    "size": 19669,
+    "response": {
+      "success": true,
+      "data": {
+        "term": "2026-FALL",
+        "week_start": "2026-09-14",
+        "dates": [
+          "2026-09-14",
+          "2026-09-15",
+          "2026-09-16",
+          "2026-09-17",
+          "2026-09-18",
+          "2026-09-19",
+          "2026-09-20"
+        ],
+        "entries": [
+          {
+            "id": "7617e999-8931-4cbc-8750-e02da4d29efc",
+            "course_id": "c08380b9-b844-4c7a-96dc-5e57264961b6",
+            "day_of_week": 1,
+            "session_type": "lecture",
+            "note": null,
+            "starts_at": "09:00",
+            "ends_at": "10:30",
+            "course_code": "CS201",
+            "course_title": "Data Structures & Algorithms",
+            "course_colour": "#2F4FE3",
+            "department": "Computer Science",
+            "room_id": "1d3c7f26-edce-4cb6-b236-f2abe0e54da6",
+            "room_code": "A101",
+            "room_name": "Lecture Theatre 1",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+            "floor_name": "Ground floor",
+            "floor_level": 0,
+            "lecturer": "Dr Ravi Menon",
+            "date": "2026-09-14",
+            "starts_at_iso": "2026-09-14T09:00:00",
+            "ends_at_iso": "2026-09-14T10:30:00",
+            "is_now": false,
+            "is_next": false,
+            "minutes_until": null
+          },
+          {
+            "id": "3d432754-3644-48e7-9b63-1694ce2da254",
+            "course_id": "cf8f3f8b-58bf-474f-9b9f-387eb52ef539",
+            "day_of_week": 1,
+            "session_type": "lecture",
+            "note": null,
+            "starts_at": "11:00",
+            "ends_at": "12:30",
+            "course_code": "MATH204",
+            "course_title": "Linear Algebra",
+            "course_colour": "#0E9F6E",
+            "department": "Mathematics",
+            "room_id": "d9892020-2cf9-4f36-8d2f-8dc978bb83a4",
+            "room_code": "B110",
+            "room_name": "Science Lecture Hall",
+            "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+            "building_code": "B",
+            "building_name": "Brixner Building",
+            "floor_id": "420b5986-16bb-4794-96fe-d025a1b072fb",
+            "floor_name": "Ground floor",
+            "floor_level": 0,
+            "lecturer": "Prof. Lena Fischer",
+            "date": "2026-09-14",
+            "starts_at_iso": "2026-09-14T11:00:00",
+            "ends_at_iso": "2026-09-14T12:30:00",
+            "is_now": false,
+            "is_next": false,
+            "minutes_until": null
+          },
+          {
+            "id": "23b604a4-3c88-4eef-84d6-4535dad3567c",
+            "course_id": "27774b8d-60b3-4721-8263-8b4d141776b5",
+            "day_of_week": 2,
+            "session_type": "lecture",
+            "note": null,
+            "starts_at": "13:00",
+            "ends_at": "14:30",
+            "course_code": "CS310",
+            "course_title": "Database Systems",
+            "course_colour": "#7A3FE0",
+            "department": "Computer Science",
+            "room_id": null,
+            "room_code": null,
+            "room_name": null,
+            "building_id": null,
+            "building_code": null,
+            "building_name": null,
+            "floor_id": null,
+            "floor_name": null,
+            "floor_level": null,
+            "lecturer": "Dr Ravi Menon",
+            "date": "2026-09-15",
+            "starts_at_iso": "2026-09-15T13:00:00",
+            "ends_at_iso": "2026-09-15T14:30:00",
+            "is_now": false,
+            "is_next": false,
+            "minutes_until": null
+          },
+          {
+            "id": "9a2d4198-bae4-47ea-9689-5e4639c967e6",
+            "course_id": "fe2c4110-db17-45c7-ad7e-bfb5889e6bd3",
+            "day_of_week": 2,
+            "session_type": "lecture",
+            "note": null,
+            "starts_at": "15:00",
+            "ends_at": "16:30",
+            "course_code": "ENG150",
+            "course_title": "Technical Writing",
+            "course_colour": "#DB2777",
+            "department": "Languages",
+            "room_id": "e9d03f11-6f90-4135-a9b0-d66c2af79aba",
+            "room_code": "D-240",
+            "room_name": "Board Room",
+            "building_id": "9ab7fe21-2901-4d9b-a84f-aa20392d7400",
+            "building_code": "D",
+            "building_name": "Dunmore Administration",
+            "floor_id": "7edfd265-c2b4-4ec0-a74f-2bce7292e96c",
+            "floor_name": "First floor",
+            "floor_level": 1,
+            "lecturer": "Prof. Lena Fischer",
+            "date": "2026-09-15",
+            "starts_at_iso": "2026-09-15T15:00:00",
+            "ends_at_iso": "2026-09-15T16:30:00",
+            "is_now": false,
+            "is_next": false,
+            "minutes_until": null
+          },
+          {
+            "id": "f3e3290e-17dd-4768-a8df-5e02c01fbb32",
+            "course_id": "cf8f3f8b-58bf-474f-9b9f-387eb52ef539",
+            "day_of_week": 3,
+            "session_type": "tutorial",
+            "note": null,
+            "starts_at": "09:00",
+            "ends_at": "10:00",
+            "course_code": "MATH204",
+            "course_title": "Linear Algebra",
+            "course_colour": "#0E9F6E",
+            "department": "Mathematics",
+            "room_id": "b006a567-734f-4107-9998-18a0c148db54",
+            "room_code": "B212",
+            "room_name": "Tutorial Room",
+            "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+            "building_code": "B",
+            "building_name": "Brixner Building",
+            "floor_id": "28d5bf6b-d231-4b85-9bf3-16a6ab84af16",
+            "floor_name": "First floor",
+            "floor_level": 1,
+            "lecturer": "Prof. Lena Fischer",
+            "date": "2026-09-16",
+            "starts_at_iso": "2026-09-16T09:00:00",
+            "ends_at_iso": "2026-09-16T10:00:00",
+            "is_now": false,
+            "is_next": false,
+            "minutes_until": -308
+          },
+          {
+            "id": "f0f0867a-a803-43ec-9957-9211008d41aa",
+            "course_id": "c08380b9-b844-4c7a-96dc-5e57264961b6",
+            "day_of_week": 3,
+            "session_type": "lab",
+            "note": null,
+            "starts_at": "11:00",
+            "ends_at": "12:30",
+            "course_code": "CS201",
+            "course_title": "Data Structures & Algorithms",
+            "course_colour": "#2F4FE3",
+            "department": "Computer Science",
+            "room_id": "1e662e40-e9ca-4892-95a0-2d357fc380bf",
+            "room_code": "A201",
+            "room_name": "Computing Lab 1",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_id": "69395211-1869-4299-90c1-d451458eecb9",
+            "floor_name": "First floor",
+            "floor_level": 1,
+            "lecturer": "Dr Ravi Menon",
+            "date": "2026-09-16",
+            "starts_at_iso": "2026-09-16T11:00:00",
+            "ends_at_iso": "2026-09-16T12:30:00",
+            "is_now": false,
+            "is_next": false,
+            "minutes_until": -188
+          },
+          {
+            "id": "c7de07d5-0b1b-4657-9ad5-f0acbbb04ddc",
+            "course_id": "27774b8d-60b3-4721-8263-8b4d141776b5",
+            "day_of_week": 4,
+            "session_type": "lab",
+            "note": null,
+            "starts_at": "09:00",
+            "ends_at": "10:30",
+            "course_code": "CS310",
+            "course_title": "Database Systems",
+            "course_colour": "#7A3FE0",
+            "department": "Computer Science",
+            "room_id": "c9427acd-bdda-496d-bcd3-10cca4b05c15",
+            "room_code": "A204",
+            "room_name": "Software Studio",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_id": "69395211-1869-4299-90c1-d451458eecb9",
+            "floor_name": "First floor",
+            "floor_level": 1,
+            "lecturer": "Dr Ravi Menon",
+            "date": "2026-09-17",
+            "starts_at_iso": "2026-09-17T09:00:00",
+            "ends_at_iso": "2026-09-17T10:30:00",
+            "is_now": false,
+            "is_next": true,
+            "minutes_until": null
+          },
+          {
+            "id": "60b0cf14-6728-4d88-81e8-f522a103b9ee",
+            "course_id": "cf8f3f8b-58bf-474f-9b9f-387eb52ef539",
+            "day_of_week": 4,
+            "session_type": "lecture",
+            "note": null,
+            "starts_at": "11:00",
+            "ends_at": "12:30",
+            "course_code": "MATH204",
+            "course_title": "Linear Algebra",
+            "course_colour": "#0E9F6E",
+            "department": "Mathematics",
+            "room_id": "d9892020-2cf9-4f36-8d2f-8dc978bb83a4",
+            "room_code": "B110",
+            "room_name": "Science Lecture Hall",
+            "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+            "building_code": "B",
+            "building_name": "Brixner Building",
+            "floor_id": "420b5986-16bb-4794-96fe-d025a1b072fb",
+            "floor_name": "Ground floor",
+            "floor_level": 0,
+            "lecturer": "Prof. Lena Fischer",
+            "date": "2026-09-17",
+            "starts_at_iso": "2026-09-17T11:00:00",
+            "ends_at_iso": "2026-09-17T12:30:00",
+            "is_now": false,
+            "is_next": false,
+            "minutes_until": null
+          },
+          {
+            "id": "21cd248d-3cbb-40fa-a1b7-aa8f12cec38e",
+            "course_id": "1a328f84-d890-4f60-b229-6afa64cd5fe6",
+            "day_of_week": 4,
+            "session_type": "lecture",
+            "note": null,
+            "starts_at": "14:00",
+            "ends_at": "15:30",
+            "course_code": "CS340",
+            "course_title": "Mobile & Ubiquitous Computing",
+            "course_colour": "#1D9BF0",
+            "department": "Computer Science",
+            "room_id": "29abbbaa-64aa-4c3d-b684-0e76e1b8bd30",
+            "room_code": "A210",
+            "room_name": "Seminar Room 2",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_id": "69395211-1869-4299-90c1-d451458eecb9",
+            "floor_name": "First floor",
+            "floor_level": 1,
+            "lecturer": "Dr Ravi Menon",
+            "date": "2026-09-17",
+            "starts_at_iso": "2026-09-17T14:00:00",
+            "ends_at_iso": "2026-09-17T15:30:00",
+            "is_now": false,
+            "is_next": false,
+            "minutes_until": null
+          },
+          {
+            "id": "aeecffaf-9790-42cb-9bab-3ca86070cd96",
+            "course_id": "fe2c4110-db17-45c7-ad7e-bfb5889e6bd3",
+            "day_of_week": 4,
+            "session_type": "lecture",
+            "note": null,
+            "starts_at": "15:30",
+            "ends_at": "17:00",
+            "course_code": "ENG150",
+            "course_title": "Technical Writing",
+            "course_colour": "#DB2777",
+            "department": "Languages",
+            "room_id": "e9d03f11-6f90-4135-a9b0-d66c2af79aba",
+            "room_code": "D-240",
+            "room_name": "Board Room",
+            "building_id": "9ab7fe21-2901-4d9b-a84f-aa20392d7400",
+            "building_code": "D",
+            "building_name": "Dunmore Administration",
+            "floor_id": "7edfd265-c2b4-4ec0-a74f-2bce7292e96c",
+            "floor_name": "First floor",
+            "floor_level": 1,
+            "lecturer": "Prof. Lena Fischer",
+            "date": "2026-09-17",
+            "starts_at_iso": "2026-09-17T15:30:00",
+            "ends_at_iso": "2026-09-17T17:00:00",
+            "is_now": false,
+            "is_next": false,
+            "minutes_until": null
+          },
+          {
+            "id": "72578a59-8b1f-470a-a897-460c1c50181e",
+            "course_id": "1a328f84-d890-4f60-b229-6afa64cd5fe6",
+            "day_of_week": 5,
+            "session_type": "lab",
+            "note": null,
+            "starts_at": "10:00",
+            "ends_at": "11:30",
+            "course_code": "CS340",
+            "course_title": "Mobile & Ubiquitous Computing",
+            "course_colour": "#1D9BF0",
+            "department": "Computer Science",
+            "room_id": "91a84996-5085-40d4-86bb-4caac4d7374e",
+            "room_code": "A301",
+            "room_name": "Networks Lab",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_id": "d7820003-933b-42be-9db6-676fc3686431",
+            "floor_name": "Second floor",
+            "floor_level": 2,
+            "lecturer": "Dr Ravi Menon",
+            "date": "2026-09-18",
+            "starts_at_iso": "2026-09-18T10:00:00",
+            "ends_at_iso": "2026-09-18T11:30:00",
+            "is_now": false,
+            "is_next": false,
+            "minutes_until": null
+          }
+        ],
+        "today": [
+          {
+            "id": "f3e3290e-17dd-4768-a8df-5e02c01fbb32",
+            "course_id": "cf8f3f8b-58bf-474f-9b9f-387eb52ef539",
+            "day_of_week": 3,
+            "session_type": "tutorial",
+            "note": null,
+            "starts_at": "09:00",
+            "ends_at": "10:00",
+            "course_code": "MATH204",
+            "course_title": "Linear Algebra",
+            "course_colour": "#0E9F6E",
+            "department": "Mathematics",
+            "room_id": "b006a567-734f-4107-9998-18a0c148db54",
+            "room_code": "B212",
+            "room_name": "Tutorial Room",
+            "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+            "building_code": "B",
+            "building_name": "Brixner Building",
+            "floor_id": "28d5bf6b-d231-4b85-9bf3-16a6ab84af16",
+            "floor_name": "First floor",
+            "floor_level": 1,
+            "lecturer": "Prof. Lena Fischer",
+            "date": "2026-09-16",
+            "starts_at_iso": "2026-09-16T09:00:00",
+            "ends_at_iso": "2026-09-16T10:00:00",
+            "is_now": false,
+            "is_next": false,
+            "minutes_until": -308
+          },
+          {
+            "id": "f0f0867a-a803-43ec-9957-9211008d41aa",
+            "course_id": "c08380b9-b844-4c7a-96dc-5e57264961b6",
+            "day_of_week": 3,
+            "session_type": "lab",
+            "note": null,
+            "starts_at": "11:00",
+            "ends_at": "12:30",
+            "course_code": "CS201",
+            "course_title": "Data Structures & Algorithms",
+            "course_colour": "#2F4FE3",
+            "department": "Computer Science",
+            "room_id": "1e662e40-e9ca-4892-95a0-2d357fc380bf",
+            "room_code": "A201",
+            "room_name": "Computing Lab 1",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_id": "69395211-1869-4299-90c1-d451458eecb9",
+            "floor_name": "First floor",
+            "floor_level": 1,
+            "lecturer": "Dr Ravi Menon",
+            "date": "2026-09-16",
+            "starts_at_iso": "2026-09-16T11:00:00",
+            "ends_at_iso": "2026-09-16T12:30:00",
+            "is_now": false,
+            "is_next": false,
+            "minutes_until": -188
+          }
+        ],
+        "next": {
+          "id": "c7de07d5-0b1b-4657-9ad5-f0acbbb04ddc",
+          "course_id": "27774b8d-60b3-4721-8263-8b4d141776b5",
+          "day_of_week": 4,
+          "session_type": "lab",
+          "note": null,
+          "starts_at": "09:00",
+          "ends_at": "10:30",
+          "course_code": "CS310",
+          "course_title": "Database Systems",
+          "course_colour": "#7A3FE0",
+          "department": "Computer Science",
+          "room_id": "c9427acd-bdda-496d-bcd3-10cca4b05c15",
+          "room_code": "A204",
+          "room_name": "Software Studio",
+          "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+          "building_code": "A",
+          "building_name": "Halden Hall",
+          "floor_id": "69395211-1869-4299-90c1-d451458eecb9",
+          "floor_name": "First floor",
+          "floor_level": 1,
+          "lecturer": "Dr Ravi Menon",
+          "date": "2026-09-17",
+          "starts_at_iso": "2026-09-17T09:00:00",
+          "ends_at_iso": "2026-09-17T10:30:00",
+          "is_now": false,
+          "is_next": true,
+          "minutes_until": null
+        },
+        "days": [
+          {
+            "day_of_week": 1,
+            "date": "2026-09-14",
+            "entries": [
+              {
+                "id": "7617e999-8931-4cbc-8750-e02da4d29efc",
+                "course_id": "c08380b9-b844-4c7a-96dc-5e57264961b6",
+                "day_of_week": 1,
+                "session_type": "lecture",
+                "note": null,
+                "starts_at": "09:00",
+                "ends_at": "10:30",
+                "course_code": "CS201",
+                "course_title": "Data Structures & Algorithms",
+                "course_colour": "#2F4FE3",
+                "department": "Computer Science",
+                "room_id": "1d3c7f26-edce-4cb6-b236-f2abe0e54da6",
+                "room_code": "A101",
+                "room_name": "Lecture Theatre 1",
+                "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+                "building_code": "A",
+                "building_name": "Halden Hall",
+                "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+                "floor_name": "Ground floor",
+                "floor_level": 0,
+                "lecturer": "Dr Ravi Menon",
+                "date": "2026-09-14",
+                "starts_at_iso": "2026-09-14T09:00:00",
+                "ends_at_iso": "2026-09-14T10:30:00",
+                "is_now": false,
+                "is_next": false,
+                "minutes_until": null
+              },
+              {
+                "id": "3d432754-3644-48e7-9b63-1694ce2da254",
+                "course_id": "cf8f3f8b-58bf-474f-9b9f-387eb52ef539",
+                "day_of_week": 1,
+                "session_type": "lecture",
+                "note": null,
+                "starts_at": "11:00",
+                "ends_at": "12:30",
+                "course_code": "MATH204",
+                "course_title": "Linear Algebra",
+                "course_colour": "#0E9F6E",
+                "department": "Mathematics",
+                "room_id": "d9892020-2cf9-4f36-8d2f-8dc978bb83a4",
+                "room_code": "B110",
+                "room_name": "Science Lecture Hall",
+                "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+                "building_code": "B",
+                "building_name": "Brixner Building",
+                "floor_id": "420b5986-16bb-4794-96fe-d025a1b072fb",
+                "floor_name": "Ground floor",
+                "floor_level": 0,
+                "lecturer": "Prof. Lena Fischer",
+                "date": "2026-09-14",
+                "starts_at_iso": "2026-09-14T11:00:00",
+                "ends_at_iso": "2026-09-14T12:30:00",
+                "is_now": false,
+                "is_next": false,
+                "minutes_until": null
+              }
+            ]
+          },
+          {
+            "day_of_week": 2,
+            "date": "2026-09-15",
+            "entries": [
+              {
+                "id": "23b604a4-3c88-4eef-84d6-4535dad3567c",
+                "course_id": "27774b8d-60b3-4721-8263-8b4d141776b5",
+                "day_of_week": 2,
+                "session_type": "lecture",
+                "note": null,
+                "starts_at": "13:00",
+                "ends_at": "14:30",
+                "course_code": "CS310",
+                "course_title": "Database Systems",
+                "course_colour": "#7A3FE0",
+                "department": "Computer Science",
+                "room_id": null,
+                "room_code": null,
+                "room_name": null,
+                "building_id": null,
+                "building_code": null,
+                "building_name": null,
+                "floor_id": null,
+                "floor_name": null,
+                "floor_level": null,
+                "lecturer": "Dr Ravi Menon",
+                "date": "2026-09-15",
+                "starts_at_iso": "2026-09-15T13:00:00",
+                "ends_at_iso": "2026-09-15T14:30:00",
+                "is_now": false,
+                "is_next": false,
+                "minutes_until": null
+              },
+              {
+                "id": "9a2d4198-bae4-47ea-9689-5e4639c967e6",
+                "course_id": "fe2c4110-db17-45c7-ad7e-bfb5889e6bd3",
+                "day_of_week": 2,
+                "session_type": "lecture",
+                "note": null,
+                "starts_at": "15:00",
+                "ends_at": "16:30",
+                "course_code": "ENG150",
+                "course_title": "Technical Writing",
+                "course_colour": "#DB2777",
+                "department": "Languages",
+                "room_id": "e9d03f11-6f90-4135-a9b0-d66c2af79aba",
+                "room_code": "D-240",
+                "room_name": "Board Room",
+                "building_id": "9ab7fe21-2901-4d9b-a84f-aa20392d7400",
+                "building_code": "D",
+                "building_name": "Dunmore Administration",
+                "floor_id": "7edfd265-c2b4-4ec0-a74f-2bce7292e96c",
+                "floor_name": "First floor",
+                "floor_level": 1,
+                "lecturer": "Prof. Lena Fischer",
+                "date": "2026-09-15",
+                "starts_at_iso": "2026-09-15T15:00:00",
+                "ends_at_iso": "2026-09-15T16:30:00",
+                "is_now": false,
+                "is_next": false,
+                "minutes_until": null
+              }
+            ]
+          },
+          {
+            "day_of_week": 3,
+            "date": "2026-09-16",
+            "entries": [
+              {
+                "id": "f3e3290e-17dd-4768-a8df-5e02c01fbb32",
+                "course_id": "cf8f3f8b-58bf-474f-9b9f-387eb52ef539",
+                "day_of_week": 3,
+                "session_type": "tutorial",
+                "note": null,
+                "starts_at": "09:00",
+                "ends_at": "10:00",
+                "course_code": "MATH204",
+                "course_title": "Linear Algebra",
+                "course_colour": "#0E9F6E",
+                "department": "Mathematics",
+                "room_id": "b006a567-734f-4107-9998-18a0c148db54",
+                "room_code": "B212",
+                "room_name": "Tutorial Room",
+                "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+                "building_code": "B",
+                "building_name": "Brixner Building",
+                "floor_id": "28d5bf6b-d231-4b85-9bf3-16a6ab84af16",
+                "floor_name": "First floor",
+                "floor_level": 1,
+                "lecturer": "Prof. Lena Fischer",
+                "date": "2026-09-16",
+                "starts_at_iso": "2026-09-16T09:00:00",
+                "ends_at_iso": "2026-09-16T10:00:00",
+                "is_now": false,
+                "is_next": false,
+                "minutes_until": -308
+              },
+              {
+                "id": "f0f0867a-a803-43ec-9957-9211008d41aa",
+                "course_id": "c08380b9-b844-4c7a-96dc-5e57264961b6",
+                "day_of_week": 3,
+                "session_type": "lab",
+                "note": null,
+                "starts_at": "11:00",
+                "ends_at": "12:30",
+                "course_code": "CS201",
+                "course_title": "Data Structures & Algorithms",
+                "course_colour": "#2F4FE3",
+                "department": "Computer Science",
+                "room_id": "1e662e40-e9ca-4892-95a0-2d357fc380bf",
+                "room_code": "A201",
+                "room_name": "Computing Lab 1",
+                "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+                "building_code": "A",
+                "building_name": "Halden Hall",
+                "floor_id": "69395211-1869-4299-90c1-d451458eecb9",
+                "floor_name": "First floor",
+                "floor_level": 1,
+                "lecturer": "Dr Ravi Menon",
+                "date": "2026-09-16",
+                "starts_at_iso": "2026-09-16T11:00:00",
+                "ends_at_iso": "2026-09-16T12:30:00",
+                "is_now": false,
+                "is_next": false,
+                "minutes_until": -188
+              }
+            ]
+          },
+          {
+            "day_of_week": 4,
+            "date": "2026-09-17",
+            "entries": [
+              {
+                "id": "c7de07d5-0b1b-4657-9ad5-f0acbbb04ddc",
+                "course_id": "27774b8d-60b3-4721-8263-8b4d141776b5",
+                "day_of_week": 4,
+                "session_type": "lab",
+                "note": null,
+                "starts_at": "09:00",
+                "ends_at": "10:30",
+                "course_code": "CS310",
+                "course_title": "Database Systems",
+                "course_colour": "#7A3FE0",
+                "department": "Computer Science",
+                "room_id": "c9427acd-bdda-496d-bcd3-10cca4b05c15",
+                "room_code": "A204",
+                "room_name": "Software Studio",
+                "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+                "building_code": "A",
+                "building_name": "Halden Hall",
+                "floor_id": "69395211-1869-4299-90c1-d451458eecb9",
+                "floor_name": "First floor",
+                "floor_level": 1,
+                "lecturer": "Dr Ravi Menon",
+                "date": "2026-09-17",
+                "starts_at_iso": "2026-09-17T09:00:00",
+                "ends_at_iso": "2026-09-17T10:30:00",
+                "is_now": false,
+                "is_next": true,
+                "minutes_until": null
+              },
+              {
+                "id": "60b0cf14-6728-4d88-81e8-f522a103b9ee",
+                "course_id": "cf8f3f8b-58bf-474f-9b9f-387eb52ef539",
+                "day_of_week": 4,
+                "session_type": "lecture",
+                "note": null,
+                "starts_at": "11:00",
+                "ends_at": "12:30",
+                "course_code": "MATH204",
+                "course_title": "Linear Algebra",
+                "course_colour": "#0E9F6E",
+                "department": "Mathematics",
+                "room_id": "d9892020-2cf9-4f36-8d2f-8dc978bb83a4",
+                "room_code": "B110",
+                "room_name": "Science Lecture Hall",
+                "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+                "building_code": "B",
+                "building_name": "Brixner Building",
+                "floor_id": "420b5986-16bb-4794-96fe-d025a1b072fb",
+                "floor_name": "Ground floor",
+                "floor_level": 0,
+                "lecturer": "Prof. Lena Fischer",
+                "date": "2026-09-17",
+                "starts_at_iso": "2026-09-17T11:00:00",
+                "ends_at_iso": "2026-09-17T12:30:00",
+                "is_now": false,
+                "is_next": false,
+                "minutes_until": null
+              },
+              {
+                "id": "21cd248d-3cbb-40fa-a1b7-aa8f12cec38e",
+                "course_id": "1a328f84-d890-4f60-b229-6afa64cd5fe6",
+                "day_of_week": 4,
+                "session_type": "lecture",
+                "note": null,
+                "starts_at": "14:00",
+                "ends_at": "15:30",
+                "course_code": "CS340",
+                "course_title": "Mobile & Ubiquitous Computing",
+                "course_colour": "#1D9BF0",
+                "department": "Computer Science",
+                "room_id": "29abbbaa-64aa-4c3d-b684-0e76e1b8bd30",
+                "room_code": "A210",
+                "room_name": "Seminar Room 2",
+                "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+                "building_code": "A",
+                "building_name": "Halden Hall",
+                "floor_id": "69395211-1869-4299-90c1-d451458eecb9",
+                "floor_name": "First floor",
+                "floor_level": 1,
+                "lecturer": "Dr Ravi Menon",
+                "date": "2026-09-17",
+                "starts_at_iso": "2026-09-17T14:00:00",
+                "ends_at_iso": "2026-09-17T15:30:00",
+                "is_now": false,
+                "is_next": false,
+                "minutes_until": null
+              },
+              {
+                "id": "aeecffaf-9790-42cb-9bab-3ca86070cd96",
+                "course_id": "fe2c4110-db17-45c7-ad7e-bfb5889e6bd3",
+                "day_of_week": 4,
+                "session_type": "lecture",
+                "note": null,
+                "starts_at": "15:30",
+                "ends_at": "17:00",
+                "course_code": "ENG150",
+                "course_title": "Technical Writing",
+                "course_colour": "#DB2777",
+                "department": "Languages",
+                "room_id": "e9d03f11-6f90-4135-a9b0-d66c2af79aba",
+                "room_code": "D-240",
+                "room_name": "Board Room",
+                "building_id": "9ab7fe21-2901-4d9b-a84f-aa20392d7400",
+                "building_code": "D",
+                "building_name": "Dunmore Administration",
+                "floor_id": "7edfd265-c2b4-4ec0-a74f-2bce7292e96c",
+                "floor_name": "First floor",
+                "floor_level": 1,
+                "lecturer": "Prof. Lena Fischer",
+                "date": "2026-09-17",
+                "starts_at_iso": "2026-09-17T15:30:00",
+                "ends_at_iso": "2026-09-17T17:00:00",
+                "is_now": false,
+                "is_next": false,
+                "minutes_until": null
+              }
+            ]
+          },
+          {
+            "day_of_week": 5,
+            "date": "2026-09-18",
+            "entries": [
+              {
+                "id": "72578a59-8b1f-470a-a897-460c1c50181e",
+                "course_id": "1a328f84-d890-4f60-b229-6afa64cd5fe6",
+                "day_of_week": 5,
+                "session_type": "lab",
+                "note": null,
+                "starts_at": "10:00",
+                "ends_at": "11:30",
+                "course_code": "CS340",
+                "course_title": "Mobile & Ubiquitous Computing",
+                "course_colour": "#1D9BF0",
+                "department": "Computer Science",
+                "room_id": "91a84996-5085-40d4-86bb-4caac4d7374e",
+                "room_code": "A301",
+                "room_name": "Networks Lab",
+                "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+                "building_code": "A",
+                "building_name": "Halden Hall",
+                "floor_id": "d7820003-933b-42be-9db6-676fc3686431",
+                "floor_name": "Second floor",
+                "floor_level": 2,
+                "lecturer": "Dr Ravi Menon",
+                "date": "2026-09-18",
+                "starts_at_iso": "2026-09-18T10:00:00",
+                "ends_at_iso": "2026-09-18T11:30:00",
+                "is_now": false,
+                "is_next": false,
+                "minutes_until": null
+              }
+            ]
+          },
+          {
+            "day_of_week": 6,
+            "date": null,
+            "entries": []
+          },
+          {
+            "day_of_week": 7,
+            "date": null,
+            "entries": []
+          }
+        ]
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns enrolled course timetable entries",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-09",
+    "folder": "05 - Positioning & Navigation",
+    "name": "Calculate A* Navigation Route",
+    "method": "POST",
+    "path": "/navigation/route",
+    "reqBody": {
+      "from_node_id": "a5f08dea-64ad-46dc-8986-582599a29a50",
+      "to_room_code": "A101",
+      "accessible": false
+    },
+    "status": 200,
+    "duration": 21,
+    "size": 3877,
+    "response": {
+      "success": true,
+      "data": {
+        "route": {
+          "nodes": [
+            {
+              "id": "a5f08dea-64ad-46dc-8986-582599a29a50",
+              "code": "A-F0-C1",
+              "label": "Halden Hall Ground floor corridor 1",
+              "kind": "junction",
+              "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+              "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+              "floor_level": 0,
+              "floor_name": "Ground floor",
+              "building_code": "A",
+              "plan_x": 4,
+              "plan_y": 17,
+              "lat": null,
+              "lng": null,
+              "is_accessible": true
+            },
+            {
+              "id": "6c061393-1c2d-4d14-b048-7a32d0c170bd",
+              "code": "A-F0-C2",
+              "label": "Halden Hall Ground floor corridor 2",
+              "kind": "corridor",
+              "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+              "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+              "floor_level": 0,
+              "floor_name": "Ground floor",
+              "building_code": "A",
+              "plan_x": 14,
+              "plan_y": 17,
+              "lat": null,
+              "lng": null,
+              "is_accessible": true
+            },
+            {
+              "id": "9778d53a-62d1-47c6-93db-e8990cb8614e",
+              "code": "A101-DOOR",
+              "label": "Lecture Theatre 1 (A101) entrance",
+              "kind": "room",
+              "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+              "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+              "floor_level": 0,
+              "floor_name": "Ground floor",
+              "building_code": "A",
+              "plan_x": 16,
+              "plan_y": 18,
+              "lat": null,
+              "lng": null,
+              "is_accessible": true
+            }
+          ],
+          "legs": [
+            {
+              "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+              "floor_name": "Ground floor",
+              "floor_level": 0,
+              "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+              "building_code": "A",
+              "plan_geometry": [
+                [
+                  4,
+                  17
+                ],
+                [
+                  14,
+                  17
+                ],
+                [
+                  16,
+                  18
+                ]
+              ],
+              "geo_geometry": [
+                [
+                  52.24449728710025,
+                  4.450208685234073
+                ],
+                [
+                  52.24449728710025,
+                  4.450355398319257
+                ],
+                [
+                  52.244488303988504,
+                  4.450384740936293
+                ]
+              ],
+              "distance_m": 12.2
+            }
+          ],
+          "transitions": [],
+          "steps": [
+            {
+              "index": 1,
+              "instruction": "Head east for 10 m along Halden Hall Ground floor corridor 2",
+              "kind": "walk",
+              "distance_m": 10,
+              "node_id": "6c061393-1c2d-4d14-b048-7a32d0c170bd",
+              "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+              "floor_name": "Ground floor",
+              "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be"
+            },
+            {
+              "index": 2,
+              "instruction": "Arrive at Lecture Theatre 1 (A101)",
+              "kind": "arrive",
+              "distance_m": 0,
+              "node_id": "9778d53a-62d1-47c6-93db-e8990cb8614e",
+              "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+              "floor_name": "Ground floor",
+              "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be"
+            }
+          ],
+          "distance_m": 12,
+          "duration_seconds": 10,
+          "floors": [
+            {
+              "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+              "floor_name": "Ground floor",
+              "level": 0,
+              "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+              "building_code": "A"
+            }
+          ],
+          "requires_accessible": false,
+          "accessible": true,
+          "origin": {
+            "id": "a5f08dea-64ad-46dc-8986-582599a29a50",
+            "code": "A-F0-C1",
+            "label": "Halden Hall Ground floor corridor 1",
+            "kind": "junction",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+            "floor_level": 0,
+            "floor_name": "Ground floor",
+            "building_code": "A",
+            "plan_x": 4,
+            "plan_y": 17,
+            "lat": null,
+            "lng": null,
+            "is_accessible": true
+          },
+          "destination": {
+            "id": "9778d53a-62d1-47c6-93db-e8990cb8614e",
+            "code": "A101-DOOR",
+            "label": "Lecture Theatre 1 (A101) entrance",
+            "kind": "room",
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+            "floor_level": 0,
+            "floor_name": "Ground floor",
+            "building_code": "A",
+            "plan_x": 16,
+            "plan_y": 18,
+            "lat": null,
+            "lng": null,
+            "is_accessible": true
+          }
+        },
+        "destination_label": "Lecture Theatre 1 (A101)",
+        "origin": {
+          "id": "a5f08dea-64ad-46dc-8986-582599a29a50",
+          "code": "A-F0-C1",
+          "label": "Halden Hall Ground floor corridor 1",
+          "kind": "junction",
+          "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+          "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+          "floor_level": 0,
+          "floor_name": "Ground floor",
+          "building_code": "A",
+          "plan_x": 4,
+          "plan_y": 17,
+          "lat": null,
+          "lng": null,
+          "is_accessible": true
+        },
+        "destination": {
+          "id": "9778d53a-62d1-47c6-93db-e8990cb8614e",
+          "code": "A101-DOOR",
+          "label": "Lecture Theatre 1 (A101) entrance",
+          "kind": "room",
+          "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+          "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+          "floor_level": 0,
+          "floor_name": "Ground floor",
+          "building_code": "A",
+          "plan_x": 16,
+          "plan_y": 18,
+          "lat": null,
+          "lng": null,
+          "is_accessible": true
+        }
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Route object contains nodes and step instructions",
+        "passed": true
+      },
+      {
+        "name": "Has calculated distance and duration",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-10",
+    "folder": "06 - Room Admission Queues",
+    "name": "List Active Room Admission Queues",
+    "method": "GET",
+    "path": "/queues",
+    "reqBody": null,
+    "status": 200,
+    "duration": 5,
+    "size": 6627,
+    "response": {
+      "success": true,
+      "data": {
+        "queues": [
+          {
+            "id": "209ca767-ea97-47bb-b88b-058481a9ac4c",
+            "room_id": "6a9edc3f-22aa-4b5e-ba8c-41e7fa095bfc",
+            "is_active": true,
+            "max_size": 48,
+            "admission_capacity": 2,
+            "avg_service_seconds": 3600,
+            "proximity_radius_m": 120,
+            "requires_proximity_to_join": true,
+            "check_in_window_seconds": 300,
+            "grace_period_seconds": 180,
+            "opens_at": "08:00:00",
+            "closes_at": "20:00:00",
+            "notes": "Admission is granted in order of arrival.",
+            "room_code": "A104",
+            "room_name": "Robotics Workshop",
+            "room_capacity": 32,
+            "plan_x": 32,
+            "plan_y": 6,
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+            "floor_name": "Ground floor",
+            "floor_level": 0,
+            "waiting": 0,
+            "serving": 0,
+            "my_ticket_id": null
+          },
+          {
+            "id": "217664cc-537c-43a6-8115-56e31c04384f",
+            "room_id": "43fe59ee-81b6-4eb4-a5f9-990965380afd",
+            "is_active": true,
+            "max_size": 18,
+            "admission_capacity": 3,
+            "avg_service_seconds": 1800,
+            "proximity_radius_m": 120,
+            "requires_proximity_to_join": true,
+            "check_in_window_seconds": 300,
+            "grace_period_seconds": 180,
+            "opens_at": "08:00:00",
+            "closes_at": "20:00:00",
+            "notes": "Admission is granted in order of arrival.",
+            "room_code": "A112",
+            "room_name": "Student Project Room",
+            "room_capacity": 12,
+            "plan_x": 6,
+            "plan_y": 22,
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_id": "6b5aabcb-432f-49ba-9761-c53d4e4af715",
+            "floor_name": "Ground floor",
+            "floor_level": 0,
+            "waiting": 0,
+            "serving": 0,
+            "my_ticket_id": null
+          },
+          {
+            "id": "fe2f2fbe-7614-4fc0-822a-1cced1cd659c",
+            "room_id": "c9427acd-bdda-496d-bcd3-10cca4b05c15",
+            "is_active": true,
+            "max_size": 42,
+            "admission_capacity": 2,
+            "avg_service_seconds": 3600,
+            "proximity_radius_m": 120,
+            "requires_proximity_to_join": true,
+            "check_in_window_seconds": 300,
+            "grace_period_seconds": 180,
+            "opens_at": "08:00:00",
+            "closes_at": "20:00:00",
+            "notes": "Admission is granted in order of arrival.",
+            "room_code": "A204",
+            "room_name": "Software Studio",
+            "room_capacity": 28,
+            "plan_x": 30,
+            "plan_y": 6,
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_id": "69395211-1869-4299-90c1-d451458eecb9",
+            "floor_name": "First floor",
+            "floor_level": 1,
+            "waiting": 0,
+            "serving": 0,
+            "my_ticket_id": null
+          },
+          {
+            "id": "4f03e9cf-d78b-42ec-b9e4-7aef475da160",
+            "room_id": "d97cf006-a0d6-432f-ab01-0f02dcb79139",
+            "is_active": true,
+            "max_size": 24,
+            "admission_capacity": 3,
+            "avg_service_seconds": 1800,
+            "proximity_radius_m": 120,
+            "requires_proximity_to_join": true,
+            "check_in_window_seconds": 300,
+            "grace_period_seconds": 180,
+            "opens_at": "08:00:00",
+            "closes_at": "20:00:00",
+            "notes": "Admission is granted in order of arrival.",
+            "room_code": "A312",
+            "room_name": "Quiet Study",
+            "room_capacity": 16,
+            "plan_x": 10,
+            "plan_y": 22,
+            "building_id": "78dbb89c-531e-45b7-8079-3c1af76605be",
+            "building_code": "A",
+            "building_name": "Halden Hall",
+            "floor_id": "d7820003-933b-42be-9db6-676fc3686431",
+            "floor_name": "Second floor",
+            "floor_level": 2,
+            "waiting": 0,
+            "serving": 0,
+            "my_ticket_id": null
+          },
+          {
+            "id": "57922dcd-9761-4f7b-a363-7b35f3aaa99c",
+            "room_id": "3d0131ae-c802-40e5-8a44-55c87d9c16f2",
+            "is_active": true,
+            "max_size": 23,
+            "admission_capacity": 3,
+            "avg_service_seconds": 1800,
+            "proximity_radius_m": 120,
+            "requires_proximity_to_join": true,
+            "check_in_window_seconds": 300,
+            "grace_period_seconds": 180,
+            "opens_at": "08:00:00",
+            "closes_at": "20:00:00",
+            "notes": "Admission is granted in order of arrival.",
+            "room_code": "B204",
+            "room_name": "Group Study Room",
+            "room_capacity": 15,
+            "plan_x": 26,
+            "plan_y": 6,
+            "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+            "building_code": "B",
+            "building_name": "Brixner Building",
+            "floor_id": "28d5bf6b-d231-4b85-9bf3-16a6ab84af16",
+            "floor_name": "First floor",
+            "floor_level": 1,
+            "waiting": 1,
+            "serving": 0,
+            "my_ticket_id": null
+          },
+          {
+            "id": "1aa22b51-a514-4df0-9129-b4b741d05485",
+            "room_id": "189e9f46-7ec7-406f-a1b1-9f05a3411464",
+            "is_active": true,
+            "max_size": 27,
+            "admission_capacity": 2,
+            "avg_service_seconds": 2400,
+            "proximity_radius_m": 120,
+            "requires_proximity_to_join": true,
+            "check_in_window_seconds": 300,
+            "grace_period_seconds": 180,
+            "opens_at": "08:00:00",
+            "closes_at": "20:00:00",
+            "notes": "Admission is granted in order of arrival.",
+            "room_code": "B208",
+            "room_name": "Microscopy Suite",
+            "room_capacity": 18,
+            "plan_x": 6,
+            "plan_y": 20,
+            "building_id": "c08656a2-dd23-4e01-b091-7107577f3819",
+            "building_code": "B",
+            "building_name": "Brixner Building",
+            "floor_id": "28d5bf6b-d231-4b85-9bf3-16a6ab84af16",
+            "floor_name": "First floor",
+            "floor_level": 1,
+            "waiting": 0,
+            "serving": 0,
+            "my_ticket_id": null
+          },
+          {
+            "id": "92c5154d-79f5-4a65-a142-f672a7dd28bc",
+            "room_id": "e1df8dbe-2b55-420e-95ae-ccc3d9af8bb3",
+            "is_active": true,
+            "max_size": 12,
+            "admission_capacity": 3,
+            "avg_service_seconds": 1800,
+            "proximity_radius_m": 120,
+            "requires_proximity_to_join": true,
+            "check_in_window_seconds": 300,
+            "grace_period_seconds": 180,
+            "opens_at": "08:00:00",
+            "closes_at": "20:00:00",
+            "notes": "Study pods require you to be in the building when you join.",
+            "room_code": "C112",
+            "room_name": "Group Pod 1",
+            "room_capacity": 8,
+            "plan_x": 6,
+            "plan_y": 22,
+            "building_id": "b551f50e-ac1c-47d1-a6b7-e7ef0ab4c2a2",
+            "building_code": "C",
+            "building_name": "Caven Library & Study Centre",
+            "floor_id": "73893164-4830-40ae-a89f-bbd20d8e6dcb",
+            "floor_name": "Ground floor",
+            "floor_level": 0,
+            "waiting": 1,
+            "serving": 0,
+            "my_ticket_id": null
+          },
+          {
+            "id": "80457460-3c2c-4ef7-a3d5-5ce225448324",
+            "room_id": "68fe77b2-c4d3-4ce2-ac02-e4f115486a95",
+            "is_active": true,
+            "max_size": 15,
+            "admission_capacity": 3,
+            "avg_service_seconds": 1800,
+            "proximity_radius_m": 120,
+            "requires_proximity_to_join": true,
+            "check_in_window_seconds": 300,
+            "grace_period_seconds": 180,
+            "opens_at": "08:00:00",
+            "closes_at": "20:00:00",
+            "notes": "Study pods require you to be in the building when you join.",
+            "room_code": "C205",
+            "room_name": "Group Pod 2",
+            "room_capacity": 10,
+            "plan_x": 30,
+            "plan_y": 6,
+            "building_id": "b551f50e-ac1c-47d1-a6b7-e7ef0ab4c2a2",
+            "building_code": "C",
+            "building_name": "Caven Library & Study Centre",
+            "floor_id": "de66b604-d958-4010-b86d-81d3ef6ad88c",
+            "floor_name": "Study level",
+            "floor_level": 1,
+            "waiting": 0,
+            "serving": 0,
+            "my_ticket_id": null
+          },
+          {
+            "id": "01327375-7069-40d2-91ad-d7bb9c4df369",
+            "room_id": "0e4bf522-157c-44bf-9f89-d87096f1b9e6",
+            "is_active": true,
+            "max_size": 12,
+            "admission_capacity": 3,
+            "avg_service_seconds": 1800,
+            "proximity_radius_m": 120,
+            "requires_proximity_to_join": true,
+            "check_in_window_seconds": 300,
+            "grace_period_seconds": 180,
+            "opens_at": "08:00:00",
+            "closes_at": "20:00:00",
+            "notes": "Study pods require you to be in the building when you join.",
+            "room_code": "C210",
+            "room_name": "Media Booth",
+            "room_capacity": 6,
+            "plan_x": 6,
+            "plan_y": 20,
+            "building_id": "b551f50e-ac1c-47d1-a6b7-e7ef0ab4c2a2",
+            "building_code": "C",
+            "building_name": "Caven Library & Study Centre",
+            "floor_id": "de66b604-d958-4010-b86d-81d3ef6ad88c",
+            "floor_name": "Study level",
+            "floor_level": 1,
+            "waiting": 0,
+            "serving": 0,
+            "my_ticket_id": null
+          }
+        ]
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns queues array",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-11",
+    "folder": "07 - Office Ticketing",
+    "name": "List Administrative Offices",
+    "method": "GET",
+    "path": "/offices",
+    "reqBody": null,
+    "status": 200,
+    "duration": 33,
+    "size": 6798,
+    "response": {
+      "success": true,
+      "data": {
+        "offices": [
+          {
+            "id": "c8dfac39-d6b5-46a9-95d2-072c97edaf30",
+            "code": "DEAN",
+            "name": "Dean's Office",
+            "description": "Dean's Office — appointments, documents and student support.",
+            "building_id": "9ab7fe21-2901-4d9b-a84f-aa20392d7400",
+            "floor_id": "7edfd265-c2b4-4ec0-a74f-2bce7292e96c",
+            "room_id": "4fb45011-cb3f-48db-bfca-644246954ab7",
+            "ticket_prefix": "D",
+            "service_duration_minutes": 15,
+            "concurrent_capacity": 1,
+            "daily_capacity": 10,
+            "check_in_radius_m": 45,
+            "grace_period_seconds": 420,
+            "requires_proximity_to_request": true,
+            "requires_appointment": false,
+            "contact_email": "dean@campusflow.dev",
+            "contact_phone": null,
+            "is_active": true,
+            "created_at": "2026-09-16T14:05:57.544Z",
+            "updated_at": "2026-09-16T14:05:57.544Z",
+            "building_code": "D",
+            "building_name": "Dunmore Administration",
+            "floor_name": "First floor",
+            "floor_level": 1,
+            "room_code": "D-230",
+            "room_name": "Dean's Office",
+            "room_lat": 52.24381,
+            "room_lng": 4.449755,
+            "room_plan_x": 8,
+            "room_plan_y": 6,
+            "waiting": 0,
+            "in_service": 0,
+            "next_slot": null,
+            "is_open_now": false,
+            "opens_at": null,
+            "closes_at": null,
+            "next_opening": null,
+            "average_service_minutes": 15,
+            "estimated_wait_minutes": 0,
+            "next_ticket_number": "D-001",
+            "today_windows": [
+              {
+                "id": "0aea3748-f94f-44aa-a022-694449bf373d",
+                "office_id": "c8dfac39-d6b5-46a9-95d2-072c97edaf30",
+                "day_of_week": 3,
+                "opens_at": "08:30",
+                "closes_at": "12:30",
+                "capacity": 10,
+                "avg_service_minutes": 15,
+                "is_active": true
+              }
+            ]
+          },
+          {
+            "id": "e070b872-ad4a-43d6-8c5d-cceed5cc0086",
+            "code": "PRINCIPAL",
+            "name": "Principal's Office",
+            "description": "Principal's Office — appointments, documents and student support.",
+            "building_id": "9ab7fe21-2901-4d9b-a84f-aa20392d7400",
+            "floor_id": "868fcdd5-63fe-4f2c-9084-a964b5699f9e",
+            "room_id": "665be250-2735-4012-a0dc-62f5d2301dbb",
+            "ticket_prefix": "P",
+            "service_duration_minutes": 12,
+            "concurrent_capacity": 1,
+            "daily_capacity": 12,
+            "check_in_radius_m": 45,
+            "grace_period_seconds": 300,
+            "requires_proximity_to_request": true,
+            "requires_appointment": false,
+            "contact_email": "principal@campusflow.dev",
+            "contact_phone": null,
+            "is_active": true,
+            "created_at": "2026-09-16T14:05:57.527Z",
+            "updated_at": "2026-09-16T14:05:57.527Z",
+            "building_code": "D",
+            "building_name": "Dunmore Administration",
+            "floor_name": "Ground floor",
+            "floor_level": 0,
+            "room_code": "D-101",
+            "room_name": "Principal's Office",
+            "room_lat": 52.243819,
+            "room_lng": 4.449726,
+            "room_plan_x": 6,
+            "room_plan_y": 5,
+            "waiting": 0,
+            "in_service": 0,
+            "next_slot": null,
+            "is_open_now": false,
+            "opens_at": null,
+            "closes_at": null,
+            "next_opening": null,
+            "average_service_minutes": 12,
+            "estimated_wait_minutes": 0,
+            "next_ticket_number": "P-001",
+            "today_windows": [
+              {
+                "id": "5590e63c-8191-4991-98d0-e815d6a9495a",
+                "office_id": "e070b872-ad4a-43d6-8c5d-cceed5cc0086",
+                "day_of_week": 3,
+                "opens_at": "08:30",
+                "closes_at": "12:30",
+                "capacity": 12,
+                "avg_service_minutes": 12,
+                "is_active": true
+              }
+            ]
+          },
+          {
+            "id": "5ced94c8-e0da-43ed-891c-690f8ee78349",
+            "code": "REGISTRAR",
+            "name": "Registrar",
+            "description": "Registrar — appointments, documents and student support.",
+            "building_id": "9ab7fe21-2901-4d9b-a84f-aa20392d7400",
+            "floor_id": "868fcdd5-63fe-4f2c-9084-a964b5699f9e",
+            "room_id": "b9566f50-adb4-444f-8073-17aa5ef083a6",
+            "ticket_prefix": "R",
+            "service_duration_minutes": 9,
+            "concurrent_capacity": 2,
+            "daily_capacity": 80,
+            "check_in_radius_m": 60,
+            "grace_period_seconds": 300,
+            "requires_proximity_to_request": false,
+            "requires_appointment": false,
+            "contact_email": "registrar@campusflow.dev",
+            "contact_phone": null,
+            "is_active": true,
+            "created_at": "2026-09-16T14:05:57.550Z",
+            "updated_at": "2026-09-16T14:05:57.550Z",
+            "building_code": "D",
+            "building_name": "Dunmore Administration",
+            "floor_name": "Ground floor",
+            "floor_level": 0,
+            "room_code": "D-118",
+            "room_name": "Registrar",
+            "room_lat": 52.243711,
+            "room_lng": 4.44999,
+            "room_plan_x": 24,
+            "room_plan_y": 17,
+            "waiting": 0,
+            "in_service": 0,
+            "next_slot": null,
+            "is_open_now": false,
+            "opens_at": null,
+            "closes_at": null,
+            "next_opening": null,
+            "average_service_minutes": 9,
+            "estimated_wait_minutes": 0,
+            "next_ticket_number": "R-001",
+            "today_windows": [
+              {
+                "id": "75ee59f1-1d79-4261-a898-8bd460d0ec45",
+                "office_id": "5ced94c8-e0da-43ed-891c-690f8ee78349",
+                "day_of_week": 3,
+                "opens_at": "08:30",
+                "closes_at": "12:30",
+                "capacity": 80,
+                "avg_service_minutes": 9,
+                "is_active": true
+              }
+            ]
+          },
+          {
+            "id": "20f993ca-bc2f-4053-98ba-a6025eb9384a",
+            "code": "SECRETARY",
+            "name": "Secretary's Office",
+            "description": "Secretary's Office — appointments, documents and student support.",
+            "building_id": "9ab7fe21-2901-4d9b-a84f-aa20392d7400",
+            "floor_id": "868fcdd5-63fe-4f2c-9084-a964b5699f9e",
+            "room_id": "ce31907d-4f45-47ff-9c97-4c60b7c80644",
+            "ticket_prefix": "S",
+            "service_duration_minutes": 8,
+            "concurrent_capacity": 2,
+            "daily_capacity": 40,
+            "check_in_radius_m": 45,
+            "grace_period_seconds": 240,
+            "requires_proximity_to_request": false,
+            "requires_appointment": false,
+            "contact_email": "secretary@campusflow.dev",
+            "contact_phone": null,
+            "is_active": true,
+            "created_at": "2026-09-16T14:05:57.535Z",
+            "updated_at": "2026-09-16T14:05:57.535Z",
+            "building_code": "D",
+            "building_name": "Dunmore Administration",
+            "floor_name": "Ground floor",
+            "floor_level": 0,
+            "room_code": "D-102",
+            "room_name": "Secretary's Office",
+            "room_lat": 52.243819,
+            "room_lng": 4.449917,
+            "room_plan_x": 20,
+            "room_plan_y": 5,
+            "waiting": 0,
+            "in_service": 0,
+            "next_slot": null,
+            "is_open_now": false,
+            "opens_at": null,
+            "closes_at": null,
+            "next_opening": null,
+            "average_service_minutes": 8,
+            "estimated_wait_minutes": 0,
+            "next_ticket_number": "S-001",
+            "today_windows": [
+              {
+                "id": "ee57900d-651b-4afd-87f9-05e1b25e4e01",
+                "office_id": "20f993ca-bc2f-4053-98ba-a6025eb9384a",
+                "day_of_week": 3,
+                "opens_at": "08:30",
+                "closes_at": "12:30",
+                "capacity": 40,
+                "avg_service_minutes": 8,
+                "is_active": true
+              }
+            ]
+          },
+          {
+            "id": "2ef5dec9-2023-49ab-b31e-fae89db51250",
+            "code": "AFFAIRS",
+            "name": "Student Affairs Office",
+            "description": "Student Affairs Office — appointments, documents and student support.",
+            "building_id": "9ab7fe21-2901-4d9b-a84f-aa20392d7400",
+            "floor_id": "868fcdd5-63fe-4f2c-9084-a964b5699f9e",
+            "room_id": "ebb72ee7-babd-4818-b6b6-41b11e5dcd1e",
+            "ticket_prefix": "SA",
+            "service_duration_minutes": 10,
+            "concurrent_capacity": 3,
+            "daily_capacity": 60,
+            "check_in_radius_m": 60,
+            "grace_period_seconds": 300,
+            "requires_proximity_to_request": false,
+            "requires_appointment": false,
+            "contact_email": "affairs@campusflow.dev",
+            "contact_phone": null,
+            "is_active": true,
+            "created_at": "2026-09-16T14:05:57.539Z",
+            "updated_at": "2026-09-16T14:05:57.539Z",
+            "building_code": "D",
+            "building_name": "Dunmore Administration",
+            "floor_name": "Ground floor",
+            "floor_level": 0,
+            "room_code": "D-110",
+            "room_name": "Student Affairs",
+            "room_lat": 52.243711,
+            "room_lng": 4.449741,
+            "room_plan_x": 6,
+            "room_plan_y": 17,
+            "waiting": 1,
+            "in_service": 0,
+            "next_slot": null,
+            "is_open_now": false,
+            "opens_at": null,
+            "closes_at": null,
+            "next_opening": null,
+            "average_service_minutes": 10,
+            "estimated_wait_minutes": 4,
+            "next_ticket_number": "SA-001",
+            "today_windows": [
+              {
+                "id": "fa3ec7a6-d475-416c-a0c0-0755d93c290f",
+                "office_id": "2ef5dec9-2023-49ab-b31e-fae89db51250",
+                "day_of_week": 3,
+                "opens_at": "08:30",
+                "closes_at": "12:30",
+                "capacity": 60,
+                "avg_service_minutes": 10,
+                "is_active": true
+              }
+            ]
+          }
+        ],
+        "my_ticket": null
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns administrative offices array",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-12",
+    "folder": "08 - Campus Engagement",
+    "name": "List Published Events",
+    "method": "GET",
+    "path": "/events",
+    "reqBody": null,
+    "status": 200,
+    "duration": 6,
+    "size": 2831,
+    "response": {
+      "success": true,
+      "data": {
+        "items": [
+          {
+            "id": "4c46f835-6d6b-42ca-90ab-d39f111549b8",
+            "title": "Study Skills Workshop",
+            "description": "Evidence-based techniques for exam preparation.",
+            "category": "academic",
+            "starts_at": "2026-09-17T16:05:57.924Z",
+            "ends_at": "2026-09-17T18:05:57.924Z",
+            "venue": "Caven Library, Group Pod 1",
+            "building_id": "b551f50e-ac1c-47d1-a6b7-e7ef0ab4c2a2",
+            "room_id": "e1df8dbe-2b55-420e-95ae-ccc3d9af8bb3",
+            "capacity": 30,
+            "registration_required": true,
+            "organiser_id": "8f98201f-4f60-4795-88a8-2ee90149547e",
+            "status": "published",
+            "created_at": "2026-09-16T14:05:57.924Z",
+            "updated_at": "2026-09-16T14:05:57.924Z",
+            "building_code": "C",
+            "building_name": "Caven Library & Study Centre",
+            "room_code": "C112",
+            "organiser_name": "Marcus Bell",
+            "registrations": 0
+          },
+          {
+            "id": "d7f3a7b8-4ea3-43fb-8e73-cdb7613b267b",
+            "title": "Wellbeing Drop-in",
+            "description": "No appointment needed — talk to a student counsellor.",
+            "category": "wellbeing",
+            "starts_at": "2026-09-18T15:05:57.924Z",
+            "ends_at": "2026-09-18T18:05:57.924Z",
+            "venue": "Dunmore Administration, D-110",
+            "building_id": "af1158bb-af94-4a0f-a5c2-76e8d4718f03",
+            "room_id": null,
+            "capacity": 40,
+            "registration_required": false,
+            "organiser_id": "8f98201f-4f60-4795-88a8-2ee90149547e",
+            "status": "published",
+            "created_at": "2026-09-16T14:05:57.924Z",
+            "updated_at": "2026-09-16T14:05:57.924Z",
+            "building_code": "E",
+            "building_name": "Ellsworth Student Union",
+            "room_code": null,
+            "organiser_name": "Marcus Bell",
+            "registrations": 0
+          },
+          {
+            "id": "1f9e36d1-4856-41b6-bdfe-6dbd6b952bae",
+            "title": "Campus Career Fair",
+            "description": "Meet 24 employers from the region, bring your CV.",
+            "category": "career",
+            "starts_at": "2026-09-19T18:05:57.924Z",
+            "ends_at": "2026-09-19T23:05:57.924Z",
+            "venue": "Ellsworth Student Union, Event Hall",
+            "building_id": "af1158bb-af94-4a0f-a5c2-76e8d4718f03",
+            "room_id": "6a177d00-0d81-42e4-843f-ad562546a251",
+            "capacity": 150,
+            "registration_required": true,
+            "organiser_id": "a6306ef7-c2cc-4a59-90f5-2d7aedfba0c0",
+            "status": "published",
+            "created_at": "2026-09-16T14:05:57.924Z",
+            "updated_at": "2026-09-16T14:05:57.924Z",
+            "building_code": "E",
+            "building_name": "Ellsworth Student Union",
+            "room_code": "E120",
+            "organiser_name": "Amara Osei",
+            "registrations": 0
+          },
+          {
+            "id": "3f6460aa-2918-43ca-8066-16d8d22643c1",
+            "title": "Interfaculty Football",
+            "description": "Staff vs students friendly match on the north field.",
+            "category": "sport",
+            "starts_at": "2026-09-21T19:05:57.924Z",
+            "ends_at": "2026-09-21T21:05:57.924Z",
+            "venue": "North Field",
+            "building_id": null,
+            "room_id": null,
+            "capacity": null,
+            "registration_required": false,
+            "organiser_id": "8f98201f-4f60-4795-88a8-2ee90149547e",
+            "status": "published",
+            "created_at": "2026-09-16T14:05:57.924Z",
+            "updated_at": "2026-09-16T14:05:57.924Z",
+            "building_code": null,
+            "building_name": null,
+            "room_code": null,
+            "organiser_name": "Marcus Bell",
+            "registrations": 0
+          }
+        ],
+        "meta": {
+          "page": 1,
+          "per_page": 12,
+          "total": 4,
+          "total_pages": 1
+        },
+        "registered_event_ids": []
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns published campus events array",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-13",
+    "folder": "08 - Campus Engagement",
+    "name": "List Campus Announcements",
+    "method": "GET",
+    "path": "/announcements",
+    "reqBody": null,
+    "status": 200,
+    "duration": 5,
+    "size": 1472,
+    "response": {
+      "success": true,
+      "data": {
+        "items": [
+          {
+            "id": "24e7f73b-5d5b-46f0-9629-efed89c3d19e",
+            "title": "Course registration closes Friday",
+            "body": "Add or drop courses before 17:00 on Friday. The registrar handles exceptions in person.",
+            "priority": "urgent",
+            "is_pinned": true,
+            "published_at": "2026-09-16T11:05:57.928Z",
+            "expires_at": null,
+            "building_code": "D",
+            "author_name": "Marcus Bell"
+          },
+          {
+            "id": "98da8266-2de8-4cd4-a559-c675895abc27",
+            "title": "Library extends opening hours during exams",
+            "body": "Caven Library is open until 23:00 from Monday. Group pods can be reserved through CampusFlow.",
+            "priority": "normal",
+            "is_pinned": true,
+            "published_at": "2026-09-15T14:05:57.928Z",
+            "expires_at": null,
+            "building_code": "C",
+            "author_name": "Amara Osei"
+          },
+          {
+            "id": "ff845851-8d75-4338-b0f8-0a64fd265cb6",
+            "title": "Lift maintenance in Halden Hall",
+            "body": "The Halden Hall lift is being serviced on Friday between 08:00 and 12:00. Accessible routes via Brixner are available.",
+            "priority": "high",
+            "is_pinned": false,
+            "published_at": "2026-09-16T09:05:57.928Z",
+            "expires_at": null,
+            "building_code": "A",
+            "author_name": "Amara Osei"
+          },
+          {
+            "id": "be5540c8-56e9-4971-869c-cd90ad26ef1f",
+            "title": "New queue rules for study pods",
+            "body": "Study pods now require you to be inside the building when you join the queue. This reduces no-shows.",
+            "priority": "normal",
+            "is_pinned": false,
+            "published_at": "2026-09-14T14:05:57.928Z",
+            "expires_at": null,
+            "building_code": "C",
+            "author_name": "Amara Osei"
+          }
+        ],
+        "meta": {
+          "page": 1,
+          "per_page": 12,
+          "total": 4,
+          "total_pages": 1
+        }
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns targeted announcements array",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-14",
+    "folder": "09 - AI Assistant",
+    "name": "Submit AI Assistant Message",
+    "method": "POST",
+    "path": "/ai/messages",
+    "reqBody": {
+      "message": "Where is Halden Hall?"
+    },
+    "status": 200,
+    "duration": 6,
+    "size": 471,
+    "response": {
+      "success": true,
+      "data": {
+        "conversation_id": "cc99004c-c467-4f83-8850-f462d46d519e",
+        "provider": "deterministic",
+        "model": null,
+        "intent": "UNKNOWN",
+        "message": {
+          "id": "16c78278-1233-4dc9-97a0-2da100cc1e65",
+          "role": "assistant",
+          "content": "I can help with your timetable, room availability, queues, office tickets, campus navigation, events and announcements. What would you like to do?",
+          "data": null,
+          "actions": [],
+          "tool_calls": [],
+          "created_at": "2026-09-16T14:08:31.698Z"
+        },
+        "latency_ms": 4
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns intent and AI response content",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  {
+    "id": "PM-15",
+    "folder": "10 - Admin Operations",
+    "name": "Fetch Admin Analytics Dashboard",
+    "method": "GET",
+    "path": "/admin/analytics",
+    "reqBody": null,
+    "status": 200,
+    "duration": 26,
+    "size": 3045,
+    "response": {
+      "success": true,
+      "data": {
+        "generated_at": "2026-09-16T14:08:31.726Z",
+        "users": {
+          "students": 6,
+          "staff": 6,
+          "admins": 1,
+          "total": 13,
+          "active_7d": 13
+        },
+        "campus": {
+          "buildings": 5,
+          "floors": 10,
+          "rooms": 30,
+          "total_capacity": 1273,
+          "qr_nodes": 29,
+          "navigation_nodes": 103,
+          "navigation_edges": 106
+        },
+        "queues": {
+          "configured": 9,
+          "active": 9,
+          "waiting_now": 2,
+          "issued_today": 11,
+          "issued_7d": 200,
+          "called_today": 9,
+          "average_wait_minutes": 16.4,
+          "average_service_minutes": 17,
+          "no_show_rate_7d": 19.2,
+          "busiest_rooms": [
+            {
+              "room_id": "e1df8dbe-2b55-420e-95ae-ccc3d9af8bb3",
+              "room_code": "C112",
+              "room_name": "Group Pod 1",
+              "building_code": "C",
+              "tickets": 23
+            },
+            {
+              "room_id": "3d0131ae-c802-40e5-8a44-55c87d9c16f2",
+              "room_code": "B204",
+              "room_name": "Group Study Room",
+              "building_code": "B",
+              "tickets": 23
+            },
+            {
+              "room_id": "43fe59ee-81b6-4eb4-a5f9-990965380afd",
+              "room_code": "A112",
+              "room_name": "Student Project Room",
+              "building_code": "A",
+              "tickets": 22
+            },
+            {
+              "room_id": "c9427acd-bdda-496d-bcd3-10cca4b05c15",
+              "room_code": "A204",
+              "room_name": "Software Studio",
+              "building_code": "A",
+              "tickets": 22
+            },
+            {
+              "room_id": "189e9f46-7ec7-406f-a1b1-9f05a3411464",
+              "room_code": "B208",
+              "room_name": "Microscopy Suite",
+              "building_code": "B",
+              "tickets": 22
+            },
+            {
+              "room_id": "d97cf006-a0d6-432f-ab01-0f02dcb79139",
+              "room_code": "A312",
+              "room_name": "Quiet Study",
+              "building_code": "A",
+              "tickets": 22
+            }
+          ],
+          "hourly_volume": [
+            {
+              "hour": "00:00",
+              "tickets": 63
+            },
+            {
+              "hour": "02:00",
+              "tickets": 45
+            },
+            {
+              "hour": "04:00",
+              "tickets": 27
+            },
+            {
+              "hour": "13:00",
+              "tickets": 1
+            },
+            {
+              "hour": "14:00",
+              "tickets": 1
+            },
+            {
+              "hour": "22:00",
+              "tickets": 63
+            }
+          ]
+        },
+        "offices": {
+          "configured": 5,
+          "open_now": 5,
+          "issued_today": 20,
+          "completed_today": 15,
+          "waiting_now": 1,
+          "average_service_minutes": 9.9,
+          "average_wait_minutes": 20.6,
+          "no_show_rate_7d": 18.3,
+          "busiest": [
+            {
+              "office_id": "20f993ca-bc2f-4053-98ba-a6025eb9384a",
+              "name": "Secretary's Office",
+              "tickets": 40,
+              "completed": 29,
+              "avg_service_minutes": 8
+            },
+            {
+              "office_id": "2ef5dec9-2023-49ab-b31e-fae89db51250",
+              "name": "Student Affairs Office",
+              "tickets": 36,
+              "completed": 32,
+              "avg_service_minutes": 9.5
+            },
+            {
+              "office_id": "5ced94c8-e0da-43ed-891c-690f8ee78349",
+              "name": "Registrar",
+              "tickets": 31,
+              "completed": 23,
+              "avg_service_minutes": 8.7
+            },
+            {
+              "office_id": "e070b872-ad4a-43d6-8c5d-cceed5cc0086",
+              "name": "Principal's Office",
+              "tickets": 26,
+              "completed": 21,
+              "avg_service_minutes": 11.4
+            },
+            {
+              "office_id": "c8dfac39-d6b5-46a9-95d2-072c97edaf30",
+              "name": "Dean's Office",
+              "tickets": 21,
+              "completed": 14,
+              "avg_service_minutes": 14.9
+            }
+          ]
+        },
+        "navigation": {
+          "sessions_today": 0,
+          "sessions_7d": 0,
+          "completion_rate_7d": null,
+          "off_route_events_7d": 0,
+          "recalculations_7d": 0,
+          "average_distance_m": null,
+          "popular_destinations": []
+        },
+        "engagement": {
+          "events_upcoming": 4,
+          "announcements_active": 4,
+          "notifications_7d": 4
+        },
+        "utilisation": [
+          {
+            "room_id": "d9db757f-77c7-4fe0-acd8-72dcdd57ac95",
+            "room_code": "B101",
+            "room_name": "Chemistry Lab",
+            "building_code": "B",
+            "booked_hours": 3,
+            "utilisation": 25
+          },
+          {
+            "room_id": "1e662e40-e9ca-4892-95a0-2d357fc380bf",
+            "room_code": "A201",
+            "room_name": "Computing Lab 1",
+            "building_code": "A",
+            "booked_hours": 1.5,
+            "utilisation": 13
+          },
+          {
+            "room_id": "b006a567-734f-4107-9998-18a0c148db54",
+            "room_code": "B212",
+            "room_name": "Tutorial Room",
+            "building_code": "B",
+            "booked_hours": 1,
+            "utilisation": 8
+          }
+        ]
+      }
+    },
+    "tests": [
+      {
+        "name": "Status code is 200 OK",
+        "passed": true
+      },
+      {
+        "name": "Returns analytics metrics summary",
+        "passed": true
+      }
+    ],
+    "passed": true
+  }
+]
