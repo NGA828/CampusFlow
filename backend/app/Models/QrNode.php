@@ -33,6 +33,7 @@ class QrNode extends Model
     public function building()   { return $this->belongsTo(Building::class); }
     public function floor()      { return $this->belongsTo(Floor::class); }
     public function room()       { return $this->belongsTo(Room::class); }
+    public function navNode()    { return $this->hasOne(NavigationNode::class, 'qr_node_id'); }
 
     public function toApiArray(): array
     {
@@ -43,6 +44,7 @@ class QrNode extends Model
             'building_id' => $this->building_id,
             'floor_id'    => $this->floor_id,
             'room_id'     => $this->room_id,
+            'nav_node_id' => $this->relationLoaded('navNode') ? $this->navNode?->id : $this->navNode()->value('id'),
             'lat'         => $this->lat,
             'lng'         => $this->lng,
             'plan_x'      => $this->plan_x,

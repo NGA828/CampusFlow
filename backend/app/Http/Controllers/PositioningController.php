@@ -124,7 +124,7 @@ class PositioningController extends Controller
      */
     public function anchors(Request $request): JsonResponse
     {
-        $anchors = QrNode::with(['building', 'floor', 'room'])
+        $anchors = QrNode::with(['building', 'floor', 'room', 'navNode'])
             ->where('is_active', true)
             ->when($request->query('floor_id'), fn ($q, $id) => $q->where('floor_id', $id))
             ->when($request->query('building_id'), fn ($q, $id) => $q->where('building_id', $id))
@@ -132,12 +132,15 @@ class PositioningController extends Controller
             ->get()
             ->map(fn (QrNode $node) => [
                 'id'            => $node->id,
+                'code'          => $node->code,
                 'label'         => $node->label,
                 'type'          => $node->type,
                 'lat'           => $node->lat,
                 'lng'           => $node->lng,
                 'plan_x'        => $node->plan_x,
                 'plan_y'        => $node->plan_y,
+                'is_active'     => $node->is_active,
+                'nav_node_id'   => $node->navNode?->id,
                 'building_code' => $node->building?->code,
                 'floor_name'    => $node->floor?->name,
                 'room_code'     => $node->room?->code,
