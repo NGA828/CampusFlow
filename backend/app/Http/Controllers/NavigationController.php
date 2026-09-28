@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Building;
 use App\Models\NavigationEdge;
 use App\Models\NavigationNode;
 use App\Models\NavigationSession;
@@ -366,16 +367,50 @@ class NavigationController extends Controller
             return NavigationNode::find($validated['to_node_id']);
         }
 
+        $code = trim($validated['to_room_code'] ?? '');
+
         $room = null;
         if (! empty($validated['to_room_id'])) {
             $room = Room::find($validated['to_room_id']);
-        } elseif (! empty($validated['to_room_code'])) {
-            $room = Room::where('code', strtoupper($validated['to_room_code']))->first();
+        } elseif ($code !== '') {
+            $upper = strtoupper($code);
+            // 1. Exact match on code (case-insensitive)
+            $room = Room::whereRaw('UPPER(code) = ?', [$upper])->first();
+
+            // 2. Normalize hyphens/spaces (e.g. ADM101 -> ADM-101 or ADM 101 -> ADM-101)
+            if (! $room && preg_match('/^([A-Z]+)\s*[-_]?\s*(\d+)$/i', $code, $m)) {
+                $normalized = strtoupper($m[1]) . '-' . $m[2];
+                $room = Room::whereRaw('UPPER(code) = ?', [$normalized])->first();
+            }
+
+            // 3. Prefix or room name match
+            if (! $room) {
+                $room = Room::whereRaw('UPPER(code) LIKE ?', [$upper . '%'])
+                    ->orWhereRaw('UPPER(name) LIKE ?', ['%' . $upper . '%'])
+                    ->first();
+            }
         }
 
         if ($room) {
-            return NavigationNode::where('room_id', $room->id)->where('type', 'room_entry')->first()
-                ?? NavigationNode::where('room_id', $room->id)->first();
+            $node = NavigationNode::where('room_id', $room->id)->where('type', 'room_entry')->first()
+                ?? NavigationNode::where('room_id', $room->id)->first()
+                ?? NavigationNode::where('floor_id', $room->floor_id)->first();
+            if ($node) {
+                return $node;
+            }
+        }
+
+        // 4. Fallback: match Building code or name if no room matched (e.g., ADM, STB, LIB, ENG, BUS, SAC, SUB)
+        if ($code !== '') {
+            $upper = strtoupper($code);
+            $building = Building::whereRaw('UPPER(code) = ?', [$upper])
+                ->orWhereRaw('UPPER(name) LIKE ?', ['%' . $upper . '%'])
+                ->first();
+
+            if ($building) {
+                return NavigationNode::where('building_id', $building->id)->where('type', 'exit')->first()
+                    ?? NavigationNode::where('building_id', $building->id)->first();
+            }
         }
 
         return null;
@@ -387,8 +422,26 @@ class NavigationController extends Controller
      */
     private function computeRoute(?string $fromNodeId, string $toNodeId, bool $accessible): array
     {
+        $emptyRoute = [
+            'nodes'       => [],
+            'steps'       => [],
+            'legs'        => [],
+            'transitions' => [],
+            'distance_m'  => 0,
+            'duration_s'  => 0,
+            'accessible'  => $accessible,
+            'uses_stairs' => false,
+            'origin'      => ['label' => 'Unknown origin', 'node' => null],
+            'destination' => ['label' => 'Unknown destination', 'node' => null],
+        ];
+
+        if (! $fromNodeId) {
+            return $emptyRoute;
+        }
+
         // Load all active nodes + edges for the graph
-        $nodes = NavigationNode::where('is_active', true)
+        $nodes = NavigationNode::with(['building', 'floor', 'room'])
+            ->where('is_active', true)
             ->when($accessible, fn ($q) => $q->where('is_accessible', true))
             ->get()
             ->keyBy('id');
@@ -397,24 +450,24 @@ class NavigationController extends Controller
             ->when($accessible, fn ($q) => $q->where('accessible', true))
             ->get();
 
+        if (! isset($nodes[$fromNodeId]) || ! isset($nodes[$toNodeId])) {
+            return $emptyRoute;
+        }
+
         // Build adjacency list
         $adj = [];
         foreach ($edges as $edge) {
-            $adj[$edge->from_node_id][] = ['node' => $edge->to_node_id, 'weight' => $edge->weight, 'edge' => $edge];
+            $adj[$edge->from_node_id][] = ['node' => $edge->to_node_id, 'weight' => (float) $edge->weight, 'edge' => $edge];
             if ($edge->bidirectional) {
-                $adj[$edge->to_node_id][] = ['node' => $edge->from_node_id, 'weight' => $edge->weight, 'edge' => $edge];
+                $adj[$edge->to_node_id][] = ['node' => $edge->from_node_id, 'weight' => (float) $edge->weight, 'edge' => $edge];
             }
         }
 
-        if (! $fromNodeId || ! isset($nodes[$fromNodeId]) || ! isset($nodes[$toNodeId])) {
-            return ['nodes' => [], 'edges' => [], 'total_distance_m' => 0];
-        }
-
-        // Dijkstra
-        $dist   = [$fromNodeId => 0];
-        $prev   = [];
-        $queue  = new \SplMinHeap();
-        $queue->insert([0, $fromNodeId]);
+        // Dijkstra algorithm
+        $dist  = [$fromNodeId => 0.0];
+        $prev  = [];
+        $queue = new \SplMinHeap();
+        $queue->insert([0.0, $fromNodeId]);
 
         while (! $queue->isEmpty()) {
             [$d, $u] = $queue->extract();
@@ -432,21 +485,166 @@ class NavigationController extends Controller
             }
         }
 
+        if (! isset($dist[$toNodeId])) {
+            return $emptyRoute;
+        }
+
         // Reconstruct path
-        $path  = [];
-        $edgesUsed = [];
-        $cur   = $toNodeId;
+        $pathNodeIds = [];
+        $cur = $toNodeId;
         while (isset($prev[$cur])) {
-            array_unshift($path, $cur);
-            array_unshift($edgesUsed, $prev[$cur]['edge']->toApiArray());
+            array_unshift($pathNodeIds, $cur);
             $cur = $prev[$cur]['from'];
         }
-        array_unshift($path, $fromNodeId);
+        array_unshift($pathNodeIds, $fromNodeId);
+
+        $orderedNodes = array_values(array_filter(array_map(fn ($id) => $nodes[$id] ?? null, $pathNodeIds)));
+        if (empty($orderedNodes)) {
+            return $emptyRoute;
+        }
+
+        $originNode = $orderedNodes[0];
+        $destNode   = end($orderedNodes);
+
+        $totalDistance = round($dist[$toNodeId], 2);
+        $durationSeconds = (int) round($totalDistance / 1.2);
+
+        $usesStairs = false;
+        $steps = [];
+        $transitions = [];
+
+        // 1. Build Steps & Transitions
+        $steps[] = [
+            'index'        => 0,
+            'instruction'  => 'Start at ' . ($originNode->label ?? 'starting anchor'),
+            'kind'         => 'start',
+            'distance_m'   => 0,
+            'duration_s'   => 0,
+            'floor_id'     => $originNode->floor_id,
+            'floor_name'   => $originNode->floor?->name,
+        ];
+
+        for ($i = 1; $i < count($orderedNodes); $i++) {
+            $prevNode = $orderedNodes[$i - 1];
+            $currNode = $orderedNodes[$i];
+            $edgeWeight = ($dist[$currNode->id] ?? 0) - ($dist[$prevNode->id] ?? 0);
+
+            if ($currNode->type === 'stairs' || $prevNode->type === 'stairs') {
+                $usesStairs = true;
+            }
+
+            // Floor transition check
+            if ($prevNode->floor_id !== $currNode->floor_id) {
+                $kind = ($currNode->type === 'elevator' || $prevNode->type === 'elevator') ? 'elevator' : 'stairs';
+                $floorName = $currNode->floor?->name ?? 'Level ' . ($currNode->floor?->level ?? 1);
+                $transitions[] = [
+                    'kind'        => $kind,
+                    'instruction' => "Take {$kind} to {$floorName}",
+                    'floor_name'  => $floorName,
+                    'distance_m'  => round($edgeWeight, 1),
+                ];
+            }
+
+            $steps[] = [
+                'index'        => $i,
+                'instruction'  => "Head to {$currNode->label}",
+                'kind'         => $currNode->type ?? 'walk',
+                'distance_m'   => round($edgeWeight, 1),
+                'duration_s'   => (int) round($edgeWeight / 1.2),
+                'floor_id'     => $currNode->floor_id,
+                'floor_name'   => $currNode->floor?->name,
+            ];
+        }
+
+        $steps[] = [
+            'index'        => count($orderedNodes),
+            'instruction'  => 'Arrive at ' . ($destNode->room?->name ?? $destNode->label),
+            'kind'         => 'arrive',
+            'distance_m'   => 0,
+            'duration_s'   => 0,
+            'floor_id'     => $destNode->floor_id,
+            'floor_name'   => $destNode->floor?->name,
+        ];
+
+        // 2. Build Legs (Group by floor or outdoor segment)
+        $legs = [];
+        $currentLegNodes = [];
+
+        foreach ($orderedNodes as $node) {
+            if (empty($currentLegNodes)) {
+                $currentLegNodes[] = $node;
+                continue;
+            }
+            $lastInLeg = end($currentLegNodes);
+            if ($lastInLeg->floor_id === $node->floor_id) {
+                $currentLegNodes[] = $node;
+            } else {
+                $legs[] = $this->buildLeg($currentLegNodes);
+                $currentLegNodes = [$node];
+            }
+        }
+        if (! empty($currentLegNodes)) {
+            $legs[] = $this->buildLeg($currentLegNodes);
+        }
 
         return [
-            'nodes'             => collect($path)->map(fn ($id) => $nodes[$id]?->toApiArray())->filter()->values(),
-            'edges'             => $edgesUsed,
-            'total_distance_m'  => round($dist[$toNodeId] ?? 0, 2),
+            'nodes'       => array_map(fn ($n) => $n->toApiArray(), $orderedNodes),
+            'steps'       => $steps,
+            'legs'        => $legs,
+            'transitions' => $transitions,
+            'distance_m'  => $totalDistance,
+            'duration_s'  => $durationSeconds,
+            'accessible'  => $accessible,
+            'uses_stairs' => $usesStairs,
+            'origin'      => [
+                'label' => $originNode->label,
+                'node'  => $originNode->toApiArray(),
+            ],
+            'destination' => [
+                'label'   => $destNode->room?->name ?? $destNode->label,
+                'node'    => $destNode->toApiArray(),
+                'room_id' => $destNode->room_id,
+            ],
+        ];
+    }
+
+    private function buildLeg(array $legNodes): array
+    {
+        $first = $legNodes[0];
+        $points = [];
+        $geo = [];
+
+        foreach ($legNodes as $node) {
+            if ($node->plan_x !== null && $node->plan_y !== null) {
+                $points[] = ['x' => (float) $node->plan_x, 'y' => (float) $node->plan_y];
+            }
+            if ($node->lat !== null && $node->lng !== null) {
+                $geo[] = ['lat' => (float) $node->lat, 'lng' => (float) $node->lng];
+            }
+        }
+
+        $distance = 0.0;
+        for ($i = 1; $i < count($legNodes); $i++) {
+            $prev = $legNodes[$i - 1];
+            $curr = $legNodes[$i];
+            if ($prev->lat && $prev->lng && $curr->lat && $curr->lng) {
+                $distance += $this->approximateMeters($prev->lat, $prev->lng, $curr->lat, $curr->lng);
+            } else {
+                $dx = ($curr->plan_x ?? 0) - ($prev->plan_x ?? 0);
+                $dy = ($curr->plan_y ?? 0) - ($prev->plan_y ?? 0);
+                $distance += sqrt($dx * $dx + $dy * $dy);
+            }
+        }
+
+        return [
+            'floor_id'      => $first->floor_id,
+            'floor_name'    => $first->floor?->name ?? 'Campus Grounds',
+            'floor_level'   => $first->floor?->level ?? 0,
+            'building_code' => $first->building?->code ?? null,
+            'distance_m'    => round($distance, 1),
+            'duration_s'    => (int) round($distance / 1.2),
+            'points'        => $points,
+            'geo'           => $geo,
         ];
     }
 

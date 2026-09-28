@@ -8,6 +8,7 @@
  * (tap a room, follow a route) and the administrator's spatial editor.
  */
 import { useId, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
 import { cx } from '@/components/ui/kit';
 import type { FloorPlanPayload, NavigationNode, Room, Route } from '@/lib/api/types';
 
@@ -37,7 +38,7 @@ interface FloorPlanProps {
   showQr?: boolean;
   editable?: boolean;
   onMoveRoom?: (room: Room, position: { x: number; y: number }) => void;
-  marker?: { x: number; y: number; label?: string } | null;
+  marker?: { x: number; y: number; label?: string; instruction?: string } | null;
   className?: string;
   busyRoomIds?: string[];
 }
@@ -112,6 +113,10 @@ export function FloorPlan({
           <linearGradient id={`${planId}-surface`} x1="0" y1="0" x2="1" y2="1">
             <stop offset="0" stopColor="#fbfcf8" />
             <stop offset="1" stopColor="#edf3ec" />
+          </linearGradient>
+          <linearGradient id={`${planId}-route-line`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#4340e0" />
+            <stop offset="100%" stopColor="#f9a92c" />
           </linearGradient>
           <pattern id={`${planId}-grid`} width="2" height="2" patternUnits="userSpaceOnUse">
             <path d="M2 0H0V2" fill="none" stroke="#d7e2d6" strokeWidth="0.06" />
@@ -252,19 +257,40 @@ export function FloorPlan({
 
         {routePaths.map((path, index) => (
           <g key={index}>
-            <path d={path} fill="none" stroke="#fff5d8" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-            <path d={path} fill="none" stroke="#e3890c" strokeWidth={0.9} strokeLinecap="round" strokeLinejoin="round" className="route-dash" />
+            <path d={path} fill="none" stroke="#fff5d8" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />
+            <path d={path} fill="none" stroke="#e3890c" strokeWidth={1.1} strokeLinecap="round" strokeLinejoin="round" className="route-dash" />
+            <motion.path
+              d={path}
+              fill="none"
+              stroke={`url(#${planId}-route-line)`}
+              strokeWidth={1.1}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: [0, 1] }}
+              transition={{ duration: 1.8, ease: 'easeInOut' }}
+            />
           </g>
         ))}
 
         {marker ? (
-          <g>
-            <circle cx={marker.x} cy={marker.y} r={1.6} fill="#4340e0" opacity={0.2} />
-            <circle cx={marker.x} cy={marker.y} r={0.8} fill="#4340e0" stroke="white" strokeWidth={0.25} />
-            {marker.label ? (
-              <text x={marker.x + 1.4} y={marker.y + 0.4} style={{ fontSize: 1.3, fontWeight: 600 }} className="fill-brand-700">
-                {marker.label}
-              </text>
+          <g transform={`translate(${marker.x}, ${marker.y})`}>
+            <circle r={2.2} fill="#4340e0" opacity={0.25} />
+            <circle r={1.4} fill="#4340e0" opacity={0.4} />
+            <circle r={0.75} fill="#4340e0" stroke="#ffffff" strokeWidth={0.22} />
+            {marker.instruction || marker.label ? (
+              <g transform="translate(-10, -4.2)">
+                <rect
+                  width={Math.max(22, (marker.instruction || marker.label || '').length * 0.75 + 4)}
+                  height={3.0}
+                  rx={0.8}
+                  fill="#101527"
+                  opacity={0.94}
+                />
+                <text x={1.6} y={2.0} style={{ fontSize: 1.1, fontWeight: 600 }} fill="#ffffff">
+                  {marker.instruction || marker.label}
+                </text>
+              </g>
             ) : null}
           </g>
         ) : null}

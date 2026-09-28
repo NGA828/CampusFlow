@@ -6,38 +6,56 @@ import { campusApi, positioningApi } from "@/lib/api/endpoints";
 import { CampusMap } from "@/components/maps/campus-map";
 import { FloorPlan } from "@/components/maps/floor-plan";
 import { RoutePlanner } from "@/components/maps/route-planner";
+import { RoutePreview } from "@/components/maps/route-preview";
 import { Badge, CardSkeleton, Button } from "@/components/ui/kit";
 import { ReadError, momentLabel } from "@/components/layout/student-companion";
-import type { Floor, Position, Room } from "@/lib/api/types";
+import type { Floor, Position, Room, Route } from "@/lib/api/types";
 import s from "@/components/layout/campus-operations.module.css";
+
 export default function MapPage() {
   const buildings = useAsync(() => campusApi.buildings(), []);
   const position = useAsync(() => positioningApi.current(), []);
   const [buildingId, setBuildingId] = useState("");
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"campus" | "indoor">("campus");
+  const [activeRoute, setActiveRoute] = useState<Route | null>(null);
+  const [leftTab, setLeftTab] = useState<"places" | "route">("places");
+
   const rows = buildings.data?.buildings ?? [];
   const selected = rows.find((b) => b.id === buildingId) ?? rows[0];
-  const fix =
-    position.error || position.loading ? null : position.data?.position;
+  const fix = position.error || position.loading ? null : position.data?.position;
   const choices = rows.filter((b) =>
     `${b.name} ${b.code}`.toLowerCase().includes(search.toLowerCase()),
   );
+
   return (
     <div className={s.page}>
       <header className={s.heading}>
         <div>
-          <p className={s.eyebrow}>Campus explorer / find your place</p>
+          <p className={s.eyebrow}>Campus explorer & route guidance</p>
           <h1>Campus map</h1>
           <p>
-            From a building to a room. Explore the published campus map, then
-            preview your route.
+            From a building to a room. Explore published places or preview your route on the master interactive map.
           </p>
         </div>
-        <a className={`${s.link} ${s.primary}`} href="#route-preview">
-          Plan a route →
-        </a>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => { setLeftTab("places"); }}
+            className={`rounded-[12px] px-3.5 py-2 text-[13px] font-bold transition-all ${leftTab === "places" && !activeRoute ? "bg-brand-600 text-white shadow-sm" : "bg-white border border-ink-200 text-ink-700 hover:bg-ink-50"}`}
+          >
+            Explore Places
+          </button>
+          <button
+            type="button"
+            onClick={() => { setLeftTab("route"); }}
+            className={`rounded-[12px] px-3.5 py-2 text-[13px] font-bold transition-all ${leftTab === "route" || activeRoute ? "bg-brand-600 text-white shadow-sm" : "bg-white border border-ink-200 text-ink-700 hover:bg-ink-50"}`}
+          >
+            Plan Route →
+          </button>
+        </div>
       </header>
+
       {position.loading ? (
         <p className={s.notice} role="status">
           Loading saved position…
@@ -45,8 +63,7 @@ export default function MapPage() {
       ) : position.error ? (
         <div className={s.error}>
           <p>
-            Saved position unavailable. You can still explore and choose a route
-            starting anchor.
+            Saved position unavailable. You can still explore and choose a route starting anchor.
           </p>
           <Button variant="secondary" onClick={position.reload}>
             Retry saved position
@@ -60,17 +77,16 @@ export default function MapPage() {
               <strong>
                 {fix.building_name || fix.building_code || "Campus location"}
               </strong>{" "}
-              · {momentLabel(fix.updated_at)}. This is a saved fix, not live
-              location.
+              · {momentLabel(fix.updated_at)}. Saved fix, not live location.
             </>
           ) : (
             <>
-              No saved position. Choose a building to explore; use your phone
-              for live positioning.
+              No saved position. Choose a building or plan a route; use mobile app for live positioning.
             </>
           )}
         </p>
       )}
+
       {buildings.error ? (
         <ReadError message={buildings.error} retry={buildings.reload} />
       ) : buildings.loading ? (
@@ -80,53 +96,98 @@ export default function MapPage() {
           <h2>No campus buildings published</h2>
           <p>Maps and indoor plans appear when your campus publishes them.</p>
         </section>
+      ) : activeRoute ? (
+        /* Unified Master Map View when a Route is Active */
+        <div className="space-y-4">
+          <RoutePreview
+            route={activeRoute}
+            walking={null}
+            onClearRoute={() => setActiveRoute(null)}
+          />
+        </div>
       ) : (
+        /* Unified Explorer View */
         <div className={s.explorer}>
           <aside className={s.places}>
-            <div>
-              <p className={s.eyebrow}>Explore by building</p>
-              <h2>Places on campus</h2>
-            </div>
-            <div className={s.tools}>
-              <label>
-                Find a building
-                <input
-                  type="search"
-                  placeholder="Name or code"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </label>
-            </div>
-            <p className={s.muted}>
-              {choices.length} of {rows.length} buildings
-            </p>
-            <div className={s.placeList} aria-label="Campus buildings">
-              {choices.map((b) => (
+            <div className="flex items-center justify-between border-b border-ink-100 pb-2.5">
+              <div>
+                <p className={s.eyebrow}>{leftTab === "places" ? "Browse buildings" : "Wayfinding"}</p>
+                <h2>{leftTab === "places" ? "Places on campus" : "Plan a route"}</h2>
+              </div>
+              <div className="flex rounded-lg bg-ink-100 p-0.5 text-[11px] font-semibold">
                 <button
-                  key={b.id}
-                  aria-pressed={b.id === selected?.id}
-                  onClick={() => setBuildingId(b.id)}
+                  type="button"
+                  onClick={() => setLeftTab("places")}
+                  className={`rounded-md px-2 py-1 transition-colors ${leftTab === "places" ? "bg-white text-ink-900 shadow-xs" : "text-ink-500"}`}
                 >
-                  <strong>
-                    {b.code} · {b.name}
-                  </strong>
-                  {b.status}
+                  Places
                 </button>
-              ))}
-            </div>
-            {!choices.length ? (
-              <div className={s.empty}>
-                <h3>No matching buildings</h3>
-                <button className={s.link} onClick={() => setSearch("")}>
-                  Clear search
+                <button
+                  type="button"
+                  onClick={() => setLeftTab("route")}
+                  className={`rounded-md px-2 py-1 transition-colors ${leftTab === "route" ? "bg-white text-ink-900 shadow-xs" : "text-ink-500"}`}
+                >
+                  Route
                 </button>
               </div>
-            ) : null}
-            <Link className={s.link} href="/student/campus/rooms">
-              Browse all rooms →
-            </Link>
+            </div>
+
+            {leftTab === "places" ? (
+              <>
+                <div className={s.tools}>
+                  <label>
+                    Find a building
+                    <input
+                      type="search"
+                      placeholder="Name or code"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <p className={s.muted}>
+                  {choices.length} of {rows.length} buildings
+                </p>
+                <div className={s.placeList} aria-label="Campus buildings">
+                  {choices.map((b) => (
+                    <button
+                      key={b.id}
+                      aria-pressed={b.id === selected?.id}
+                      onClick={() => setBuildingId(b.id)}
+                    >
+                      <strong>
+                        {b.code} · {b.name}
+                      </strong>
+                      {b.status}
+                    </button>
+                  ))}
+                </div>
+                {!choices.length ? (
+                  <div className={s.empty}>
+                    <h3>No matching buildings</h3>
+                    <button className={s.link} onClick={() => setSearch("")}>
+                      Clear search
+                    </button>
+                  </div>
+                ) : null}
+                <Link className={s.link} href="/student/campus/rooms">
+                  Browse all rooms →
+                </Link>
+              </>
+            ) : (
+              <div className="pt-1">
+                <Suspense fallback={<CardSkeleton rows={3} />}>
+                  <RoutePlanner
+                    hidePreviewCard
+                    onRouteCalculated={(r) => {
+                      if (r) setActiveRoute(r);
+                    }}
+                  />
+                </Suspense>
+              </div>
+            )}
           </aside>
+
           <section className={s.map}>
             <div className={s.bar}>
               <div>
@@ -178,9 +239,7 @@ export default function MapPage() {
                   }
                 />
                 <p className={s.mapNote}>
-                  Schematic map from campus data. Select a building on the map
-                  or in the list. Saved positions may no longer reflect where
-                  you are.
+                  Schematic map from campus data. Select a building on the map or in the list.
                 </p>
                 <div className={`${s.bar} mt-5`}>
                   <p className={s.muted}>
@@ -201,9 +260,6 @@ export default function MapPage() {
           </section>
         </div>
       )}
-      <Suspense fallback={<CardSkeleton rows={3} />}>
-        <RoutePlanner />
-      </Suspense>
     </div>
   );
 }
