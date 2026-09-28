@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/layout/app-shell';
 import { ResourceTable, type Column } from '@/components/admin/table';
 import { FloorPlan } from '@/components/maps/floor-plan';
 import { useToast } from '@/components/ui/toast';
+import { QRCodeDisplay } from '@/components/ui/qr-code';
 import type { Geofence, NavigationEdge, NavigationNode, QrNode, Room } from '@/lib/api/types';
 
 type Tab = 'qr' | 'nodes' | 'edges' | 'geofences' | 'plan';
@@ -261,7 +262,7 @@ export default function AdminSpatialPage() {
                   }
                 }}
               >
-                Payload
+                View QR
               </Button>
               <Button size="sm" variant="ghost" onClick={() => void runAction(() => adminApi.regenerateQr(row.id), 'Anchor regenerated')}>
                 Regenerate
@@ -400,14 +401,47 @@ export default function AdminSpatialPage() {
         </div>
       ) : null}
 
-      <Modal open={payload !== null} onClose={() => setPayload(null)} title="QR payload" footer={<Button onClick={() => setPayload(null)}>Close</Button>}>
+      <Modal
+        open={payload !== null}
+        onClose={() => setPayload(null)}
+        title={`QR Anchor Graphic — ${payload?.code}`}
+        footer={
+          <div className="flex w-full justify-between items-center gap-2">
+            <Button variant="secondary" onClick={() => window.print()}>
+              Print Badge
+            </Button>
+            <Button onClick={() => setPayload(null)}>Close</Button>
+          </div>
+        }
+      >
         {payload ? (
-          <div className="space-y-3">
+          <div className="space-y-4 text-center">
             <p className="text-[13px] text-ink-600">
-              Print this payload for anchor <strong className="font-semibold">{payload.code}</strong>. The signature is validated server-side on every scan.
+              Scan this QR code image directly using the mobile app scanner or your phone camera.
             </p>
-            <Textarea readOnly rows={3} value={payload.payload} className="font-mono text-[12px]" />
-            {payload.scan_url ? <Textarea readOnly rows={2} value={payload.scan_url} className="font-mono text-[11.5px]" /> : null}
+
+            <div className="flex flex-col items-center justify-center gap-3 py-2 bg-slate-50 rounded-xl border border-slate-200 p-4">
+              <QRCodeDisplay value={payload.payload} size={220} alt={`QR Code for ${payload.code}`} />
+              <div className="font-mono text-xs font-bold text-ink-800 tracking-wide bg-white border border-slate-300 px-3 py-1 rounded-md shadow-xs">
+                {payload.code}
+              </div>
+            </div>
+
+            <details className="text-left text-xs text-ink-500 bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <summary className="cursor-pointer font-semibold text-ink-700">View Raw Payload Strings</summary>
+              <div className="space-y-2 mt-2 pt-2 border-t border-slate-200">
+                <div>
+                  <span className="font-semibold block text-[11px] text-slate-500 uppercase">Signed Payload:</span>
+                  <Textarea readOnly rows={2} value={payload.payload} className="font-mono text-[11px]" />
+                </div>
+                {payload.scan_url ? (
+                  <div>
+                    <span className="font-semibold block text-[11px] text-slate-500 uppercase">Scan URL:</span>
+                    <Textarea readOnly rows={2} value={payload.scan_url} className="font-mono text-[11px]" />
+                  </div>
+                ) : null}
+              </div>
+            </details>
           </div>
         ) : null}
       </Modal>
