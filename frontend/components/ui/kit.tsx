@@ -201,9 +201,18 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
   return <input ref={ref} className={cx(CONTROL, className)} {...rest} />;
 });
 
-export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...rest }, ref) {
+export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, style, ...rest }, ref) {
   return (
-    <select ref={ref} className={cx(CONTROL, 'appearance-none bg-[right_0.75rem_center] pr-9', className)} {...rest}>
+    <select
+      ref={ref}
+      className={cx(CONTROL, 'appearance-none bg-[right_0.75rem_center] bg-no-repeat pr-9 cursor-pointer', className)}
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E")`,
+        backgroundSize: '1.25rem 1.25rem',
+        ...style,
+      }}
+      {...rest}
+    >
       {children}
     </select>
   );

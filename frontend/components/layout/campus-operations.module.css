@@ -514,8 +514,21 @@
   .board {
     gap: 10px;
   }
+}
+@media (max-width: 960px) {
   .explorer {
-    grid-template-columns: 210px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .places {
+    border-right: 0;
+    border-bottom: 1px solid #dce5d6;
+    padding: 16px;
+  }
+  .placeList {
+    max-height: 220px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
   }
 }
 @media (max-width: 650px) {
@@ -540,6 +553,10 @@
   .explorer {
     grid-template-columns: minmax(0, 1fr);
   }
+  .placeList {
+    grid-template-columns: minmax(0, 1fr);
+    max-height: 180px;
+  }
   .row {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -552,9 +569,6 @@
   .places {
     border-right: 0;
     border-bottom: 1px solid #dce5d6;
-  }
-  .placeList {
-    max-height: 170px;
   }
   .map {
     padding: 14px;

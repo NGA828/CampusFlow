@@ -300,57 +300,59 @@ export function CampusMap({
         </div>
       </div>
 
-      <div className="pointer-events-none absolute bottom-3 left-3 flex items-end gap-2">
-        <div className="pointer-events-auto rounded-[11px] border border-white/70 bg-white/92 px-3 py-2 text-[10px] text-ink-600 shadow-[var(--shadow-card)] backdrop-blur-sm">
-          <div className="mb-1.5 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-mint-500" /> Operational
-            <span className="ml-1 h-2 w-2 rounded-full bg-signal-400" /> Limited
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-coral-400" /> Closed / maintenance
-            <span className="ml-1 h-0.5 w-5 rounded bg-signal-500" /> Route
-          </div>
-        </div>
-        <div className="hidden items-center gap-2 rounded-[11px] border border-white/70 bg-white/92 px-3 py-2 text-[10px] text-ink-600 shadow-[var(--shadow-card)] backdrop-blur-sm sm:flex">
-          <span className="text-[15px] font-bold text-brand-700">N</span>
-          <span className="h-5 w-px bg-ink-200" />
-          <span className="block h-1.5 rounded-full bg-ink-700" style={{ width: `${scaleWidth}px` }} />
-          <span>{scaleMetres} m</span>
-        </div>
-      </div>
-
-      {selectedBuilding ? (
-        <div className="absolute bottom-3 right-3 max-w-[min(290px,calc(100%-24px))] rounded-[14px] border border-brand-100 bg-white/96 p-3 shadow-[var(--shadow-pop)] backdrop-blur-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-700">Selected destination</p>
-              <p className="mt-1 text-[14px] font-semibold text-ink-900">{selectedBuilding.code} · {selectedBuilding.name}</p>
+      <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap items-end justify-between gap-2">
+        <div className="pointer-events-auto flex items-end gap-2">
+          <div className="hidden rounded-[11px] border border-white/70 bg-white/92 px-3 py-2 text-[10px] text-ink-600 shadow-[var(--shadow-card)] backdrop-blur-sm sm:block">
+            <div className="mb-1.5 flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-mint-500" /> Operational
+              <span className="ml-1 h-2 w-2 rounded-full bg-signal-400" /> Limited
             </div>
-            <span className={cx(
-              'rounded-full px-2 py-1 text-[10px] font-semibold',
-              selectedBuilding.status === 'operational' ? 'bg-mint-50 text-mint-700' :
-                selectedBuilding.status === 'limited' ? 'bg-signal-50 text-signal-700' :
-                  'bg-coral-50 text-coral-600',
-            )}>
-              {selectedBuilding.status}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-coral-400" /> Closed / maintenance
+              <span className="ml-1 h-0.5 w-5 rounded bg-signal-500" /> Route
+            </div>
           </div>
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ink-500">
-            {typeof selectedBuilding.floor_count === 'number' ? <span>{selectedBuilding.floor_count} floors</span> : null}
-            {typeof selectedBuilding.room_count === 'number' ? <span>{selectedBuilding.room_count} rooms</span> : null}
-            <span>{selectedBuilding.has_elevator ? 'Step-free access' : 'Stairs likely'}</span>
+          <div className="hidden items-center gap-2 rounded-[11px] border border-white/70 bg-white/92 px-3 py-2 text-[10px] text-ink-600 shadow-[var(--shadow-card)] backdrop-blur-sm md:flex">
+            <span className="text-[15px] font-bold text-brand-700">N</span>
+            <span className="h-5 w-px bg-ink-200" />
+            <span className="block h-1.5 rounded-full bg-ink-700" style={{ width: `${scaleWidth}px` }} />
+            <span>{scaleMetres} m</span>
           </div>
-          {onOpenBuilding ? (
-            <button
-              type="button"
-              onClick={() => onOpenBuilding(selectedBuilding.id)}
-              className="mt-3 min-h-9 rounded-[9px] bg-brand-600 px-3 text-[11px] font-semibold text-white transition-colors hover:bg-brand-700"
-            >
-              Explore floors and rooms →
-            </button>
-          ) : null}
         </div>
-      ) : null}
+
+        {selectedBuilding ? (
+          <div className="pointer-events-auto ml-auto max-w-[min(290px,calc(100%-16px))] rounded-[14px] border border-brand-100 bg-white/96 p-3 shadow-[var(--shadow-pop)] backdrop-blur-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-700">Selected destination</p>
+                <p className="mt-0.5 text-[13px] font-semibold text-ink-900 leading-tight">{selectedBuilding.code} · {selectedBuilding.name}</p>
+              </div>
+              <span className={cx(
+                'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                selectedBuilding.status === 'operational' ? 'bg-mint-50 text-mint-700' :
+                  selectedBuilding.status === 'limited' ? 'bg-signal-50 text-signal-700' :
+                    'bg-coral-50 text-coral-600',
+              )}>
+                {selectedBuilding.status}
+              </span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ink-500">
+              {typeof selectedBuilding.floor_count === 'number' ? <span>{selectedBuilding.floor_count} floors</span> : null}
+              {typeof selectedBuilding.room_count === 'number' ? <span>{selectedBuilding.room_count} rooms</span> : null}
+              <span>{selectedBuilding.has_elevator ? 'Step-free access' : 'Stairs likely'}</span>
+            </div>
+            {onOpenBuilding ? (
+              <button
+                type="button"
+                onClick={() => onOpenBuilding(selectedBuilding.id)}
+                className="mt-2 min-h-8 w-full rounded-[8px] bg-brand-600 px-3 text-[11px] font-semibold text-white transition-colors hover:bg-brand-700"
+              >
+                Explore floors and rooms →
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       {markersWithTones.length > 0 ? (
         <div className="absolute bottom-3 left-1/2 hidden -translate-x-1/2 items-center gap-3 rounded-[10px] border border-white/70 bg-white/92 px-3 py-1.5 text-[10px] text-ink-600 shadow-[var(--shadow-card)] backdrop-blur-sm md:flex">
