@@ -10,6 +10,7 @@
  * campus-sized area).
  */
 import { useId, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
 import { cx } from '@/components/ui/kit';
 import type { Building, Position, Route } from '@/lib/api/types';
 
@@ -99,13 +100,40 @@ export function CampusMap({
   const scaleWidth = Math.max(44, Math.min(116, (scaleMetres / geometry.width) * 100));
 
   const routePath = useMemo(() => {
+    if (!route) return '';
+
     const segments: string[] = [];
-    for (const leg of route?.legs ?? []) {
+    for (const leg of route.legs ?? []) {
       const points = (leg.geo ?? []).map((point) => toSvg(point.lat, point.lng));
       if (points.length < 2) continue;
       segments.push(points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' '));
     }
-    return segments.join(' ');
+    if (segments.length > 0) return segments.join(' ');
+
+    const geoPoints: { lat: number; lng: number }[] = [];
+    for (const node of route.nodes ?? []) {
+      if (typeof node.lat === 'number' && typeof node.lng === 'number') {
+        const last = geoPoints[geoPoints.length - 1];
+        if (!last || Math.abs(last.lat - node.lat) > 0.000001 || Math.abs(last.lng - node.lng) > 0.000001) {
+          geoPoints.push({ lat: node.lat, lng: node.lng });
+        }
+      }
+    }
+    if (geoPoints.length < 2) {
+      if (typeof route.origin?.node?.lat === 'number' && typeof route.origin?.node?.lng === 'number') {
+        geoPoints.unshift({ lat: route.origin.node.lat, lng: route.origin.node.lng });
+      }
+      if (typeof route.destination?.node?.lat === 'number' && typeof route.destination?.node?.lng === 'number') {
+        const last = geoPoints[geoPoints.length - 1];
+        if (!last || Math.abs(last.lat - route.destination.node.lat) > 0.000001 || Math.abs(last.lng - route.destination.node.lng) > 0.000001) {
+          geoPoints.push({ lat: route.destination.node.lat, lng: route.destination.node.lng });
+        }
+      }
+    }
+    if (geoPoints.length < 2) return '';
+
+    const svgPoints = geoPoints.map((point) => toSvg(point.lat, point.lng));
+    return svgPoints.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route, origin]);
 
@@ -149,8 +177,14 @@ export function CampusMap({
           <filter id={`${mapId}-shadow`} x="-30%" y="-30%" width="160%" height="160%">
             <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#243a32" floodOpacity="0.18" />
           </filter>
-          <filter id={`${mapId}-glow`} x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur stdDeviation="1.5" result="blur" />
+          {/* Route glow gradient */}
+          <linearGradient id={`${mapId}-route-gradient`} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#6366f1" />
+            <stop offset="50%" stopColor="#06b6d4" />
+            <stop offset="100%" stopColor="#10b981" />
+          </linearGradient>
+          <filter id={`${mapId}-route-glow`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
             <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
           <marker id={`${mapId}-arrow`} viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
@@ -239,8 +273,29 @@ export function CampusMap({
 
         {routePath ? (
           <>
-            <path d={routePath} fill="none" stroke="#fff5d8" strokeWidth="6" strokeLinecap="round" opacity="0.9" />
-            <path d={routePath} fill="none" stroke="#e3890c" strokeWidth="3" strokeLinecap="round" className="route-dash" markerEnd={`url(#${mapId}-arrow)`} />
+            {/* Glow halo */}
+            <path d={routePath} fill="none" stroke={`url(#${mapId}-route-gradient)`} strokeWidth="9" strokeLinecap="round" opacity={0.18} filter={`url(#${mapId}-route-glow)`} />
+            {/* Animated core path */}
+            <motion.path
+              d={routePath} fill="none"
+              stroke={`url(#${mapId}-route-gradient)`}
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 1 }}
+              transition={{ duration: 2.0, ease: [0.25, 0.46, 0.45, 0.94] }}
+            />
+            {/* Dashed white shimmer overlay */}
+            <motion.path
+              d={routePath} fill="none"
+              stroke="#ffffff"
+              strokeWidth="1.2"
+              strokeDasharray="4 10"
+              strokeLinecap="round"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 0.4 }}
+              transition={{ duration: 2.4, ease: 'easeOut', delay: 0.3 }}
+            />
           </>
         ) : null}
 
@@ -248,10 +303,26 @@ export function CampusMap({
           const point = toSvg(marker.lat, marker.lng);
           const tone = toneClasses[marker.tone ?? 'qr'];
           return (
-            <g key={`${marker.label}-${index}`} role="img" aria-label={marker.label} filter={marker.tone === 'user' ? `url(#${mapId}-glow)` : undefined}>
+            <g key={`${marker.label}-${index}`} role="img" aria-label={marker.label}>
               <title>{marker.label}</title>
+              {marker.tone === 'user' ? (
+                <>
+                  <motion.circle
+                    cx={point.x} cy={point.y}
+                    r={9} fill="none" stroke={tone.ring} strokeWidth={1.4}
+                    animate={{ r: [8, 14], opacity: [0.7, 0] }}
+                    transition={{ duration: 2.0, repeat: Infinity, ease: 'easeOut' }}
+                  />
+                  <motion.circle
+                    cx={point.x} cy={point.y}
+                    r={6} fill="none" stroke={tone.fill} strokeWidth={1.0}
+                    animate={{ r: [5, 10], opacity: [0.5, 0] }}
+                    transition={{ duration: 2.0, repeat: Infinity, ease: 'easeOut', delay: 0.5 }}
+                  />
+                </>
+              ) : null}
               <circle cx={point.x} cy={point.y} r={4.5} fill={tone.fill} stroke="#fff" strokeWidth="1.2" />
-              <circle cx={point.x} cy={point.y} r={8} fill="none" stroke={tone.ring} strokeWidth="1.4" opacity="0.7" />
+              <circle cx={point.x} cy={point.y} r={2} fill="#ffffff" opacity={0.8} />
             </g>
           );
         })}

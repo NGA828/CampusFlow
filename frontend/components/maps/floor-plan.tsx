@@ -8,23 +8,24 @@
  * (tap a room, follow a route) and the administrator's spatial editor.
  */
 import { useId, useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cx } from '@/components/ui/kit';
 import type { FloorPlanPayload, NavigationNode, Room, Route } from '@/lib/api/types';
 
-const ROOM_FILL: Record<Room['room_type'], string> = {
-  lecture: '#dfe4ff',
-  auditorium: '#dfe4ff',
-  lab: '#e2f5f0',
-  study: '#fff1d6',
-  library: '#e8ecfb',
-  office: '#fbe4e7',
-  meeting: '#eae6fb',
-  service: '#e6eaf3',
-  other: '#eceef6',
+// Rich fills per room type — evokes the Smart City palette
+const ROOM_FILL: Record<Room['room_type'], { base: string; light: string; stroke: string }> = {
+  lecture:    { base: '#6366f1', light: '#e0e7ff', stroke: '#4f46e5' },
+  auditorium: { base: '#8b5cf6', light: '#ede9fe', stroke: '#7c3aed' },
+  lab:        { base: '#10b981', light: '#d1fae5', stroke: '#059669' },
+  study:      { base: '#f59e0b', light: '#fef3c7', stroke: '#d97706' },
+  library:    { base: '#3b82f6', light: '#dbeafe', stroke: '#2563eb' },
+  office:     { base: '#ec4899', light: '#fce7f3', stroke: '#db2777' },
+  meeting:    { base: '#a855f7', light: '#f3e8ff', stroke: '#9333ea' },
+  service:    { base: '#64748b', light: '#f1f5f9', stroke: '#475569' },
+  other:      { base: '#94a3b8', light: '#f8fafc', stroke: '#64748b' },
 };
 
-const BUSY_FILL = '#f6c9ce';
+const BUSY_COLOR = { base: '#ef4444', light: '#fee2e2', stroke: '#dc2626' };
 const EMPTY_LIST: [] = [];
 
 interface FloorPlanProps {
@@ -99,7 +100,10 @@ export function FloorPlan({
   };
 
   return (
-    <div className={cx('relative overflow-hidden rounded-[var(--radius-card)] border border-ink-200 bg-[#edf2ed] shadow-[var(--shadow-card)]', className)}>
+    <div
+      className={cx('relative overflow-hidden rounded-[var(--radius-card)] border border-slate-700/60 shadow-[var(--shadow-card)]', className)}
+      style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f2027 100%)' }}
+    >
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="h-full max-h-[70vh] w-full touch-none"
@@ -110,25 +114,53 @@ export function FloorPlan({
         onPointerLeave={() => setDrag(null)}
       >
         <defs>
+          {/* Dark blueprint surface */}
           <linearGradient id={`${planId}-surface`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#fbfcf8" />
-            <stop offset="1" stopColor="#edf3ec" />
+            <stop offset="0%" stopColor="#0f172a" />
+            <stop offset="100%" stopColor="#1e3a5f" />
           </linearGradient>
-          <linearGradient id={`${planId}-route-line`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#4340e0" />
-            <stop offset="100%" stopColor="#f9a92c" />
-          </linearGradient>
-          <pattern id={`${planId}-grid`} width="2" height="2" patternUnits="userSpaceOnUse">
-            <path d="M2 0H0V2" fill="none" stroke="#d7e2d6" strokeWidth="0.06" />
+          {/* Dot grid */}
+          <pattern id={`${planId}-dots`} width="2" height="2" patternUnits="userSpaceOnUse">
+            <circle cx="0.5" cy="0.5" r="0.12" fill="#334155" opacity="0.8" />
           </pattern>
+          {/* Route glow gradient */}
+          <linearGradient id={`${planId}-route-glow`} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#6366f1" />
+            <stop offset="40%" stopColor="#06b6d4" />
+            <stop offset="100%" stopColor="#10b981" />
+          </linearGradient>
+          {/* Room shine overlay */}
+          <linearGradient id={`${planId}-room-shine`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#000000" stopOpacity="0.06" />
+          </linearGradient>
+          {/* Route glow filter */}
+          <filter id={`${planId}-route-filter`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="0.45" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          {/* Marker glow filter */}
+          <filter id={`${planId}-marker-glow`} x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="0.6" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          {/* Room drop shadow */}
           <filter id={`${planId}-shadow`} x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="0.35" stdDeviation="0.35" floodColor="#243a32" floodOpacity="0.18" />
+            <feDropShadow dx="0" dy="0.4" stdDeviation="0.5" floodColor="#6366f1" floodOpacity="0.5" />
           </filter>
         </defs>
+        {/* Blueprint background */}
         <rect x={0} y={0} width={width} height={height} fill={`url(#${planId}-surface)`} />
-        <rect x={0} y={0} width={width} height={height} fill={`url(#${planId}-grid)`} opacity="0.8" />
-        <rect x={0.7} y={0.7} width={width - 1.4} height={height - 1.4} rx="1.5" fill="none" stroke="#bfd1c0" strokeWidth="0.18" strokeDasharray="0.8 0.7" />
-        <text x="1.7" y="2.5" fill="#6b8172" style={{ fontSize: 1.05, letterSpacing: 0.18, fontWeight: 700 }}>
+        <rect x={0} y={0} width={width} height={height} fill={`url(#${planId}-dots)`} opacity="1" />
+        {/* Perimeter glow border */}
+        <rect
+          x={0.4} y={0.4}
+          width={width - 0.8} height={height - 0.8}
+          rx="1.8" fill="none"
+          stroke="#1d4ed8" strokeWidth="0.22" strokeDasharray="1.5 1" opacity="0.4"
+        />
+        {/* Floor label */}
+        <text x="1.5" y="2.2" fill="#94a3b8" style={{ fontSize: 0.9, letterSpacing: 0.2, fontWeight: 700 }}>
           {plan.building.code} · {plan.floor.name.toUpperCase()}
         </text>
 
@@ -144,7 +176,7 @@ export function FloorPlan({
           const isHighlighted = highlightRoomIds.includes(room.id);
           const isBusy = busy.has(room.id) || busy.has(room.code);
           const isHovered = hovered === room.id;
-          const fill = isSelected ? '#9ea9ff' : isBusy ? BUSY_FILL : ROOM_FILL[room.room_type] ?? '#eceef6';
+          const colors = isBusy ? BUSY_COLOR : (ROOM_FILL[room.room_type] ?? ROOM_FILL.other);
 
           return (
             <g
@@ -162,38 +194,68 @@ export function FloorPlan({
               }}
               className={cx(onSelectRoom && 'cursor-pointer', editable && onMoveRoom && 'cursor-move')}
             >
-              {hasOutline ? <rect
-                x={x}
-                y={y}
-                width={w}
-                height={h}
-                rx={0.8}
-                fill={fill}
-                stroke={isSelected ? '#4340e0' : isHighlighted ? '#f9a92c' : '#c6cde2'}
-                strokeWidth={isSelected || isHighlighted ? 0.5 : 0.3}
-                filter={isSelected ? `url(#${planId}-shadow)` : undefined}
-              />
-              : <><circle cx={x} cy={y} r={0.9} fill={fill} stroke="#637356" strokeWidth={0.25} /><text x={x + 1.4} y={y + 0.4} style={{ fontSize: 1.2, fontWeight: 600 }} className="fill-ink-800">{room.code}</text></>}
+              {hasOutline ? (
+                <>
+                  {/* Room body */}
+                  <rect
+                    x={x} y={y} width={w} height={h} rx={0.7}
+                    fill={colors.light}
+                    fillOpacity={isSelected ? 0.95 : isHovered ? 0.88 : 0.75}
+                    stroke={isSelected ? colors.base : isHighlighted ? '#f59e0b' : colors.stroke}
+                    strokeWidth={isSelected || isHighlighted ? 0.42 : 0.22}
+                    filter={isSelected ? `url(#${planId}-shadow)` : undefined}
+                  />
+                  {/* Shine overlay */}
+                  <rect x={x} y={y} width={w} height={h * 0.5} rx={0.7} fill={`url(#${planId}-room-shine)`} />
+                  {/* Left accent bar */}
+                  <rect x={x} y={y + 0.5} width={0.3} height={Math.max(0, h - 1)} rx={0.15} fill={colors.base} opacity={0.85} />
+                </>
+              ) : (
+                <>
+                  <circle cx={x} cy={y} r={0.9} fill={colors.light} stroke={colors.base} strokeWidth={0.25} />
+                  <text x={x + 1.4} y={y + 0.4} style={{ fontSize: 1.2, fontWeight: 600 }} fill={colors.base}>{room.code}</text>
+                </>
+              )}
+
+              {/* Room labels */}
               {hasOutline && w >= 5 && h >= 4 ? (
                 <>
-                  <text x={x + w / 2} y={y + h / 2 - 0.6} textAnchor="middle" style={{ fontSize: Math.min(1.5, w / 5), fontWeight: 600 }} className="fill-ink-800">
+                  <text x={x + w / 2} y={y + h / 2 - 0.6} textAnchor="middle" style={{ fontSize: Math.min(1.4, w / 5), fontWeight: 700 }} fill="#1e293b">
                     {room.code}
                   </text>
-                  <text x={x + w / 2} y={y + h / 2 + 1.6} textAnchor="middle" style={{ fontSize: Math.min(1.1, w / 7) }} className="fill-ink-500">
+                  <text x={x + w / 2} y={y + h / 2 + 1.4} textAnchor="middle" style={{ fontSize: Math.min(1.0, w / 7) }} fill="#475569">
                     {room.name.length > 18 ? `${room.name.slice(0, 17)}…` : room.name}
                   </text>
                 </>
               ) : null}
-              {room.requires_admission ? <circle cx={hasOutline ? x + w - 1 : x} cy={y + 1} r={0.7} fill="#f9a92c" /> : null}
 
-              {isHovered ? (
-                <g>
-                  <rect x={x} y={y - 3.4} width={Math.min(26, Math.max(14, room.name.length * 0.85))} height={2.8} rx={0.6} fill="#101527" opacity={0.92} />
-                  <text x={x + 1} y={y - 1.4} style={{ fontSize: 1.2 }} className="fill-white">
-                    {room.code} · {room.capacity} seats · {room.room_type}
-                  </text>
-                </g>
+              {/* Admission badge */}
+              {room.requires_admission ? (
+                <circle cx={hasOutline ? x + w - 1 : x} cy={y + 1} r={0.65} fill="#f59e0b" stroke="#d97706" strokeWidth={0.15} />
               ) : null}
+
+              {/* Hover tooltip with AnimatePresence */}
+              <AnimatePresence>
+                {isHovered ? (
+                  <motion.g
+                    initial={{ opacity: 0, y: 0.5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <rect
+                      x={x} y={y - 4.2}
+                      width={Math.min(28, Math.max(14, room.name.length * 0.85))}
+                      height={3.2} rx={0.7}
+                      fill="#0f172a" stroke="#334155" strokeWidth={0.15}
+                      opacity={0.97}
+                    />
+                    <text x={x + 1.1} y={y - 2.4} style={{ fontSize: 1.15, fontWeight: 600 }} fill="#e2e8f0">
+                      {room.code} · {room.capacity} seats · {room.room_type}
+                    </text>
+                  </motion.g>
+                ) : null}
+              </AnimatePresence>
             </g>
           );
         })}
@@ -212,10 +274,10 @@ export function FloorPlan({
                   y1={from.plan_y}
                   x2={to.plan_x}
                   y2={to.plan_y}
-                  stroke={edge.is_accessible ? '#7a83fb' : '#b3bad3'}
-                  strokeWidth={0.28}
+                  stroke={edge.is_accessible ? '#38bdf8' : '#64748b'}
+                  strokeWidth={0.25}
                   strokeDasharray={isVertical ? '0.6 0.5' : undefined}
-                  opacity={0.75}
+                  opacity={0.7}
                 />
               );
             })
@@ -230,7 +292,7 @@ export function FloorPlan({
                     cx={node.plan_x ?? 0}
                     cy={node.plan_y ?? 0}
                     r={node.kind === 'junction' || node.kind === 'entrance' ? 0.9 : 0.6}
-                    fill={node.kind === 'elevator' ? '#129a84' : node.kind === 'stairs' ? '#b3bad3' : '#4340e0'}
+                    fill={node.kind === 'elevator' ? '#06b6d4' : node.kind === 'stairs' ? '#94a3b8' : '#6366f1'}
                     opacity={node.is_active ? 0.9 : 0.35}
                   />
                 </g>
@@ -257,76 +319,117 @@ export function FloorPlan({
 
         {routePaths.map((path, index) => (
           <g key={index}>
-            <path d={path} fill="none" stroke="#fff5d8" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />
-            <path d={path} fill="none" stroke="#e3890c" strokeWidth={1.1} strokeLinecap="round" strokeLinejoin="round" className="route-dash" />
+            {/* Outer glow halo */}
+            <path
+              d={path} fill="none"
+              stroke={`url(#${planId}-route-glow)`}
+              strokeWidth={3.5}
+              strokeLinecap="round" strokeLinejoin="round"
+              opacity={0.2}
+              filter={`url(#${planId}-route-filter)`}
+            />
+            {/* Animated solid core */}
             <motion.path
-              d={path}
-              fill="none"
-              stroke={`url(#${planId}-route-line)`}
-              strokeWidth={1.1}
+              d={path} fill="none"
+              stroke={`url(#${planId}-route-glow)`}
+              strokeWidth={1.4}
+              strokeLinecap="round" strokeLinejoin="round"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 1 }}
+              transition={{ duration: 2.0, ease: [0.25, 0.46, 0.45, 0.94] }}
+            />
+            {/* Dashed white overlay for dimension */}
+            <motion.path
+              d={path} fill="none"
+              stroke="#ffffff"
+              strokeWidth={0.35}
               strokeLinecap="round"
-              strokeLinejoin="round"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: [0, 1] }}
-              transition={{ duration: 1.8, ease: 'easeInOut' }}
+              strokeDasharray="0.8 2.0"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 0.4 }}
+              transition={{ duration: 2.2, ease: 'easeOut', delay: 0.3 }}
             />
           </g>
         ))}
 
         {marker ? (
-          <g transform={`translate(${marker.x}, ${marker.y})`}>
-            <circle r={2.2} fill="#4340e0" opacity={0.25} />
-            <circle r={1.4} fill="#4340e0" opacity={0.4} />
-            <circle r={0.75} fill="#4340e0" stroke="#ffffff" strokeWidth={0.22} />
-            {marker.instruction || marker.label ? (
-              <g transform="translate(-10, -4.2)">
+          <motion.g
+            transform={`translate(${marker.x}, ${marker.y})`}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.4, type: 'spring', stiffness: 200 }}
+          >
+            {/* Ripple ring 1 */}
+            <motion.circle
+              r={3.2} fill="none" stroke="#6366f1" strokeWidth={0.35}
+              animate={{ r: [3.0, 5.5], opacity: [0.7, 0] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeOut' }}
+            />
+            {/* Ripple ring 2 */}
+            <motion.circle
+              r={2.5} fill="none" stroke="#06b6d4" strokeWidth={0.28}
+              animate={{ r: [2.2, 4.2], opacity: [0.6, 0] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeOut', delay: 0.55 }}
+            />
+            {/* Solid dot */}
+            <circle r={1.35} fill="#6366f1" filter={`url(#${planId}-marker-glow)`} />
+            <circle r={0.65} fill="#ffffff" />
+            {/* Instruction tooltip */}
+            {(marker.instruction || marker.label) ? (
+              <g transform="translate(-12, -6.5)">
                 <rect
-                  width={Math.max(22, (marker.instruction || marker.label || '').length * 0.75 + 4)}
-                  height={3.0}
-                  rx={0.8}
-                  fill="#101527"
-                  opacity={0.94}
+                  width={Math.max(24, ((marker.instruction || marker.label) ?? '').length * 0.72 + 4)}
+                  height={3.4} rx={0.9}
+                  fill="#0f172a" stroke="#6366f1" strokeWidth={0.18}
+                  opacity={0.97}
                 />
-                <text x={1.6} y={2.0} style={{ fontSize: 1.1, fontWeight: 600 }} fill="#ffffff">
+                <text x={1.6} y={2.3} style={{ fontSize: 1.05, fontWeight: 600 }} fill="#e2e8f0">
                   {marker.instruction || marker.label}
                 </text>
               </g>
             ) : null}
-          </g>
+          </motion.g>
         ) : null}
       </svg>
 
+      {/* Dark HUD overlays */}
       <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-3">
-        <div className="pointer-events-auto rounded-[11px] border border-white/75 bg-white/92 px-3 py-2 shadow-[var(--shadow-card)] backdrop-blur-sm">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-mint-700">{editable ? 'Spatial editor' : 'Indoor map'}</p>
-          <p className="mt-0.5 text-[12px] font-semibold text-ink-800">{plan.building.code} · {plan.floor.name}</p>
-          <p className="mt-0.5 text-[10px] text-ink-500">{rooms.length} rooms · {width} × {height} {plan.floor.plan_units}</p>
+        <div className="pointer-events-auto rounded-[11px] border border-white/10 bg-slate-900/85 px-3 py-2 shadow-lg backdrop-blur-md">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-400">{editable ? 'Spatial editor' : 'Indoor map'}</p>
+          <p className="mt-0.5 text-[12px] font-semibold text-white">{plan.building.code} · {plan.floor.name}</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">{rooms.length} rooms · {width} × {height} {plan.floor.plan_units}</p>
         </div>
-        <div className="pointer-events-auto flex items-center gap-2 rounded-[11px] border border-white/75 bg-white/92 px-2.5 py-2 text-[10px] text-ink-500 shadow-[var(--shadow-card)] backdrop-blur-sm">
-          <span className="text-[14px] font-bold text-brand-700">N</span>
-          <span className="h-4 w-px bg-ink-200" />
+        <div className="pointer-events-auto flex items-center gap-2 rounded-[11px] border border-white/10 bg-slate-900/85 px-2.5 py-2 text-[10px] text-slate-300 shadow-lg backdrop-blur-md">
+          <span className="text-[14px] font-bold text-indigo-400">N</span>
+          <span className="h-4 w-px bg-slate-700" />
           <span>{showGraph ? `${navigationNodes.length} nodes` : showQr ? `${qrNodes.length} anchors` : 'Published plan'}</span>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-ink-100 bg-white/80 px-4 py-2 text-[11px] text-ink-500">
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/8 bg-slate-900/70 px-4 py-2 text-[11px] text-slate-400 backdrop-blur-sm">
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-ink-300" /> Room
+          <span className="h-2.5 w-2.5 rounded-sm bg-indigo-500/60 ring-1 ring-indigo-500" /> Room
         </span>
         {showGraph ? (
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-brand-600" /> Navigation node
+            <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" /> Navigation node
           </span>
         ) : null}
         {showQr ? (
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-signal-400" /> QR anchor
+            <span className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> QR anchor
           </span>
         ) : null}
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-signal-400 ring-2 ring-signal-200" /> Requires admission
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-amber-200/50" /> Requires admission
         </span>
-        {onMoveRoom ? <span className="ml-auto text-ink-400">Drag a room to reposition it in plan metres.</span> : null}
+        {routePaths.length > 0 ? (
+          <span className="flex items-center gap-1.5">
+            <span className="h-0.5 w-5 rounded-full" style={{ background: 'linear-gradient(90deg,#6366f1,#06b6d4,#10b981)' }} /> Route
+          </span>
+        ) : null}
+        {onMoveRoom ? <span className="ml-auto text-slate-500">Drag a room to reposition it in plan metres.</span> : null}
       </div>
     </div>
   );

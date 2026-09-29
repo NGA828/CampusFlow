@@ -576,14 +576,17 @@ class NavigationController extends Controller
                 continue;
             }
             $lastInLeg = end($currentLegNodes);
-            if ($lastInLeg->floor_id === $node->floor_id) {
+            $sameFloor = $lastInLeg->floor_id && $node->floor_id && $lastInLeg->floor_id === $node->floor_id;
+            
+            if ($sameFloor) {
                 $currentLegNodes[] = $node;
             } else {
+                $currentLegNodes[] = $node;
                 $legs[] = $this->buildLeg($currentLegNodes);
                 $currentLegNodes = [$node];
             }
         }
-        if (! empty($currentLegNodes)) {
+        if (! empty($currentLegNodes) && count($currentLegNodes) > 1) {
             $legs[] = $this->buildLeg($currentLegNodes);
         }
 
@@ -611,6 +614,18 @@ class NavigationController extends Controller
     private function buildLeg(array $legNodes): array
     {
         $first = $legNodes[0];
+        $allSameFloor = true;
+        $firstFloorId = $first->floor_id;
+        foreach ($legNodes as $n) {
+            if ($n->floor_id !== $firstFloorId) {
+                $allSameFloor = false;
+                break;
+            }
+        }
+
+        $floorId = $allSameFloor ? $firstFloorId : null;
+        $floorName = $allSameFloor ? ($first->floor?->name ?? 'Floor Plan') : 'Campus Grounds';
+
         $points = [];
         $geo = [];
 
@@ -637,10 +652,10 @@ class NavigationController extends Controller
         }
 
         return [
-            'floor_id'      => $first->floor_id,
-            'floor_name'    => $first->floor?->name ?? 'Campus Grounds',
-            'floor_level'   => $first->floor?->level ?? 0,
-            'building_code' => $first->building?->code ?? null,
+            'floor_id'      => $floorId,
+            'floor_name'    => $floorName,
+            'floor_level'   => $allSameFloor ? ($first->floor?->level ?? 1) : 0,
+            'building_code' => $allSameFloor ? ($first->building?->code ?? null) : null,
             'distance_m'    => round($distance, 1),
             'duration_s'    => (int) round($distance / 1.2),
             'points'        => $points,

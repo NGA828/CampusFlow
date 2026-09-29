@@ -161,6 +161,15 @@ class DatabaseSeeder extends Seeder
         $nSac101    = NavigationNode::create(['building_id' => $sac->id, 'floor_id' => $sacF1->id, 'room_id' => $sac101->id, 'label' => 'Gymnasium Entry Portal', 'type' => 'room_entry', 'plan_x' => 19.0, 'plan_y' => 14.0, 'is_accessible' => true]);
         $nAdm101    = NavigationNode::create(['building_id' => $adm->id, 'floor_id' => $admF1->id, 'room_id' => $adm101->id, 'label' => 'Admissions Counter Portal', 'type' => 'room_entry', 'plan_x' => 11.0, 'plan_y' => 9.0, 'is_accessible' => true]);
 
+        // Indoor Corridor Junction Nodes
+        $nStbCorr = NavigationNode::create(['building_id' => $stb->id, 'floor_id' => $stbF1->id, 'label' => 'STB Main Concourse Corridor', 'type' => 'junction', 'plan_x' => 10.0, 'plan_y' => 11.0, 'is_accessible' => true]);
+        $nSubCorr = NavigationNode::create(['building_id' => $sub->id, 'floor_id' => $subF1->id, 'label' => 'SUB Atrium Central Hallway', 'type' => 'junction', 'plan_x' => 8.0, 'plan_y' => 10.0, 'is_accessible' => true]);
+        $nLibCorr = NavigationNode::create(['building_id' => $lib->id, 'floor_id' => $libF1->id, 'label' => 'Library Main Foyer Junction', 'type' => 'junction', 'plan_x' => 12.0, 'plan_y' => 10.0, 'is_accessible' => true]);
+        $nEngCorr = NavigationNode::create(['building_id' => $eng->id, 'floor_id' => $engF1->id, 'label' => 'Engineering Hallway Corridor', 'type' => 'junction', 'plan_x' => 15.0, 'plan_y' => 10.0, 'is_accessible' => true]);
+        $nBusCorr = NavigationNode::create(['building_id' => $bus->id, 'floor_id' => $busF1->id, 'label' => 'Business Executive Hallway', 'type' => 'junction', 'plan_x' => 10.0, 'plan_y' => 9.0, 'is_accessible' => true]);
+        $nSacCorr = NavigationNode::create(['building_id' => $sac->id, 'floor_id' => $sacF1->id, 'label' => 'Sports Complex Concourse Corridor', 'type' => 'junction', 'plan_x' => 14.0, 'plan_y' => 14.0, 'is_accessible' => true]);
+        $nAdmCorr = NavigationNode::create(['building_id' => $adm->id, 'floor_id' => $admF1->id, 'label' => 'Admissions Welcome Hall Corridor', 'type' => 'junction', 'plan_x' => 9.0, 'plan_y' => 9.0, 'is_accessible' => true]);
+
         // Connect Central Plaza Hub to Building Entrances
         $outdoorNodes = [$nStbOut, $nSubOut, $nLibOut, $nEngOut, $nBusOut, $nSacOut, $nAdmOut];
         foreach ($outdoorNodes as $index => $node) {
@@ -174,14 +183,27 @@ class DatabaseSeeder extends Seeder
         NavigationEdge::create(['from_node_id' => $nSubOut->id, 'to_node_id' => $nBusOut->id, 'weight' => 45.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
         NavigationEdge::create(['from_node_id' => $nLibOut->id, 'to_node_id' => $nAdmOut->id, 'weight' => 38.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
 
-        // Indoor Edges
-        NavigationEdge::create(['from_node_id' => $nStbOut->id, 'to_node_id' => $nStbLab101->id, 'weight' => 15.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
-        NavigationEdge::create(['from_node_id' => $nSubOut->id, 'to_node_id' => $nSub101->id, 'weight' => 12.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
-        NavigationEdge::create(['from_node_id' => $nLibOut->id, 'to_node_id' => $nLib101->id, 'weight' => 14.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
-        NavigationEdge::create(['from_node_id' => $nEngOut->id, 'to_node_id' => $nEng101->id, 'weight' => 18.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
-        NavigationEdge::create(['from_node_id' => $nBusOut->id, 'to_node_id' => $nBus101->id, 'weight' => 16.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
-        NavigationEdge::create(['from_node_id' => $nSacOut->id, 'to_node_id' => $nSac101->id, 'weight' => 20.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
-        NavigationEdge::create(['from_node_id' => $nAdmOut->id, 'to_node_id' => $nAdm101->id, 'weight' => 10.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+        // Indoor Edges via Hallway Corridors
+        NavigationEdge::create(['from_node_id' => $nStbOut->id, 'to_node_id' => $nStbCorr->id, 'weight' => 6.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+        NavigationEdge::create(['from_node_id' => $nStbCorr->id, 'to_node_id' => $nStbLab101->id, 'weight' => 2.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+
+        NavigationEdge::create(['from_node_id' => $nSubOut->id, 'to_node_id' => $nSubCorr->id, 'weight' => 6.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+        NavigationEdge::create(['from_node_id' => $nSubCorr->id, 'to_node_id' => $nSub101->id, 'weight' => 3.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+
+        NavigationEdge::create(['from_node_id' => $nLibOut->id, 'to_node_id' => $nLibCorr->id, 'weight' => 4.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+        NavigationEdge::create(['from_node_id' => $nLibCorr->id, 'to_node_id' => $nLib101->id, 'weight' => 2.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+
+        NavigationEdge::create(['from_node_id' => $nEngOut->id, 'to_node_id' => $nEngCorr->id, 'weight' => 2.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+        NavigationEdge::create(['from_node_id' => $nEngCorr->id, 'to_node_id' => $nEng101->id, 'weight' => 3.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+
+        NavigationEdge::create(['from_node_id' => $nBusOut->id, 'to_node_id' => $nBusCorr->id, 'weight' => 4.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+        NavigationEdge::create(['from_node_id' => $nBusCorr->id, 'to_node_id' => $nBus101->id, 'weight' => 3.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+
+        NavigationEdge::create(['from_node_id' => $nSacOut->id, 'to_node_id' => $nSacCorr->id, 'weight' => 7.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+        NavigationEdge::create(['from_node_id' => $nSacCorr->id, 'to_node_id' => $nSac101->id, 'weight' => 5.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+
+        NavigationEdge::create(['from_node_id' => $nAdmOut->id, 'to_node_id' => $nAdmCorr->id, 'weight' => 4.5, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+        NavigationEdge::create(['from_node_id' => $nAdmCorr->id, 'to_node_id' => $nAdm101->id, 'weight' => 2.5, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
 
         // 8. Administrative Offices
         $registrar = Office::create(['code' => 'REG', 'name' => 'Office of the Registrar', 'description' => 'Transcripts, enrollment verifications, and graduation services.', 'status' => 'active', 'is_open' => true, 'avg_service_minutes' => 8, 'opening_hours' => 'Mon-Fri 08:00 - 17:00']);

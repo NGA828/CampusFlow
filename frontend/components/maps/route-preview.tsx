@@ -6,7 +6,7 @@ import { useAsync } from '@/lib/hooks';
 import { campusApi } from '@/lib/api/endpoints';
 import { CampusMap } from '@/components/maps/campus-map';
 import { FloorPlan } from '@/components/maps/floor-plan';
-import { Card, CardSkeleton, ErrorState, SectionHeading } from '@/components/ui/kit';
+import { Card, CardSkeleton, ErrorState } from '@/components/ui/kit';
 import type { NavigationWalking, Route } from '@/lib/api/types';
 
 interface RoutePreviewProps {
@@ -133,27 +133,27 @@ function RoutePreviewContent({ route, walking, onClearRoute }: RoutePreviewProps
   const totalTimeMinutes = Math.max(1, Math.ceil((route.distance_m ?? 0) / 75));
 
   return (
-    <Card className="!p-0 overflow-hidden border border-brand-100 shadow-md">
-      {/* Route Header & View Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 bg-white px-4 py-3">
+    <Card className="!p-0 overflow-hidden border border-indigo-900/50 shadow-xl bg-[linear-gradient(135deg,#0f172a,#1e293b)]">
+      {/* Route Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-slate-900/80 px-4 py-3 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           {onClearRoute ? (
             <button
               type="button"
               onClick={onClearRoute}
-              className="rounded-[9px] border border-ink-200 bg-ink-50 px-2.5 py-1.5 text-[11.5px] font-semibold text-ink-700 hover:bg-ink-100 transition-colors"
+              className="rounded-[9px] border border-white/15 bg-white/8 px-2.5 py-1.5 text-[11.5px] font-semibold text-slate-200 hover:bg-white/15 transition-colors backdrop-blur-sm"
             >
               ← Clear route
             </button>
           ) : null}
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">Route preview</span>
-              <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700">
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-400">Route preview</span>
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: 'rgba(99,102,241,0.25)', color: '#a5b4fc' }}>
                 {route.accessible ? 'Step-free' : route.uses_stairs ? 'Stairs' : 'Standard'}
               </span>
             </div>
-            <p className="mt-1 text-[15px] font-bold text-ink-900">
+            <p className="mt-1 text-[15px] font-bold text-white">
               {route.origin.label} → {route.destination.label}
             </p>
           </div>
@@ -162,7 +162,7 @@ function RoutePreviewContent({ route, walking, onClearRoute }: RoutePreviewProps
           <button
             type="button"
             onClick={() => setMode('campus')}
-            className={`rounded-[10px] px-3 py-1.5 text-[12px] font-semibold transition-colors ${mode === 'campus' ? 'bg-brand-600 text-white shadow-sm' : 'bg-ink-50 text-ink-600 hover:bg-ink-100'}`}
+            className={`rounded-[10px] px-3 py-1.5 text-[12px] font-semibold transition-all ${mode === 'campus' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'bg-white/8 text-slate-300 hover:bg-white/15'}`}
           >
             Campus Map
           </button>
@@ -170,15 +170,15 @@ function RoutePreviewContent({ route, walking, onClearRoute }: RoutePreviewProps
             type="button"
             onClick={() => setMode('indoor')}
             disabled={!indoorLeg}
-            className={`rounded-[10px] px-3 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-40 ${mode === 'indoor' ? 'bg-brand-600 text-white shadow-sm' : 'bg-ink-50 text-ink-600 hover:bg-ink-100'}`}
+            className={`rounded-[10px] px-3 py-1.5 text-[12px] font-semibold transition-all disabled:opacity-40 ${mode === 'indoor' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'bg-white/8 text-slate-300 hover:bg-white/15'}`}
           >
             Indoor Plan
           </button>
         </div>
       </div>
 
-      {/* Interactive Simulation & Playback Control Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-brand-900 px-4 py-2.5 text-white">
+      {/* Playback Control Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 px-4 py-2.5" style={{ background: 'linear-gradient(90deg, rgba(99,102,241,0.18) 0%, rgba(6,182,212,0.12) 100%)' }}>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -186,7 +186,8 @@ function RoutePreviewContent({ route, walking, onClearRoute }: RoutePreviewProps
               if (activeStep >= steps.length - 1) setActiveStep(0);
               setIsPlaying(!isPlaying);
             }}
-            className="flex min-h-8 min-w-8 items-center justify-center rounded-lg bg-mint-500 font-bold text-[13px] text-ink-950 transition-colors hover:bg-mint-400"
+            className="flex min-h-8 min-w-8 items-center justify-center rounded-lg text-[13px] font-bold text-white transition-colors hover:opacity-90 shadow-lg"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #06b6d4)' }}
             aria-label={isPlaying ? 'Pause simulation' : 'Play simulation'}
           >
             {isPlaying ? '⏸' : '▶'}
@@ -198,7 +199,7 @@ function RoutePreviewContent({ route, walking, onClearRoute }: RoutePreviewProps
               setIsPlaying(false);
               setActiveStep((s) => Math.max(0, s - 1));
             }}
-            className="rounded-lg bg-brand-800 px-2.5 py-1 text-[12px] font-semibold text-brand-100 hover:bg-brand-700 disabled:opacity-30"
+            className="rounded-lg border border-white/15 bg-white/8 px-2.5 py-1 text-[12px] font-semibold text-slate-200 hover:bg-white/15 disabled:opacity-30 backdrop-blur-sm"
           >
             ◀ Prev
           </button>
@@ -209,19 +210,19 @@ function RoutePreviewContent({ route, walking, onClearRoute }: RoutePreviewProps
               setIsPlaying(false);
               setActiveStep((s) => Math.min(steps.length - 1, s + 1));
             }}
-            className="rounded-lg bg-brand-800 px-2.5 py-1 text-[12px] font-semibold text-brand-100 hover:bg-brand-700 disabled:opacity-30"
+            className="rounded-lg border border-white/15 bg-white/8 px-2.5 py-1 text-[12px] font-semibold text-slate-200 hover:bg-white/15 disabled:opacity-30 backdrop-blur-sm"
           >
             Next ▶
           </button>
         </div>
         <div className="flex items-center gap-3 text-[12px]">
-          <span className="font-medium text-brand-200">
+          <span className="font-medium text-slate-300">
             Step {activeStep + 1} of {steps.length}
           </span>
-          <div className="h-2 w-28 overflow-hidden rounded-full bg-brand-800">
+          <div className="h-2 w-28 overflow-hidden rounded-full bg-white/12">
             <div
-              className="h-full bg-mint-400 transition-all duration-300"
-              style={{ width: `${((activeStep + 1) / steps.length) * 100}%` }}
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${((activeStep + 1) / steps.length) * 100}%`, background: 'linear-gradient(90deg, #6366f1, #06b6d4)' }}
             />
           </div>
         </div>
@@ -258,34 +259,32 @@ function RoutePreviewContent({ route, walking, onClearRoute }: RoutePreviewProps
       )}
 
       {/* Route Metrics Summary */}
-      <div className="grid grid-cols-2 gap-4 border-t border-ink-100 bg-ink-50/70 px-4 py-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 border-y border-white/8 px-4 py-3 sm:grid-cols-4" style={{ background: 'rgba(15,23,42,0.7)' }}>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">Distance</p>
-          <p className="text-[15px] font-bold text-ink-900">{Math.round(route.distance_m ?? 0)} metres</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">Distance</p>
+          <p className="text-[15px] font-bold text-white">{Math.round(route.distance_m ?? 0)} metres</p>
         </div>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">Est. Walk Time</p>
-          <p className="text-[15px] font-bold text-ink-900">~{totalTimeMinutes} min</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">Est. Walk Time</p>
+          <p className="text-[15px] font-bold text-white">~{totalTimeMinutes} min</p>
         </div>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">Floor Changes</p>
-          <p className="text-[15px] font-bold text-ink-900">{route.transitions.length}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">Floor Changes</p>
+          <p className="text-[15px] font-bold text-white">{route.transitions.length}</p>
         </div>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">Accessibility</p>
-          <p className="text-[15px] font-bold text-ink-900">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">Accessibility</p>
+          <p className="text-[15px] font-bold text-white">
             {route.accessible ? '100% Step-free' : route.uses_stairs ? 'Stairs required' : 'Elevators / Standard'}
           </p>
         </div>
       </div>
 
-      {/* Turn-by-Turn Visual Directions List */}
-      <div className="border-t border-ink-100 px-4 py-4">
-        <SectionHeading
-          title="Turn-by-turn directions & playback"
-          description="Click any step to inspect and position the route map at that location."
-        />
-        <div className="mt-3 space-y-2">
+      {/* Turn-by-turn Visual Directions */}
+      <div className="border-t border-white/8 px-4 py-4" style={{ background: 'rgba(15,23,42,0.75)' }}>
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-400">Turn-by-turn directions</p>
+        <p className="mt-0.5 mb-3 text-[12px] text-slate-400">Click any step to inspect the route map at that location.</p>
+        <div className="space-y-2">
           {steps.map((step, index) => {
             const isActive = index === activeStep;
             const stepIcon =
@@ -303,30 +302,32 @@ function RoutePreviewContent({ route, walking, onClearRoute }: RoutePreviewProps
                 }}
                 className={`group flex cursor-pointer items-center justify-between rounded-xl border p-3 transition-all ${
                   isActive
-                    ? 'border-brand-500 bg-brand-50/60 shadow-sm ring-2 ring-brand-500/20'
-                    : 'border-ink-100 bg-white hover:border-brand-200 hover:bg-ink-50/50'
+                    ? 'border-indigo-500/60 shadow-md ring-1 ring-indigo-500/30'
+                    : 'border-white/8 hover:border-indigo-500/30 hover:bg-white/5'
                 }`}
+                style={isActive ? { background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(6,182,212,0.12))' } : {}}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[16px] font-bold ${
-                      isActive ? 'bg-brand-600 text-white shadow-sm' : 'bg-ink-100 text-ink-700'
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[16px] font-bold transition-all ${
+                      isActive ? 'shadow-lg' : 'bg-white/8'
                     }`}
+                    style={isActive ? { background: 'linear-gradient(135deg, #6366f1, #06b6d4)' } : {}}
                   >
                     {stepIcon}
                   </div>
                   <div>
-                    <p className={`text-[13px] font-bold ${isActive ? 'text-brand-900' : 'text-ink-800'}`}>
+                    <p className={`text-[13px] font-bold ${isActive ? 'text-white' : 'text-slate-300'}`}>
                       {step.instruction}
                     </p>
                     {step.floor_name ? (
-                      <p className="text-[11px] text-ink-500">{step.floor_name}</p>
+                      <p className="text-[11px] text-slate-500">{step.floor_name}</p>
                     ) : null}
                   </div>
                 </div>
                 {step.distance_m > 0 ? (
                   <div className="text-right">
-                    <span className="text-[12px] font-semibold text-ink-600">
+                    <span className={`text-[12px] font-semibold ${isActive ? 'text-cyan-400' : 'text-slate-500'}`}>
                       {Math.round(step.distance_m)} m
                     </span>
                   </div>
@@ -338,10 +339,10 @@ function RoutePreviewContent({ route, walking, onClearRoute }: RoutePreviewProps
       </div>
 
       {route.destination.room_id ? (
-        <div className="border-t border-ink-100 bg-ink-50/40 px-4 py-3">
+        <div className="border-t border-white/8 px-4 py-3" style={{ background: 'rgba(15,23,42,0.7)' }}>
           <Link
             href={`/student/campus/rooms/${route.destination.label.split(' ')[0]}`}
-            className="inline-flex items-center gap-1.5 text-[13px] font-bold text-brand-700 hover:text-brand-800"
+            className="inline-flex items-center gap-1.5 text-[13px] font-bold text-indigo-400 hover:text-cyan-400 transition-colors"
           >
             View destination room details →
           </Link>
