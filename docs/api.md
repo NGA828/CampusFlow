@@ -179,3 +179,6 @@ Existing `/api/v1/admin/{buildings,floors,rooms}` GET/POST and corresponding
 
 Five Laravel feature tests cover these contracts but remain **unexecuted** without PHP/Composer.
 Browser verification uses raw-wire fixtures; it is not production authorization/database evidence.
+
+### Navigation preview integrity (2026-09-29)
+`POST /campus/navigation/route` uses Dijkstra over active nodes and non-negative metre-weighted edges. Accessibility filters apply to both edge endpoints and edges; stairs/stairwells are excluded when step-free is requested. No origin, disconnected destinations, or excluded endpoints produce HTTP 422 instead of a successful empty route. Each returned step includes `node_id`, referencing the ordered `route.nodes` array. Indoor leg `points` are confined to a single floor; `geo` belongs to outdoor/entrance connections. Clients must not connect missing coordinates or floor transitions into a straight line. A room without a navigation node is not silently substituted with an arbitrary node on its floor.

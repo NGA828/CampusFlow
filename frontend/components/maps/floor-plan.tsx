@@ -9,6 +9,7 @@
  */
 import { useId, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { routeSegments } from '@/lib/maps/route-geometry';
 import { cx } from '@/components/ui/kit';
 import type { FloorPlanPayload, NavigationNode, Room, Route } from '@/lib/api/types';
 
@@ -74,14 +75,9 @@ export function FloorPlan({
 
   const routePaths = useMemo(() => {
     if (!route) return [] as string[];
-    return route.legs
-      .filter((leg) => !leg.floor_id || leg.floor_id === plan.floor.id)
-      .map((leg) => {
-        const points = (leg.points ?? []).filter((point) => typeof point.x === 'number' && typeof point.y === 'number');
-        if (points.length < 2) return '';
-        return points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(' ');
-      })
-      .filter(Boolean);
+    return routeSegments(route, plan.floor.id).map(({ from, to }) =>
+      `M${from.x},${from.y} L${to.x},${to.y}`);
+
   }, [route, plan.floor.id]);
 
   const busy = useMemo(() => new Set(busyRoomIds.length ? busyRoomIds : Object.keys(plan.busy ?? {})), [busyRoomIds, plan.busy]);
@@ -104,6 +100,20 @@ export function FloorPlan({
       className={cx('relative overflow-hidden rounded-[var(--radius-card)] border border-slate-700/60 shadow-[var(--shadow-card)]', className)}
       style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f2027 100%)' }}
     >
+      {/* Dark HUD overlays */}
+      <div className="flex items-start justify-between gap-3 p-3">
+        <div className="pointer-events-auto rounded-[11px] border border-white/10 bg-slate-900/85 px-3 py-2 shadow-lg backdrop-blur-md">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-400">{editable ? 'Spatial editor' : 'Indoor map'}</p>
+          <p className="mt-0.5 text-[12px] font-semibold text-white">{plan.building.code} · {plan.floor.name}</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">{rooms.length} rooms · {width} × {height} {plan.floor.plan_units}</p>
+        </div>
+        <div className="pointer-events-auto flex items-center gap-2 rounded-[11px] border border-white/10 bg-slate-900/85 px-2.5 py-2 text-[10px] text-slate-300 shadow-lg backdrop-blur-md">
+          <span className="text-[14px] font-bold text-indigo-400">L{plan.floor.level}</span>
+          <span className="h-4 w-px bg-slate-700" />
+          <span>{showGraph ? `${navigationNodes.length} nodes` : showQr ? `${qrNodes.length} anchors` : 'Published plan'}</span>
+        </div>
+      </div>
+
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="h-full max-h-[70vh] w-full touch-none"
@@ -114,6 +124,9 @@ export function FloorPlan({
         onPointerLeave={() => setDrag(null)}
       >
         <defs>
+          <marker id={`${planId}-direction`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="3" markerHeight="3" orient="auto">
+            <path d="M0 0 L10 5 L0 10 z" fill="#67e8f9" />
+          </marker>
           {/* Dark blueprint surface */}
           <linearGradient id={`${planId}-surface`} x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor="#0f172a" />
@@ -319,58 +332,25 @@ export function FloorPlan({
 
         {routePaths.map((path, index) => (
           <g key={index}>
-            {/* Outer glow halo */}
-            <path
-              d={path} fill="none"
-              stroke={`url(#${planId}-route-glow)`}
-              strokeWidth={3.5}
-              strokeLinecap="round" strokeLinejoin="round"
-              opacity={0.2}
-              filter={`url(#${planId}-route-filter)`}
-            />
-            {/* Animated solid core */}
-            <motion.path
-              d={path} fill="none"
-              stroke={`url(#${planId}-route-glow)`}
-              strokeWidth={1.4}
-              strokeLinecap="round" strokeLinejoin="round"
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: 1, opacity: 1 }}
-              transition={{ duration: 2.0, ease: [0.25, 0.46, 0.45, 0.94] }}
-            />
-            {/* Dashed white overlay for dimension */}
-            <motion.path
-              d={path} fill="none"
-              stroke="#ffffff"
-              strokeWidth={0.35}
-              strokeLinecap="round"
-              strokeDasharray="0.8 2.0"
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: 1, opacity: 0.4 }}
-              transition={{ duration: 2.2, ease: 'easeOut', delay: 0.3 }}
-            />
+            <path d={path} fill="none" stroke="#0f172a" strokeWidth={2} />
+            <path data-testid="indoor-route" d={path} fill="none" stroke="#67e8f9" strokeWidth={0.65}
+              strokeLinecap="round" markerEnd={`url(#${planId}-direction)`} />
+
           </g>
         ))}
 
+        {[{ node: route?.origin.node, label: 'Start', color: '#a5b4fc' }, { node: route?.destination.node, label: 'Destination', color: '#fda4af' }].map(({ node, label, color }) =>
+          node?.floor_id === plan.floor.id && typeof node.plan_x === 'number' && typeof node.plan_y === 'number' ? (
+            <g key={label} transform={`translate(${node.plan_x}, ${node.plan_y})`} role="img" aria-label={label}>
+              <circle r={1.1} fill={color} stroke="#0f172a" strokeWidth={0.2} />
+              <text y={2.6} textAnchor="middle" fill={color} style={{ fontSize: 1, fontWeight: 700 }}>{label}</text>
+            </g>
+          ) : null,
+        )}
+
         {marker ? (
-          <motion.g
-            transform={`translate(${marker.x}, ${marker.y})`}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.4, type: 'spring', stiffness: 200 }}
-          >
-            {/* Ripple ring 1 */}
-            <motion.circle
-              r={3.2} fill="none" stroke="#6366f1" strokeWidth={0.35}
-              animate={{ r: [3.0, 5.5], opacity: [0.7, 0] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeOut' }}
-            />
-            {/* Ripple ring 2 */}
-            <motion.circle
-              r={2.5} fill="none" stroke="#06b6d4" strokeWidth={0.28}
-              animate={{ r: [2.2, 4.2], opacity: [0.6, 0] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeOut', delay: 0.55 }}
-            />
+          <g data-testid="route-position" transform={`translate(${marker.x}, ${marker.y})`}>
+            <circle r={2.4} fill="none" stroke="#67e8f9" strokeWidth={0.3} />
             {/* Solid dot */}
             <circle r={1.35} fill="#6366f1" filter={`url(#${planId}-marker-glow)`} />
             <circle r={0.65} fill="#ffffff" />
@@ -388,23 +368,9 @@ export function FloorPlan({
                 </text>
               </g>
             ) : null}
-          </motion.g>
+          </g>
         ) : null}
       </svg>
-
-      {/* Dark HUD overlays */}
-      <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-3">
-        <div className="pointer-events-auto rounded-[11px] border border-white/10 bg-slate-900/85 px-3 py-2 shadow-lg backdrop-blur-md">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-400">{editable ? 'Spatial editor' : 'Indoor map'}</p>
-          <p className="mt-0.5 text-[12px] font-semibold text-white">{plan.building.code} · {plan.floor.name}</p>
-          <p className="mt-0.5 text-[10px] text-slate-400">{rooms.length} rooms · {width} × {height} {plan.floor.plan_units}</p>
-        </div>
-        <div className="pointer-events-auto flex items-center gap-2 rounded-[11px] border border-white/10 bg-slate-900/85 px-2.5 py-2 text-[10px] text-slate-300 shadow-lg backdrop-blur-md">
-          <span className="text-[14px] font-bold text-indigo-400">N</span>
-          <span className="h-4 w-px bg-slate-700" />
-          <span>{showGraph ? `${navigationNodes.length} nodes` : showQr ? `${qrNodes.length} anchors` : 'Published plan'}</span>
-        </div>
-      </div>
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/8 bg-slate-900/70 px-4 py-2 text-[11px] text-slate-400 backdrop-blur-sm">

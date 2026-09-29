@@ -1,353 +1,102 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useAsync } from '@/lib/hooks';
 import { campusApi } from '@/lib/api/endpoints';
-import { CampusMap } from '@/components/maps/campus-map';
-import { FloorPlan } from '@/components/maps/floor-plan';
+import { CampusMap } from './campus-map';
+import { FloorPlan } from './floor-plan';
 import { Card, CardSkeleton, ErrorState } from '@/components/ui/kit';
+import { finite, routeSegments, stepNode } from '@/lib/maps/route-geometry';
 import type { NavigationWalking, Route } from '@/lib/api/types';
+import s from './route-preview.module.css';
 
-interface RoutePreviewProps {
-  route: Route;
-  walking: NavigationWalking | null;
-  onClearRoute?: () => void;
-}
+interface Props { route: Route; walking: NavigationWalking | null; onClearRoute?: () => void }
 
-/**
- * Route visualisation. Outdoor legs are drawn on the schematic campus map, indoor legs
- * on the floor plan of the leg's floor — no third-party tiles are involved.
- */
-export function RoutePreview({ route, walking, onClearRoute }: RoutePreviewProps) {
-  if (
-    !Array.isArray(route.nodes) ||
-    !Array.isArray(route.legs) ||
-    !Array.isArray(route.steps) ||
-    !Array.isArray(route.transitions) ||
-    !route.origin ||
-    !route.destination
-  ) {
-    return (
-      <Card>
-        <ErrorState message="This route is incomplete. Please plan the route again after the navigation service is updated." />
-      </Card>
-    );
+export function RoutePreview({ route, onClearRoute }: Props) {
+  if (!Array.isArray(route.nodes) || !route.nodes.length || !Array.isArray(route.steps) || !route.steps.length || !Array.isArray(route.legs) || !route.origin || !route.destination) {
+    return <Card><ErrorState message="No walkable route is available. Choose another starting point or ask campus staff to check the published paths." />
+      {onClearRoute && <button onClick={onClearRoute}>Change route</button>}
+    </Card>;
   }
-
-  return <RoutePreviewContent route={route} walking={walking} onClearRoute={onClearRoute} />;
+  // A newly calculated route starts at its origin, not the previous route's step.
+  return <RouteContent key={JSON.stringify(route)} route={route} onClearRoute={onClearRoute} />;
 }
 
-function RoutePreviewContent({ route, walking, onClearRoute }: RoutePreviewProps) {
-  const [mode, setMode] = useState<'campus' | 'indoor'>(() => (route.legs.some((leg) => leg.floor_id) ? 'indoor' : 'campus'));
-  const [activeStep, setActiveStep] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-
+function RouteContent({ route, onClearRoute }: Omit<Props, 'walking'>) {
+  const [active, setActive] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [view, setView] = useState<string | null | undefined>(undefined);
+  const step = route.steps[active];
+  const node = stepNode(route, step, active);
+  const floorId = view === undefined ? (node?.floor_id ?? step.floor_id ?? null) : view;
   const buildings = useAsync(() => campusApi.buildings(), []);
+  const plan = useAsync(() => floorId ? campusApi.floorPlan(floorId) : Promise.resolve(null), [floorId]);
+  const floors = [...new Set(route.nodes.map(n => n.floor_id).filter((id): id is string => !!id))];
+  const segments = routeSegments(route, floorId);
+  const select = (index: number) => { setActive(index); setView(undefined); setPlaying(false); };
 
-  const steps = useMemo(() => {
-    if (route.steps.length > 0) return route.steps;
-    return [
-      { index: 0, instruction: `Start at ${route.origin.label}`, kind: 'start', distance_m: 0, duration_s: 0, floor_id: route.legs[0]?.floor_id ?? null },
-      ...route.legs.map((leg, i) => ({
-        index: i + 1,
-        instruction: leg.floor_name ? `Walk along ${leg.floor_name}` : 'Walk across campus grounds',
-        kind: 'walk',
-        distance_m: leg.distance_m,
-        duration_s: leg.duration_s,
-        floor_id: leg.floor_id,
-      })),
-      { index: route.legs.length + 1, instruction: `Arrive at ${route.destination.label}`, kind: 'arrive', distance_m: 0, duration_s: 0, floor_id: route.legs[route.legs.length - 1]?.floor_id ?? null },
-    ];
-  }, [route.steps, route.origin.label, route.destination.label, route.legs]);
-
-  const currentStep = steps[Math.min(activeStep, steps.length - 1)];
-
-  // Active indoor floor plan
-  const indoorLeg = useMemo(() => {
-    const legs = route.legs.filter((leg) => leg.floor_id);
-    if (legs.length === 0) return null;
-    const stepFloorId = currentStep?.floor_id ?? null;
-    if (stepFloorId) {
-      const match = legs.find((leg) => leg.floor_id === stepFloorId);
-      if (match) return match;
-    }
-    return legs[0] ?? null;
-  }, [route.legs, currentStep]);
-
-  const plan = useAsync(
-    () => (indoorLeg?.floor_id ? campusApi.floorPlan(indoorLeg.floor_id) : Promise.resolve(null)),
-    [indoorLeg?.floor_id],
-  );
-
-  // Simulation playback loop
   useEffect(() => {
-    if (!isPlaying) return;
-    const interval = setInterval(() => {
-      setActiveStep((prev) => {
-        if (prev >= steps.length - 1) {
-          setIsPlaying(false);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 2200);
-    return () => clearInterval(interval);
-  }, [isPlaying, steps.length]);
+    if (!playing) return;
+    const timer = setTimeout(() => {
+      if (active >= route.steps.length - 1) setPlaying(false);
+      else { setActive(active + 1); setView(undefined); }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [playing, active, route.steps.length]);
 
-  // Sync mode based on whether active step is indoor vs outdoor
-  useEffect(() => {
-    if (currentStep?.floor_id) {
-      setMode('indoor');
-    } else {
-      setMode('campus');
-    }
-  }, [activeStep, currentStep?.floor_id]);
+  const marker = node?.floor_id === floorId && finite(node?.plan_x) && finite(node?.plan_y)
+    ? { x: node.plan_x, y: node.plan_y, label: `Step ${active + 1}` } : null;
+  const geoMarker = node && finite(node.lat) && finite(node.lng)
+    ? [{ lat: node.lat, lng: node.lng, label: `Step ${active + 1}`, tone: 'user' as const }] : [];
+  const remaining = route.steps.slice(active + 1).reduce((sum, next) => sum + next.distance_m, 0);
+  const floorLabel = (id: string) => route.steps.find(item => item.floor_id === id)?.floor_name
+    ?? route.legs.find(leg => leg.floor_id === id)?.floor_name ?? 'Indoor floor';
 
-  const stepInstructionText = useMemo(() => {
-    if (!currentStep) return 'Walking route';
-    const distText = currentStep.distance_m > 0 ? ` · ${Math.round(currentStep.distance_m)} m remaining` : '';
-    return `${currentStep.instruction}${distText}`;
-  }, [currentStep]);
-
-  // Calculate marker for current step on indoor plan
-  const markerPoint = useMemo(() => {
-    if (!indoorLeg) return null;
-    const node = route.nodes.find((n) => n.floor_id === indoorLeg.floor_id);
-    if (node && typeof node.plan_x === 'number' && typeof node.plan_y === 'number') {
-      return { x: Number(node.plan_x), y: Number(node.plan_y), label: 'Walker', instruction: stepInstructionText };
-    }
-    const legPoint = indoorLeg.points?.[0];
-    if (legPoint) return { x: legPoint.x, y: legPoint.y, label: 'Walker', instruction: stepInstructionText };
-    return null;
-  }, [indoorLeg, route.nodes, stepInstructionText]);
-
-  const campusMarker = useMemo(() => {
-    const node = route.nodes[Math.min(activeStep, route.nodes.length - 1)];
-    if (node && typeof node.lat === 'number' && typeof node.lng === 'number') {
-      return [{ lat: node.lat, lng: node.lng, label: 'Walker', tone: 'user' as const, instruction: stepInstructionText }];
-    }
-    return [];
-  }, [route.nodes, activeStep, stepInstructionText]);
-
-  const totalTimeMinutes = Math.max(1, Math.ceil((route.distance_m ?? 0) / 75));
-
-  return (
-    <Card className="!p-0 overflow-hidden border border-indigo-900/50 shadow-xl bg-[linear-gradient(135deg,#0f172a,#1e293b)]">
-      {/* Route Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-slate-900/80 px-4 py-3 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          {onClearRoute ? (
-            <button
-              type="button"
-              onClick={onClearRoute}
-              className="rounded-[9px] border border-white/15 bg-white/8 px-2.5 py-1.5 text-[11.5px] font-semibold text-slate-200 hover:bg-white/15 transition-colors backdrop-blur-sm"
-            >
-              ← Clear route
-            </button>
-          ) : null}
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-400">Route preview</span>
-              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: 'rgba(99,102,241,0.25)', color: '#a5b4fc' }}>
-                {route.accessible ? 'Step-free' : route.uses_stairs ? 'Stairs' : 'Standard'}
-              </span>
-            </div>
-            <p className="mt-1 text-[15px] font-bold text-white">
-              {route.origin.label} → {route.destination.label}
-            </p>
-          </div>
+  return <section className={s.preview} aria-label="Visual route preview">
+    <header className={s.header}>
+      <div><p className={s.eyebrow}>YOUR WALK ACROSS CAMPUS</p><h2>{route.origin.label} <span aria-hidden="true">→</span> {route.destination.label}</h2>
+        <p>Shortest published {route.accessible ? 'step-free ' : ''}path · Preview, not live location</p></div>
+      {onClearRoute && <button className={s.button} onClick={onClearRoute}>Change route</button>}
+    </header>
+    <div className={s.metrics}>
+      <span><strong>{Math.round(route.distance_m)} m</strong> total distance</span>
+      <span><strong>{Math.max(1, Math.ceil(route.duration_s / 60))} min</strong> estimated walk</span>
+      <span><strong>{route.accessible ? 'Step-free requested' : route.uses_stairs ? 'Includes stairs' : 'Standard walking'}</strong> route preference</span>
+    </div>
+    <div className={s.workspace}>
+      <div className={s.visual}>
+        <div className={s.toolbar}>
+          <label>Map view <select aria-label="Route map view" value={floorId ?? ''} onChange={e => { setView(e.target.value || null); setPlaying(false); }}>
+            <option value="">Campus outdoors</option>
+            {floors.map(id => <option key={id} value={id}>{floorLabel(id)}</option>)}
+          </select></label>
+          <button className={s.button} onClick={() => setView(undefined)}>Show selected step</button>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setMode('campus')}
-            className={`rounded-[10px] px-3 py-1.5 text-[12px] font-semibold transition-all ${mode === 'campus' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'bg-white/8 text-slate-300 hover:bg-white/15'}`}
-          >
-            Campus Map
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('indoor')}
-            disabled={!indoorLeg}
-            className={`rounded-[10px] px-3 py-1.5 text-[12px] font-semibold transition-all disabled:opacity-40 ${mode === 'indoor' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'bg-white/8 text-slate-300 hover:bg-white/15'}`}
-          >
-            Indoor Plan
-          </button>
+        {floorId ? (
+          plan.error ? <ErrorState message={plan.error} onRetry={plan.reload} /> :
+          plan.loading || !plan.data || plan.data.floor.id !== floorId ? <CardSkeleton rows={7} /> :
+          <FloorPlan plan={plan.data} route={route} marker={marker} />
+        ) : buildings.error ? <ErrorState message={buildings.error} onRetry={buildings.reload} /> :
+          buildings.loading ? <CardSkeleton rows={7} /> :
+          <CampusMap buildings={buildings.data?.buildings ?? []} route={route} markers={geoMarker} height={460} />}
+        {!segments.length && <p className={s.notice}>No walking line is published for this view. {floorId ? 'This may be a floor transition or a single location.' : 'Choose an indoor floor to see its corridor route.'} We do not draw a straight-line shortcut.</p>}
+        <div className={s.legend}><span>● Start: {route.origin.label}</span><span>→ Arrows show travel direction</span><span>◎ Destination: {route.destination.label}</span></div>
+        <div className={s.current} aria-live="polite"><span className={s.stepNumber}>{active + 1}</span><div><strong>{step.instruction}</strong><p>{floorId ? floorLabel(floorId) : 'Campus outdoors'} · {Math.round(remaining)} m after this step</p></div></div>
+        {!node && <p className={s.notice}>This instruction has no mapped position. The full published route remains visible.</p>}
+        <div className={s.controls}>
+          <button className={s.button} disabled={active === 0} onClick={() => select(active - 1)}>← Previous</button>
+          <button className={s.play} onClick={() => { if (active === route.steps.length - 1) select(0); setPlaying(!playing); }}>{playing ? 'Pause preview' : 'Play step preview'}</button>
+          <button className={s.button} disabled={active === route.steps.length - 1} onClick={() => select(active + 1)}>Next →</button>
         </div>
       </div>
-
-      {/* Playback Control Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 px-4 py-2.5" style={{ background: 'linear-gradient(90deg, rgba(99,102,241,0.18) 0%, rgba(6,182,212,0.12) 100%)' }}>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (activeStep >= steps.length - 1) setActiveStep(0);
-              setIsPlaying(!isPlaying);
-            }}
-            className="flex min-h-8 min-w-8 items-center justify-center rounded-lg text-[13px] font-bold text-white transition-colors hover:opacity-90 shadow-lg"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #06b6d4)' }}
-            aria-label={isPlaying ? 'Pause simulation' : 'Play simulation'}
-          >
-            {isPlaying ? '⏸' : '▶'}
+      <aside className={s.directions} aria-label="Route directions"><h3>Your route, step by step</h3><p>Select a step to see its position on the correct floor.</p>
+        <ol>{route.steps.map((item, index) => <li key={index}>
+          <button aria-current={active === index ? 'step' : undefined} onClick={() => select(index)}>
+            <span className={s.stepNumber}>{index + 1}</span><span><strong>{item.instruction}</strong><small>{item.floor_name || 'Campus outdoors'}{item.distance_m > 0 ? ` · ${Math.round(item.distance_m)} m` : ''}</small></span>
           </button>
-          <button
-            type="button"
-            disabled={activeStep === 0}
-            onClick={() => {
-              setIsPlaying(false);
-              setActiveStep((s) => Math.max(0, s - 1));
-            }}
-            className="rounded-lg border border-white/15 bg-white/8 px-2.5 py-1 text-[12px] font-semibold text-slate-200 hover:bg-white/15 disabled:opacity-30 backdrop-blur-sm"
-          >
-            ◀ Prev
-          </button>
-          <button
-            type="button"
-            disabled={activeStep >= steps.length - 1}
-            onClick={() => {
-              setIsPlaying(false);
-              setActiveStep((s) => Math.min(steps.length - 1, s + 1));
-            }}
-            className="rounded-lg border border-white/15 bg-white/8 px-2.5 py-1 text-[12px] font-semibold text-slate-200 hover:bg-white/15 disabled:opacity-30 backdrop-blur-sm"
-          >
-            Next ▶
-          </button>
-        </div>
-        <div className="flex items-center gap-3 text-[12px]">
-          <span className="font-medium text-slate-300">
-            Step {activeStep + 1} of {steps.length}
-          </span>
-          <div className="h-2 w-28 overflow-hidden rounded-full bg-white/12">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${((activeStep + 1) / steps.length) * 100}%`, background: 'linear-gradient(90deg, #6366f1, #06b6d4)' }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Map / Floor Plan Visual Area */}
-      {mode === 'campus' ? (
-        buildings.loading ? (
-          <CardSkeleton rows={6} />
-        ) : (
-          <CampusMap
-            buildings={buildings.data?.buildings ?? []}
-            route={route}
-            markers={campusMarker}
-            height={420}
-            className="rounded-none border-0"
-          />
-        )
-      ) : plan.error ? (
-        <div className="p-4">
-          <ErrorState message={plan.error} onRetry={plan.reload} />
-        </div>
-      ) : plan.loading || !plan.data ? (
-        <div className="p-4">
-          <CardSkeleton rows={6} />
-        </div>
-      ) : (
-        <FloorPlan
-          plan={plan.data}
-          route={route}
-          marker={markerPoint}
-          className="rounded-none border-0"
-        />
-      )}
-
-      {/* Route Metrics Summary */}
-      <div className="grid grid-cols-2 gap-4 border-y border-white/8 px-4 py-3 sm:grid-cols-4" style={{ background: 'rgba(15,23,42,0.7)' }}>
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">Distance</p>
-          <p className="text-[15px] font-bold text-white">{Math.round(route.distance_m ?? 0)} metres</p>
-        </div>
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">Est. Walk Time</p>
-          <p className="text-[15px] font-bold text-white">~{totalTimeMinutes} min</p>
-        </div>
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">Floor Changes</p>
-          <p className="text-[15px] font-bold text-white">{route.transitions.length}</p>
-        </div>
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">Accessibility</p>
-          <p className="text-[15px] font-bold text-white">
-            {route.accessible ? '100% Step-free' : route.uses_stairs ? 'Stairs required' : 'Elevators / Standard'}
-          </p>
-        </div>
-      </div>
-
-      {/* Turn-by-turn Visual Directions */}
-      <div className="border-t border-white/8 px-4 py-4" style={{ background: 'rgba(15,23,42,0.75)' }}>
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-400">Turn-by-turn directions</p>
-        <p className="mt-0.5 mb-3 text-[12px] text-slate-400">Click any step to inspect the route map at that location.</p>
-        <div className="space-y-2">
-          {steps.map((step, index) => {
-            const isActive = index === activeStep;
-            const stepIcon =
-              step.kind === 'start' ? '📍' :
-              step.kind === 'arrive' ? '🎯' :
-              step.kind === 'elevator' ? '🛗' :
-              step.kind === 'stairs' ? '🪜' : '🚶';
-
-            return (
-              <div
-                key={`${step.instruction}-${index}`}
-                onClick={() => {
-                  setIsPlaying(false);
-                  setActiveStep(index);
-                }}
-                className={`group flex cursor-pointer items-center justify-between rounded-xl border p-3 transition-all ${
-                  isActive
-                    ? 'border-indigo-500/60 shadow-md ring-1 ring-indigo-500/30'
-                    : 'border-white/8 hover:border-indigo-500/30 hover:bg-white/5'
-                }`}
-                style={isActive ? { background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(6,182,212,0.12))' } : {}}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[16px] font-bold transition-all ${
-                      isActive ? 'shadow-lg' : 'bg-white/8'
-                    }`}
-                    style={isActive ? { background: 'linear-gradient(135deg, #6366f1, #06b6d4)' } : {}}
-                  >
-                    {stepIcon}
-                  </div>
-                  <div>
-                    <p className={`text-[13px] font-bold ${isActive ? 'text-white' : 'text-slate-300'}`}>
-                      {step.instruction}
-                    </p>
-                    {step.floor_name ? (
-                      <p className="text-[11px] text-slate-500">{step.floor_name}</p>
-                    ) : null}
-                  </div>
-                </div>
-                {step.distance_m > 0 ? (
-                  <div className="text-right">
-                    <span className={`text-[12px] font-semibold ${isActive ? 'text-cyan-400' : 'text-slate-500'}`}>
-                      {Math.round(step.distance_m)} m
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {route.destination.room_id ? (
-        <div className="border-t border-white/8 px-4 py-3" style={{ background: 'rgba(15,23,42,0.7)' }}>
-          <Link
-            href={`/student/campus/rooms/${route.destination.label.split(' ')[0]}`}
-            className="inline-flex items-center gap-1.5 text-[13px] font-bold text-indigo-400 hover:text-cyan-400 transition-colors"
-          >
-            View destination room details →
-          </Link>
-        </div>
-      ) : null}
-    </Card>
-  );
+        </li>)}</ol>
+      </aside>
+    </div>
+    <footer className={s.footer}>Routes follow the campus’s published walking network. Unmapped shortcuts are not included. Check local signs and closures; use the mobile app for live positioning.</footer>
+  </section>;
 }

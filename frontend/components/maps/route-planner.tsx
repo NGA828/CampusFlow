@@ -45,6 +45,11 @@ function RouteForm({
     setBusy(true); setError(null); setRoute(null);
     try {
       const result = await campusApi.route({ from_node_id: origin, to_room_code: destination.trim(), accessible });
+      if (!result.route?.nodes?.length || !result.route.steps?.length) {
+        setError('No walkable route is available for these places. Try another starting point or ask campus staff to check the paths.');
+        onRouteCalculated?.(null);
+        return;
+      }
       setRoute(result.route);
       onRouteCalculated?.(result.route);
     } catch (caught) {
@@ -60,7 +65,7 @@ function RouteForm({
       <Card>
         <SectionHeading
           title="Plan a route preview"
-          description="Choose a published starting anchor and a destination room. This is a preview, not live positioning or walking guidance."
+          description="Choose a published starting anchor and a destination room. See the shortest path in the published campus network. This visual preview is not live positioning."
         />
         {anchors.error ? (
           <ErrorState message={anchors.error} onRetry={anchors.reload} />
@@ -119,7 +124,7 @@ function RouteForm({
                     onRouteCalculated?.(null);
                   }}
                 />
-                Request a step-free route
+                Step-free route (may be longer)
               </label>
               <Button type="submit" loading={busy} disabled={!origin || !destination.trim()}>
                 Preview route

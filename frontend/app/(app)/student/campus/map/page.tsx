@@ -1,6 +1,7 @@
 "use client";
 import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAsync } from "@/lib/hooks";
 import { campusApi, positioningApi } from "@/lib/api/endpoints";
 import { CampusMap } from "@/components/maps/campus-map";
@@ -13,13 +14,17 @@ import type { Floor, Position, Room, Route } from "@/lib/api/types";
 import s from "@/components/layout/campus-operations.module.css";
 
 export default function MapPage() {
+  return <Suspense fallback={<CardSkeleton rows={7} />}><MapContent /></Suspense>;
+}
+function MapContent() {
+  const params = useSearchParams();
   const buildings = useAsync(() => campusApi.buildings(), []);
   const position = useAsync(() => positioningApi.current(), []);
   const [buildingId, setBuildingId] = useState("");
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"campus" | "indoor">("campus");
   const [activeRoute, setActiveRoute] = useState<Route | null>(null);
-  const [leftTab, setLeftTab] = useState<"places" | "route">("places");
+  const [leftTab, setLeftTab] = useState<"places" | "route">(params.has("route") ? "route" : "places");
 
   const rows = buildings.data?.buildings ?? [];
   const selected = rows.find((b) => b.id === buildingId) ?? rows[0];
@@ -41,14 +46,14 @@ export default function MapPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => { setLeftTab("places"); }}
+            onClick={() => { setLeftTab("places"); setActiveRoute(null); }}
             className={`rounded-[12px] px-3.5 py-2 text-[13px] font-bold transition-all ${leftTab === "places" && !activeRoute ? "bg-brand-600 text-white shadow-sm" : "bg-white border border-ink-200 text-ink-700 hover:bg-ink-50"}`}
           >
             Explore Places
           </button>
           <button
             type="button"
-            onClick={() => { setLeftTab("route"); }}
+            onClick={() => { setLeftTab("route"); setActiveRoute(null); }}
             className={`rounded-[12px] px-3.5 py-2 text-[13px] font-bold transition-all ${leftTab === "route" || activeRoute ? "bg-brand-600 text-white shadow-sm" : "bg-white border border-ink-200 text-ink-700 hover:bg-ink-50"}`}
           >
             Plan Route →
@@ -180,7 +185,7 @@ export default function MapPage() {
                   <RoutePlanner
                     hidePreviewCard
                     onRouteCalculated={(r) => {
-                      if (r) setActiveRoute(r);
+                      setActiveRoute(r);
                     }}
                   />
                 </Suspense>
