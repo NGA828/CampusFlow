@@ -382,3 +382,6 @@ and [evidence](design-decisions/campus-admin-evidence.json). The landing's seven
 hashes match, but strict raster preservation is intermittent and direct pre/post differs31,759
 channels; the full375 selection has374 passes/1 failure. Five backend feature tests are authored,
 not executed. **Do not advance the accepted tracker beyond25/31 until preservation is resolved.**
+
+## Campus route correction — 2026-09-29
+Inspected Dribbble wayfinding-map references, Steerpath campus wayfinding, MapLibre route animation, Leaflet quick start and OpenStreetMap data guidance. Comparison, scores, selected patterns and production data prerequisites: [campus-wayfinding-correction](design-decisions/campus-wayfinding-correction.md). Selected server-authoritative shortest paths and synchronized floor-aware visual guidance; rejected decorative straight-line fallbacks and adding tiles as a substitute for routing correctness.

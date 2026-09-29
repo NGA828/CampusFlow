@@ -393,11 +393,8 @@ class NavigationController extends Controller
 
         if ($room) {
             $node = NavigationNode::where('room_id', $room->id)->where('type', 'room_entry')->first()
-                ?? NavigationNode::where('room_id', $room->id)->first()
-                ?? NavigationNode::where('floor_id', $room->floor_id)->first();
-            if ($node) {
-                return $node;
-            }
+                ?? NavigationNode::where('room_id', $room->id)->first();
+            return $node;
         }
 
         // 4. Fallback: match Building code or name if no room matched (e.g., ADM, STB, LIB, ENG, BUS, SAC, SUB)
@@ -417,32 +414,20 @@ class NavigationController extends Controller
     }
 
     /**
-     * Simple BFS/greedy route calculation.
-     * Phase C will swap this for a proper Dijkstra with accessible-only filtering.
+     * Dijkstra over published walkable edges, weighted in metres.
      */
     private function computeRoute(?string $fromNodeId, string $toNodeId, bool $accessible): array
     {
-        $emptyRoute = [
-            'nodes'       => [],
-            'steps'       => [],
-            'legs'        => [],
-            'transitions' => [],
-            'distance_m'  => 0,
-            'duration_s'  => 0,
-            'accessible'  => $accessible,
-            'uses_stairs' => false,
-            'origin'      => ['label' => 'Unknown origin', 'node' => null],
-            'destination' => ['label' => 'Unknown destination', 'node' => null],
-        ];
-
         if (! $fromNodeId) {
-            return $emptyRoute;
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'route' => 'No walkable route connects these places with the selected accessibility preference. Choose another starting point or ask campus staff to check the published paths.',
+            ]);
         }
 
         // Load all active nodes + edges for the graph
         $nodes = NavigationNode::with(['building', 'floor', 'room'])
             ->where('is_active', true)
-            ->when($accessible, fn ($q) => $q->where('is_accessible', true))
+            ->when($accessible, fn ($q) => $q->where('is_accessible', true)->whereNotIn('type', ['stairs', 'stairwell']))
             ->get()
             ->keyBy('id');
 
@@ -451,12 +436,20 @@ class NavigationController extends Controller
             ->get();
 
         if (! isset($nodes[$fromNodeId]) || ! isset($nodes[$toNodeId])) {
-            return $emptyRoute;
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'route' => 'No walkable route connects these places with the selected accessibility preference. Choose another starting point or ask campus staff to check the published paths.',
+            ]);
         }
 
         // Build adjacency list
         $adj = [];
         foreach ($edges as $edge) {
+            // Never route through a node excluded by activity/accessibility filters.
+            if (! isset($nodes[$edge->from_node_id], $nodes[$edge->to_node_id])
+                || ! is_finite((float) $edge->weight) || $edge->weight < 0
+                || ($accessible && in_array($edge->edge_type, ['stairs', 'stairwell'], true))) {
+                continue;
+            }
             $adj[$edge->from_node_id][] = ['node' => $edge->to_node_id, 'weight' => (float) $edge->weight, 'edge' => $edge];
             if ($edge->bidirectional) {
                 $adj[$edge->to_node_id][] = ['node' => $edge->from_node_id, 'weight' => (float) $edge->weight, 'edge' => $edge];
@@ -486,7 +479,9 @@ class NavigationController extends Controller
         }
 
         if (! isset($dist[$toNodeId])) {
-            return $emptyRoute;
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'route' => 'No walkable route connects these places with the selected accessibility preference. Choose another starting point or ask campus staff to check the published paths.',
+            ]);
         }
 
         // Reconstruct path
@@ -500,7 +495,9 @@ class NavigationController extends Controller
 
         $orderedNodes = array_values(array_filter(array_map(fn ($id) => $nodes[$id] ?? null, $pathNodeIds)));
         if (empty($orderedNodes)) {
-            return $emptyRoute;
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'route' => 'No walkable route connects these places with the selected accessibility preference. Choose another starting point or ask campus staff to check the published paths.',
+            ]);
         }
 
         $originNode = $orderedNodes[0];
@@ -516,6 +513,7 @@ class NavigationController extends Controller
         // 1. Build Steps & Transitions
         $steps[] = [
             'index'        => 0,
+            'node_id'      => $originNode->id,
             'instruction'  => 'Start at ' . ($originNode->label ?? 'starting anchor'),
             'kind'         => 'start',
             'distance_m'   => 0,
@@ -529,26 +527,44 @@ class NavigationController extends Controller
             $currNode = $orderedNodes[$i];
             $edgeWeight = ($dist[$currNode->id] ?? 0) - ($dist[$prevNode->id] ?? 0);
 
-            if ($currNode->type === 'stairs' || $prevNode->type === 'stairs') {
+            if (in_array($currNode->type, ['stairs', 'stairwell'], true) || in_array($prevNode->type, ['stairs', 'stairwell'], true) || in_array($prev[$currNode->id]['edge']->edge_type, ['stairs', 'stairwell'], true)) {
                 $usesStairs = true;
             }
 
+            $instruction = "Head to {$currNode->label}";
+            $stepKind = 'walk';
             // Floor transition check
-            if ($prevNode->floor_id !== $currNode->floor_id) {
-                $kind = ($currNode->type === 'elevator' || $prevNode->type === 'elevator') ? 'elevator' : 'stairs';
+            if ($prevNode->floor_id && $currNode->floor_id && $prevNode->floor_id !== $currNode->floor_id) {
+                $edgeKind = $prev[$currNode->id]['edge']->edge_type;
+                $kind = match ($edgeKind) {
+                    'lift', 'elevator' => 'elevator',
+                    'stairwell', 'stairs' => 'stairs',
+                    'ramp' => 'ramp',
+                    default => 'passage',
+                };
+                if ($kind === 'stairs') $usesStairs = true;
                 $floorName = $currNode->floor?->name ?? 'Level ' . ($currNode->floor?->level ?? 1);
+                $instruction = "Take the {$kind} to {$floorName}";
+                $stepKind = $kind;
                 $transitions[] = [
                     'kind'        => $kind,
                     'instruction' => "Take {$kind} to {$floorName}",
                     'floor_name'  => $floorName,
                     'distance_m'  => round($edgeWeight, 1),
                 ];
+            } elseif ($prevNode->floor_id === null && $currNode->floor_id !== null) {
+                $instruction = 'Enter ' . ($currNode->building?->name ?? 'the building') . ' at ' . $currNode->label;
+                $stepKind = 'entrance';
+            } elseif ($prevNode->floor_id !== null && $currNode->floor_id === null) {
+                $instruction = 'Exit the building toward ' . $currNode->label;
+                $stepKind = 'exit';
             }
 
             $steps[] = [
                 'index'        => $i,
-                'instruction'  => "Head to {$currNode->label}",
-                'kind'         => $currNode->type ?? 'walk',
+                'node_id'      => $currNode->id,
+                'instruction'  => $instruction,
+                'kind'         => $stepKind,
                 'distance_m'   => round($edgeWeight, 1),
                 'duration_s'   => (int) round($edgeWeight / 1.2),
                 'floor_id'     => $currNode->floor_id,
@@ -558,6 +574,7 @@ class NavigationController extends Controller
 
         $steps[] = [
             'index'        => count($orderedNodes),
+            'node_id'      => $destNode->id,
             'instruction'  => 'Arrive at ' . ($destNode->room?->name ?? $destNode->label),
             'kind'         => 'arrive',
             'distance_m'   => 0,
@@ -566,29 +583,25 @@ class NavigationController extends Controller
             'floor_name'   => $destNode->floor?->name,
         ];
 
-        // 2. Build Legs (Group by floor or outdoor segment)
+        // Each leg belongs to one coordinate system. Never append the next floor
+        // to the current floor's geometry (which draws spurious indoor shortcuts).
         $legs = [];
-        $currentLegNodes = [];
-
-        foreach ($orderedNodes as $node) {
-            if (empty($currentLegNodes)) {
-                $currentLegNodes[] = $node;
-                continue;
-            }
-            $lastInLeg = end($currentLegNodes);
-            $sameFloor = $lastInLeg->floor_id && $node->floor_id && $lastInLeg->floor_id === $node->floor_id;
-            
-            if ($sameFloor) {
+        $currentLegNodes = [$orderedNodes[0]];
+        foreach (array_slice($orderedNodes, 1) as $node) {
+            $last = end($currentLegNodes);
+            if ($last->floor_id === $node->floor_id) {
                 $currentLegNodes[] = $node;
             } else {
-                $currentLegNodes[] = $node;
                 $legs[] = $this->buildLeg($currentLegNodes);
+                // An entrance/exit may have geographic geometry, but never join
+                // two indoor floors in either the outdoor or indoor plane.
+                if ($last->floor_id === null || $node->floor_id === null) {
+                    $legs[] = $this->buildLeg([$last, $node]);
+                }
                 $currentLegNodes = [$node];
             }
         }
-        if (! empty($currentLegNodes) && count($currentLegNodes) > 1) {
-            $legs[] = $this->buildLeg($currentLegNodes);
-        }
+        $legs[] = $this->buildLeg($currentLegNodes);
 
         return [
             'nodes'       => array_map(fn ($n) => $n->toApiArray(), $orderedNodes),
@@ -630,13 +643,17 @@ class NavigationController extends Controller
         $geo = [];
 
         foreach ($legNodes as $node) {
-            if ($node->plan_x !== null && $node->plan_y !== null) {
+            if ($floorId !== null && $node->plan_x !== null && $node->plan_y !== null) {
                 $points[] = ['x' => (float) $node->plan_x, 'y' => (float) $node->plan_y];
             }
-            if ($node->lat !== null && $node->lng !== null) {
+            if ($floorId === null && $node->lat !== null && $node->lng !== null) {
                 $geo[] = ['lat' => (float) $node->lat, 'lng' => (float) $node->lng];
             }
         }
+
+        // Missing geometry must not connect the points on either side of a gap.
+        if (count($points) !== count($legNodes)) $points = [];
+        if (count($geo) !== count($legNodes)) $geo = [];
 
         $distance = 0.0;
         for ($i = 1; $i < count($legNodes); $i++) {

@@ -257,6 +257,7 @@ export interface Position {
 /* ---------------------------------------------------------------- navigation */
 
 export interface RouteStep {
+  node_id?: UUID;
   index: number;
   instruction: string;
   kind: string;
