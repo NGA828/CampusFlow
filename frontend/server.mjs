@@ -14,7 +14,15 @@ import httpProxy from 'http-proxy';
 import next from 'next';
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = process.env.HOSTNAME ?? '0.0.0.0';
+/**
+ * Bind `::` (dual-stack) by default rather than `0.0.0.0`.
+ *
+ * A production `next start` binds `[::]` while an IPv4-only dev server binds `0.0.0.0`, so both can
+ * hold :3000 at once — and `localhost` prefers IPv6, which silently serves the stale production
+ * bundle to the browser. Claiming both stacks makes a second server fail with EADDRINUSE instead of
+ * quietly answering half the requests. Set HOSTNAME=0.0.0.0 to force IPv4 only.
+ */
+const hostname = process.env.HOSTNAME ?? '::';
 const port = Number(process.env.PORT ?? 3000);
 const apiTarget = process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8000';
 
@@ -60,5 +68,7 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 server.listen(port, hostname, () => {
-  console.log(`[web] CampusFlow web ready on http://${hostname}:${port} (api → ${apiTarget})`);
+  // Bracket a bare IPv6 host so the line stays a valid URL.
+  const display = hostname.includes(':') ? `[${hostname}]` : hostname;
+  console.log(`[web] CampusFlow web ready on http://${display}:${port} (api → ${apiTarget})`);
 });

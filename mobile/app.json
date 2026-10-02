@@ -57,9 +57,7 @@
       ],
       "expo-notifications"
     ],
-    "extra": {
-      "apiUrl": "http://192.168.3.182:8000/api/v1"
-    },
+    "extra": {},
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
