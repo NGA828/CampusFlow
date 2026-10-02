@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class QrNode extends Model
 {
@@ -15,8 +16,37 @@ class QrNode extends Model
 
     protected $fillable = [
         'code', 'label', 'building_id', 'floor_id', 'room_id',
-        'lat', 'lng', 'plan_x', 'plan_y', 'type', 'version', 'is_active',
+        'lat', 'lng', 'plan_x', 'plan_y', 'type', 'version', 'is_active', 'secret',
     ];
+
+    /**
+     * Every anchor gets a signing secret on creation, so a printed graphic can always be signed.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $node): void {
+            if (blank($node->secret)) {
+                $node->secret = Str::random(64);
+            }
+        });
+    }
+
+    /** HMAC over the parts of the payload a student must not be able to change. */
+    public function payloadSignature(): string
+    {
+        return hash_hmac('sha256', $this->code . '|' . $this->version, (string) $this->secret);
+    }
+
+    /** The string encoded in the printed graphic and read by the phone camera. */
+    public function signedPayload(): string
+    {
+        return 'CF1|' . $this->code . '|' . $this->version . '|' . $this->payloadSignature();
+    }
+
+    public function signatureIsValid(?string $signature): bool
+    {
+        return filled($this->secret) && filled($signature) && hash_equals($this->payloadSignature(), $signature);
+    }
 
     protected function casts(): array
     {

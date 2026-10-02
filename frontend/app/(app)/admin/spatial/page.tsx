@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAsync, useDebounced, formatClock } from '@/lib/hooks';
 import { adminApi, campusApi } from '@/lib/api/endpoints';
 import { ApiError } from '@/lib/api/client';
@@ -14,6 +14,26 @@ import type { Geofence, NavigationEdge, NavigationNode, QrNode, Room } from '@/l
 
 type Tab = 'qr' | 'nodes' | 'edges' | 'geofences' | 'plan';
 
+/** Query parameter that keeps an open anchor badge across a refresh or a shared link. */
+const ANCHOR_PARAM = 'anchor';
+
+function readAnchorParam(): string {
+  if (typeof window === 'undefined') return '';
+  return new URLSearchParams(window.location.search).get(ANCHOR_PARAM) ?? '';
+}
+
+function writeAnchorParam(anchorId: string): void {
+  if (typeof window === 'undefined') return;
+  const params = new URLSearchParams(window.location.search);
+  if (anchorId) {
+    params.set(ANCHOR_PARAM, anchorId);
+  } else {
+    params.delete(ANCHOR_PARAM);
+  }
+  const query = params.toString();
+  window.history.replaceState(null, '', query ? `${window.location.pathname}?${query}` : window.location.pathname);
+}
+
 const NODE_KINDS = ['corridor', 'junction', 'entrance', 'exit', 'stairs', 'elevator', 'room', 'outdoor', 'qr', 'service'] as const;
 const EDGE_KINDS = ['corridor', 'stairs', 'elevator', 'ramp', 'door', 'outdoor', 'service'] as const;
 
@@ -25,6 +45,7 @@ export default function AdminSpatialPage() {
   const [buildingId, setBuildingId] = useState('');
   const [floorId, setFloorId] = useState('');
   const [payload, setPayload] = useState<{ code: string; payload: string; scan_url: string } | null>(null);
+  const [anchorId, setAnchorId] = useState('');
   const [form, setForm] = useState<{ kind: 'qr' | 'node' | 'edge' | 'geofence'; values: Record<string, string> } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ kind: Tab; id: string; label: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -49,6 +70,35 @@ export default function AdminSpatialPage() {
   const geofences = useAsync(() => adminApi.geofences({ per_page: 100 }), []);
 
   const nodeOptions = navNodes.data?.items ?? [];
+
+  /**
+   * The badge is a printed artefact: losing it to a refresh (or being unable to send someone the
+   * link for it) is the whole point of printing it, so the open anchor lives in the URL.
+   */
+  const openAnchor = useCallback(async (id: string, knownCode?: string) => {
+    try {
+      const result = await adminApi.qrPayload(id);
+      setPayload({ code: knownCode ?? result.code, payload: result.payload, scan_url: result.scan_url });
+      setAnchorId(id);
+      writeAnchorParam(id);
+    } catch {
+      toast.error('Could not load the payload');
+      writeAnchorParam('');
+    }
+  }, [toast]);
+
+  const closeAnchor = useCallback(() => {
+    setPayload(null);
+    setAnchorId('');
+    writeAnchorParam('');
+  }, []);
+
+  // Reopen the badge named in the URL after a refresh, a reload or an F5 on the printed page.
+  useEffect(() => {
+    const requested = readAnchorParam();
+    if (!requested) return;
+    void openAnchor(requested);
+  }, [openAnchor]);
 
   const floorQr = useMemo(() => (plan.data?.qr_nodes ?? []) as QrNode[], [plan.data]);
   const floorNodes = useMemo(() => (plan.data?.navigation_nodes ?? []) as NavigationNode[], [plan.data]);
@@ -253,14 +303,7 @@ export default function AdminSpatialPage() {
               <Button
                 size="sm"
                 variant="secondary"
-                onClick={async () => {
-                  try {
-                    const result = await adminApi.qrPayload(row.id);
-                    setPayload({ code: row.code, payload: result.payload, scan_url: result.scan_url });
-                  } catch {
-                    toast.error('Could not load the payload');
-                  }
-                }}
+                onClick={() => void openAnchor(row.id, row.code)}
               >
                 View QR
               </Button>
@@ -403,14 +446,14 @@ export default function AdminSpatialPage() {
 
       <Modal
         open={payload !== null}
-        onClose={() => setPayload(null)}
+        onClose={closeAnchor}
         title={`QR Anchor Graphic — ${payload?.code}`}
         footer={
           <div className="flex w-full justify-between items-center gap-2">
             <Button variant="secondary" onClick={() => window.print()}>
               Print Badge
             </Button>
-            <Button onClick={() => setPayload(null)}>Close</Button>
+            <Button onClick={closeAnchor}>Close</Button>
           </div>
         }
       >

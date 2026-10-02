@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\RespondsJson;
 use App\Models\Announcement;
 use App\Models\Building;
 use App\Models\CampusEvent;
@@ -33,6 +34,13 @@ use Illuminate\Support\Str;
 
 class AdminController extends Controller
 {
+    /**
+     * `ok()` and `forbidden()` below stay local to this controller, but `fail()` is not optional:
+     * the governance guards in this file (self-suspension, last administrator, unknown setting) all
+     * reject with it, so the shared envelope has to be in scope here.
+     */
+    use RespondsJson;
+
     /* ──────────────────────────────────────── guard */
 
     /**
@@ -490,15 +498,30 @@ class AdminController extends Controller
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $node = QrNode::findOrFail($id);
-        $payload = json_encode(['id' => $node->id, 'code' => $node->code, 'version' => $node->version]);
-        return $this->ok(['payload' => $payload, 'code' => $node->code, 'label' => $node->label, 'version' => $node->version, 'scan_url' => url("/scan?qr={$node->code}")]);
+
+        // The phone camera reads this string verbatim, so it must be the format the mobile scanner
+        // recognises: CF1|<code>|<version>|<signature>.
+        return $this->ok([
+            'payload'   => $node->signedPayload(),
+            'code'      => $node->code,
+            'label'     => $node->label,
+            'version'   => $node->version,
+            'scan_url'  => url("/scan/{$node->code}"),
+        ]);
     }
 
     public function regenerateQr(Request $request, string $id): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
         $node = QrNode::findOrFail($id);
-        $node->update(['code' => 'QR-' . strtoupper(Str::random(8)), 'version' => $node->version + 1]);
+
+        // A new code gets a new secret, so a badge printed before the rotation stops validating.
+        $node->update([
+            'code'    => 'QR-' . strtoupper(Str::random(8)),
+            'version' => $node->version + 1,
+            'secret'  => Str::random(64),
+        ]);
+
         return $this->ok(['node' => ['id' => $node->id, 'code' => $node->code, 'version' => $node->version]]);
     }
 

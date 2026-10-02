@@ -37,8 +37,9 @@ class PositioningController extends Controller
             'version' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ]);
 
-        $code = $validated['code']
-            ?? $this->extractCodeFromPayload($validated['payload'] ?? '');
+        $resolved = $this->resolveScanTarget($validated['payload'] ?? '', $validated['code'] ?? null);
+        $code = $resolved['code'];
+        $version = $validated['version'] ?? $resolved['version'];
 
         $node = QrNode::where('code', $code)->first();
 
@@ -51,12 +52,24 @@ class PositioningController extends Controller
             );
         }
 
-        if (isset($validated['version']) && (int) $validated['version'] < (int) $node->version) {
+        if (isset($version) && (int) $version < (int) $node->version) {
             $this->logScanFailure($request, $code, 'stale_version');
 
             throw new BusinessRuleException(
                 'That print-out is out of date. Use the current code for this location.',
                 'QR_VERSION_STALE',
+            );
+        }
+
+        // A signed print-out must carry the signature this anchor's own secret produced, so an
+        // edited or copied badge cannot claim somebody else's position. A code typed by hand has
+        // no signature and is still accepted.
+        if ($resolved['signature'] !== null && ! $node->signatureIsValid($resolved['signature'])) {
+            $this->logScanFailure($request, $code, 'bad_signature');
+
+            throw new BusinessRuleException(
+                'That QR graphic failed its signature check. Ask for a freshly printed anchor.',
+                'QR_SIGNATURE_INVALID',
             );
         }
 
@@ -193,12 +206,64 @@ class PositioningController extends Controller
         ]);
     }
 
-    private function extractCodeFromPayload(string $payload): string
+    /**
+     * Resolve the anchor code, and the printed version when the payload carries one, from whatever
+     * the camera handed us.
+     *
+     * The admin console prints `CF1|<code>|<version>|<signature>`, a shared link uses
+     * `/scan/{code}` or `/scan?qr={code}`, and an older badge may still carry the plain anchor
+     * JSON. All of them must resolve to the same stored code, and a print-out made before the code
+     * was rotated must still be rejected as stale.
+     *
+     * @return array{code: string, version: int|null, signature: string|null}
+     */
+    private function resolveScanTarget(string $payload, ?string $explicitCode = null): array
     {
-        // Supports full scan URL: https://campusflow.edu/scan/{code}
-        if (preg_match('#/scan/([A-Za-z0-9_-]+)#', $payload, $m)) {
-            return $m[1];
+        $candidates = [];
+
+        if ($explicitCode !== null && trim($explicitCode) !== '') {
+            $candidates[] = trim($explicitCode);
         }
-        return $payload;
+
+        if (trim($payload) !== '') {
+            $candidates[] = trim($payload);
+        }
+
+        foreach ($candidates as $candidate) {
+            // The signed print-out: CF1|<code>|<version>|<signature>
+            if (preg_match('#^CF1\|([A-Za-z0-9_-]+)\|(\d+)\|([A-Za-z0-9]+)$#', $candidate, $matches)) {
+                return [
+                    'code'      => $matches[1],
+                    'version'   => (int) $matches[2],
+                    'signature' => $matches[3],
+                ];
+            }
+
+            // Full scan link: https://campusflow.edu/scan/{code}
+            if (preg_match('#/scan/([A-Za-z0-9_-]+)#', $candidate, $matches)) {
+                return ['code' => $matches[1], 'version' => null, 'signature' => null];
+            }
+
+            // Shared link carrying the code as a query parameter: .../scan?qr={code}
+            if (preg_match('#[?&]qr=([A-Za-z0-9_-]+)#', $candidate, $matches)) {
+                return ['code' => $matches[1], 'version' => null, 'signature' => null];
+            }
+
+            // An older printed graphic encoding {"id":…,"code":…,"version":…}
+            if (str_starts_with($candidate, '{')) {
+                $decoded = json_decode($candidate, true);
+
+                if (is_array($decoded) && isset($decoded['code']) && is_string($decoded['code'])) {
+                    return [
+                        'code'      => $decoded['code'],
+                        'version'   => isset($decoded['version']) ? (int) $decoded['version'] : null,
+                        'signature' => null,
+                    ];
+                }
+            }
+        }
+
+        // A bare printed or hand-typed code.
+        return ['code' => $candidates[0] ?? '', 'version' => null, 'signature' => null];
     }
 }

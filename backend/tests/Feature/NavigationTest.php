@@ -35,6 +35,111 @@ class NavigationTest extends TestCase
             ->assertJsonPath('success', true);
     }
 
+    /**
+     * The admin console prints `CF1|<code>|<version>|<signature>`, which is what the phone camera
+     * hands to the scanner, so the printed graphic has to validate end to end.
+     */
+    public function test_scans_the_signed_anchor_payload_printed_by_the_admin_console(): void
+    {
+        $user = User::where('role', 'student')->firstOrFail();
+        $qr = QrNode::firstOrFail();
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/positioning/scan', ['payload' => $qr->signedPayload()]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.qr_node.code', $qr->code);
+    }
+
+    public function test_rejects_a_signed_payload_whose_signature_was_edited(): void
+    {
+        $user = User::where('role', 'student')->firstOrFail();
+        $qr = QrNode::firstOrFail();
+
+        $forged = 'CF1|' . $qr->code . '|' . $qr->version . '|' . str_repeat('a', 64);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/positioning/scan', ['payload' => $forged]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('code', 'QR_SIGNATURE_INVALID');
+    }
+
+    public function test_scans_a_bare_hand_typed_code(): void
+    {
+        $user = User::where('role', 'student')->firstOrFail();
+        $qr = QrNode::firstOrFail();
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/positioning/scan', ['code' => $qr->code]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.qr_node.code', $qr->code);
+    }
+
+    public function test_scans_an_anchor_json_badge_printed_before_the_signed_format(): void
+    {
+        $user = User::where('role', 'student')->firstOrFail();
+        $qr = QrNode::firstOrFail();
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/positioning/scan', [
+                'payload' => json_encode([
+                    'id'      => $qr->id,
+                    'code'    => $qr->code,
+                    'version' => $qr->version,
+                ]),
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.qr_node.code', $qr->code);
+    }
+
+    public function test_scans_a_scan_link_that_carries_the_code_as_a_query_parameter(): void
+    {
+        $user = User::where('role', 'student')->firstOrFail();
+        $qr = QrNode::firstOrFail();
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/positioning/scan', [
+                'payload' => 'https://campusflow.edu/scan?qr=' . $qr->code,
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.qr_node.code', $qr->code);
+    }
+
+    public function test_rejects_a_print_out_older_than_the_rotated_code(): void
+    {
+        $user = User::where('role', 'student')->firstOrFail();
+        $qr = QrNode::firstOrFail();
+        $qr->increment('version');
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/positioning/scan', [
+                'payload' => json_encode([
+                    'id'      => $qr->id,
+                    'code'    => $qr->code,
+                    'version' => $qr->version - 1,
+                ]),
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('code', 'QR_VERSION_STALE');
+    }
+
     public function test_can_find_navigation_route(): void
     {
         $nodes = NavigationNode::take(2)->get();
