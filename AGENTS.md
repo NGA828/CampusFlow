@@ -35,7 +35,9 @@ Hard gates — never skip for convenience:
    runs everything. **Rule 9 applies to `check:full`.** A green `check` alone
    is not a finished change — `check:php` cannot see a file that is
    syntactically valid and behaviourally broken, and one of those has
-   already shipped through this gate.
+   already shipped through this gate. CI (.github/workflows/check.yml) runs
+   `check:full` on every push and pull request, so this is enforced rather
+   than merely documented.
    See docs/role-platform-matrix.md and docs/platform-role-audit.md.
 9c. The PHP runtime IS available (PHP 8.5 at
    "C:\Program Files\php-8.5.2\php.exe"; the WinGet PHP 8.2 on PATH is the

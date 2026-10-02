@@ -92,7 +92,8 @@ are hard requirements and cannot be skipped for convenience.
   (or `cd backend && php artisan test`). They take ~3 minutes.
   `npm run check:php` only parses PHP, so it cannot see a change that is
   syntactically fine and behaviourally broken — a green `npm run check`
-  is not a finished change.
+  is not a finished change. CI runs `check:full` on every push, so the
+  suite is enforced and not left to whoever is finishing the work.
 - **Tests use their own database**, `campusflow_testing` (see
   `phpunit.xml`). The feature tests use `RefreshDatabase`, which runs
   `migrate:fresh` — pointing that at the dev `campusflow` database drops
