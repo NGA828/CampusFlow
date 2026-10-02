@@ -21,6 +21,7 @@ use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
@@ -130,15 +131,15 @@ class DatabaseSeeder extends Seeder
         RoomQueue::create(['room_id' => $eng101->id, 'is_open' => true, 'capacity' => 25, 'max_capacity' => 25, 'current_count' => 0, 'call_window_minutes' => 10, 'proximity_radius_m' => 40.0, 'mode' => 'fifo', 'welcome_message' => '3D Print Workshop Queue. Ensure design files are prepared.']);
 
         // 6. QR Anchors across buildings
-        $qrStbMain = QrNode::create(['building_id' => $stb->id, 'floor_id' => $stbF1->id, 'code' => 'QR-STB-F1-MAIN', 'label' => 'STB Main Entrance Anchor', 'plan_x' => 10.0, 'plan_y' => 5.0, 'type' => 'room_entry', 'is_active' => true]);
-        $qrStbLab  = QrNode::create(['building_id' => $stb->id, 'floor_id' => $stbF1->id, 'room_id' => $lab101->id, 'code' => 'QR-STB-F1-LAB101', 'label' => 'Outside Lab 101 Entrance', 'plan_x' => 25.0, 'plan_y' => 15.0, 'type' => 'room_entry', 'is_active' => true]);
+        $qrStbMain = QrNode::create(['building_id' => $stb->id, 'floor_id' => $stbF1->id, 'code' => 'QR-STB-F1-MAIN', 'label' => 'STB Main Entrance Anchor', 'plan_x' => 10.0, 'plan_y' => 5.0, 'type' => 'room_entry', 'secret' => Str::random(64), 'is_active' => true]);
+        $qrStbLab  = QrNode::create(['building_id' => $stb->id, 'floor_id' => $stbF1->id, 'room_id' => $lab101->id, 'code' => 'QR-STB-F1-LAB101', 'label' => 'Outside Lab 101 Entrance', 'plan_x' => 25.0, 'plan_y' => 15.0, 'type' => 'room_entry', 'secret' => Str::random(64), 'is_active' => true]);
 
-        $qrSubMain = QrNode::create(['building_id' => $sub->id, 'floor_id' => $subF1->id, 'code' => 'QR-SUB-F1-MAIN', 'label' => 'Student Union Main Plaza Entry', 'plan_x' => 8.0, 'plan_y' => 4.0, 'type' => 'room_entry', 'is_active' => true]);
-        $qrLibMain = QrNode::create(['building_id' => $lib->id, 'floor_id' => $libF1->id, 'code' => 'QR-LIB-F1-MAIN', 'label' => 'Library Main Lobby Anchor', 'plan_x' => 12.0, 'plan_y' => 6.0, 'type' => 'room_entry', 'is_active' => true]);
-        $qrEngMain = QrNode::create(['building_id' => $eng->id, 'floor_id' => $engF1->id, 'code' => 'QR-ENG-F1-MAIN', 'label' => 'Engineering Workshop Entrance', 'plan_x' => 15.0, 'plan_y' => 8.0, 'type' => 'room_entry', 'is_active' => true]);
-        $qrBusMain = QrNode::create(['building_id' => $bus->id, 'floor_id' => $busF1->id, 'code' => 'QR-BUS-F1-MAIN', 'label' => 'Business School Lobby Anchor', 'plan_x' => 10.0, 'plan_y' => 5.0, 'type' => 'room_entry', 'is_active' => true]);
-        $qrSacMain = QrNode::create(['building_id' => $sac->id, 'floor_id' => $sacF1->id, 'code' => 'QR-SAC-F1-MAIN', 'label' => 'Athletics Center Front Desk', 'plan_x' => 14.0, 'plan_y' => 7.0, 'type' => 'room_entry', 'is_active' => true]);
-        $qrAdmMain = QrNode::create(['building_id' => $adm->id, 'floor_id' => $admF1->id, 'code' => 'QR-ADM-F1-MAIN', 'label' => 'Admissions Welcome Desk', 'plan_x' => 9.0, 'plan_y' => 4.5, 'type' => 'room_entry', 'is_active' => true]);
+        $qrSubMain = QrNode::create(['building_id' => $sub->id, 'floor_id' => $subF1->id, 'code' => 'QR-SUB-F1-MAIN', 'label' => 'Student Union Main Plaza Entry', 'plan_x' => 8.0, 'plan_y' => 4.0, 'type' => 'room_entry', 'secret' => Str::random(64), 'is_active' => true]);
+        $qrLibMain = QrNode::create(['building_id' => $lib->id, 'floor_id' => $libF1->id, 'code' => 'QR-LIB-F1-MAIN', 'label' => 'Library Main Lobby Anchor', 'plan_x' => 12.0, 'plan_y' => 6.0, 'type' => 'room_entry', 'secret' => Str::random(64), 'is_active' => true]);
+        $qrEngMain = QrNode::create(['building_id' => $eng->id, 'floor_id' => $engF1->id, 'code' => 'QR-ENG-F1-MAIN', 'label' => 'Engineering Workshop Entrance', 'plan_x' => 15.0, 'plan_y' => 8.0, 'type' => 'room_entry', 'secret' => Str::random(64), 'is_active' => true]);
+        $qrBusMain = QrNode::create(['building_id' => $bus->id, 'floor_id' => $busF1->id, 'code' => 'QR-BUS-F1-MAIN', 'label' => 'Business School Lobby Anchor', 'plan_x' => 10.0, 'plan_y' => 5.0, 'type' => 'room_entry', 'secret' => Str::random(64), 'is_active' => true]);
+        $qrSacMain = QrNode::create(['building_id' => $sac->id, 'floor_id' => $sacF1->id, 'code' => 'QR-SAC-F1-MAIN', 'label' => 'Athletics Center Front Desk', 'plan_x' => 14.0, 'plan_y' => 7.0, 'type' => 'room_entry', 'secret' => Str::random(64), 'is_active' => true]);
+        $qrAdmMain = QrNode::create(['building_id' => $adm->id, 'floor_id' => $admF1->id, 'code' => 'QR-ADM-F1-MAIN', 'label' => 'Admissions Welcome Desk', 'plan_x' => 9.0, 'plan_y' => 4.5, 'type' => 'room_entry', 'secret' => Str::random(64), 'is_active' => true]);
 
         // 7. Navigation Graph — Outdoor Central Campus Quad & Building Entrances
         $hubPlaza = NavigationNode::create([
