@@ -28,9 +28,13 @@ Hard gates — never skip for convenience:
    does not exist, when a mobile-only capability is wired into the web
    client (or the reverse), when a feature test asserts against a dead path,
    or when a route has no screen in front of it. `npm run check:php` parses
-   every backend file (there is no PHP runtime in this environment, so a
-   syntax error is otherwise invisible until someone runs `artisan`), and
-   `npm run typecheck` covers both clients. All three run in
+   every backend file, and `npm run typecheck` covers both clients.
+   `npm run check:test` runs the actual PHPUnit suite. All four run in
    `npm run check` and must be green before a claim of "done".
    See docs/role-platform-matrix.md and docs/platform-role-audit.md.
+9c. The PHP runtime IS available (PHP 8.5 at
+   "C:\Program Files\php-8.5.2\php.exe"; the WinGet PHP 8.2 on PATH is the
+   wrong one). Run the suite instead of trusting `check:php`: parsing proves
+   a file is syntactically valid, never that it behaves. A change that only
+   failed at runtime has shipped through this gate before.
 10. Incremental, backend-first development per §75.

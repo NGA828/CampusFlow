@@ -26,7 +26,9 @@
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_HOST" value="127.0.0.1"/>
         <env name="DB_PORT" value="5432"/>
-        <env name="DB_DATABASE" value="campusflow"/>
+        <!-- Never the dev database. `RefreshDatabase` calls `migrate:fresh`, so pointing this at
+             `campusflow` would drop every seeded building, user and queue on each test run. -->
+        <env name="DB_DATABASE" value="campusflow_testing"/>
         <env name="DB_USERNAME" value="postgres"/>
         <env name="DB_PASSWORD" value="1234"/>
         <env name="MAIL_MAILER" value="array"/>
