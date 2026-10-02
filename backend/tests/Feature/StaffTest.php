@@ -139,4 +139,22 @@ class StaffTest extends TestCase
         ])->assertCreated()->assertJsonPath('data.announcement.created_by', $staff->id)->assertJsonPath('data.announcement.target_roles.0', 'staff');
         $this->actingAs($other, 'sanctum')->deleteJson('/api/v1/staff/announcements/' . $notice->json('data.announcement.id'))->assertNotFound();
     }
+
+    /**
+     * `campus_events.ends_at` is NOT NULL. Validation used to accept a missing end, so the
+     * request passed and then died in the database as a 500 instead of a 422.
+     */
+    public function test_event_without_an_end_time_is_rejected_before_it_reaches_the_database(): void
+    {
+        $staff = User::where('role', 'staff')->firstOrFail();
+
+        $this->actingAs($staff, 'sanctum')->postJson('/api/v1/staff/events', [
+            'title' => 'Cultural day', 'starts_at' => '2026-10-01T10:00:00Z',
+        ])->assertStatus(422)->assertJsonValidationErrors('ends_at');
+
+        $this->actingAs($staff, 'sanctum')->postJson('/api/v1/staff/events', [
+            'title' => 'Cultural day', 'starts_at' => '2026-10-01T10:00:00Z',
+            'ends_at' => '2026-10-01T09:00:00Z',
+        ])->assertStatus(422)->assertJsonValidationErrors('ends_at');
+    }
 }

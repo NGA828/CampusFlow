@@ -97,10 +97,11 @@ No new route or permission was introduced by this redesign.
 - **GET `/campus/events`**: published event paginator; items now include server-derived `can_manage`
   for the staff author with content-management permission. Other authors are view-only in the editor.
 - **POST `/staff/events`**, **PATCH `/staff/events/{id}`**: content-management permission, plus author
-  ownership for editing. Fields: `title`, `description?`, `category?`, `starts_at`, `ends_at?`, `venue?`,
-  `capacity?` (positive integer). Start/end validated; end must follow start. Create sets `created_by`
-  from the principal and status `published`; response `data.event`. Unsupported building/pinned/
-  registration flags are not presented as functional form controls.
+  ownership for editing. Fields: `title`, `description?`, `category?`, `starts_at`, `ends_at`, `venue?`,
+  `capacity?` (positive integer). Both times are required — `campus_events.ends_at` is `NOT NULL`, so
+  omitting it is a `422` rather than a stored open-ended event. End must follow start. Create sets
+  `created_by` from the principal and status `published`; response `data.event`. Unsupported building/
+  pinned/registration flags are not presented as functional form controls.
 - **DELETE `/staff/events/{id}`**: author-scoped soft deletion; other authors/unowned legacy events
   return404. The UI requests explicit review before writing.
 - **GET `/staff/announcements`**: author-owned announcement ledger. **POST** accepts `title`, `body`,

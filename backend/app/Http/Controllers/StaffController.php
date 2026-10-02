@@ -817,7 +817,9 @@ class StaffController extends Controller
             'title'      => 'required|string|max:255',
             'description'=> 'nullable|string',
             'starts_at'  => 'required|date',
-            'ends_at'    => 'nullable|date|after:starts_at',
+            // `campus_events.ends_at` is NOT NULL. Allowing it to be omitted here let a request
+            // pass validation and then fail in the database as a 500.
+            'ends_at'    => 'required|date|after:starts_at',
             'venue'      => 'nullable|string|max:255',
             'category'   => 'nullable|string|max:100',
             'capacity' => 'nullable|integer|min:1',
@@ -849,7 +851,7 @@ class StaffController extends Controller
 
         $event = CampusEvent::where('created_by', $request->user()->id)->findOrFail($id);
         $request->validate(['title' => 'required|string|max:255', 'description' => 'nullable|string',
-            'starts_at' => 'required|date', 'ends_at' => 'nullable|date|after:starts_at',
+            'starts_at' => 'required|date', 'ends_at' => 'required|date|after:starts_at',
             'venue' => 'nullable|string|max:255', 'category' => 'nullable|string|max:100',
             'capacity' => 'nullable|integer|min:1']);
         $event->update($request->only(['title', 'description', 'starts_at', 'ends_at', 'venue', 'category', 'capacity', 'status']));

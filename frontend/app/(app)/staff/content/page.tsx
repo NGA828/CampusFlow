@@ -123,7 +123,11 @@ export default function StaffContentPage() {
       kind === "event" &&
       (!draft.starts ||
         !Number.isFinite(new Date(draft.starts).getTime()) ||
-        (draft.ends && new Date(draft.ends) <= new Date(draft.starts)))
+        // The API requires an end time and the column is NOT NULL, so the composer
+        // must not offer it as optional and then let the save fail on the server.
+        !draft.ends ||
+        !Number.isFinite(new Date(draft.ends).getTime()) ||
+        new Date(draft.ends) <= new Date(draft.starts))
     ) {
       setError("Choose a valid start and an end later than the start.");
       return;
@@ -145,7 +149,7 @@ export default function StaffContentPage() {
               description: draft.body || null,
               category: draft.category,
               starts_at: new Date(draft.starts).toISOString(),
-              ends_at: draft.ends ? new Date(draft.ends).toISOString() : null,
+              ends_at: new Date(draft.ends).toISOString(),
               venue: draft.venue || null,
               capacity: draft.capacity ? Number(draft.capacity) : null,
             };
@@ -467,9 +471,10 @@ export default function StaffContentPage() {
                       />
                     </label>
                     <label className={s.field}>
-                      End time (optional)
+                      End time
                       <input
                         type="datetime-local"
+                        required
                         value={draft.ends}
                         onChange={(e) =>
                           setDraft({ ...draft, ends: e.target.value })
