@@ -15,7 +15,9 @@
     "check:php": "node scripts/check-php-syntax.mjs",
     "check:api": "node scripts/check-api-contract.mjs",
     "check:test": "cd backend && php artisan test",
-    "check": "npm run check:php && npm run check:api && npm run typecheck && npm run check:test",
+    "check:static": "npm run check:php && npm run check:api && npm run typecheck",
+    "check": "npm run check:static && node -e \"console.log('\\n[gate] Static checks passed. These do NOT run the PHPUnit suite: a change can be syntactically valid and still be broken at runtime. Run `npm run check:full` before calling any work done.')\"",
+    "check:full": "npm run check:static && npm run check:test",
     "check:separation": "node scripts/check-api-contract.mjs"
   },
   "engines": {

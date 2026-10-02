@@ -88,9 +88,11 @@ are hard requirements and cannot be skipped for convenience.
   responses, policies.
 - Compiling/rendering is not "done" — see PROMPT.md §93 Definition of
   Done.
-- Run them: `npm run check:test` (or `cd backend && php artisan test`).
-  They take ~3 minutes. `npm run check:php` only parses PHP, so it cannot
-  see a change that is syntactically fine and behaviourally broken.
+- Run them: `npm run check:full`, which is `check` plus the suite
+  (or `cd backend && php artisan test`). They take ~3 minutes.
+  `npm run check:php` only parses PHP, so it cannot see a change that is
+  syntactically fine and behaviourally broken — a green `npm run check`
+  is not a finished change.
 - **Tests use their own database**, `campusflow_testing` (see
   `phpunit.xml`). The feature tests use `RefreshDatabase`, which runs
   `migrate:fresh` — pointing that at the dev `campusflow` database drops

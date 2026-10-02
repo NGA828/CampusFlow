@@ -29,8 +29,13 @@ Hard gates — never skip for convenience:
    client (or the reverse), when a feature test asserts against a dead path,
    or when a route has no screen in front of it. `npm run check:php` parses
    every backend file, and `npm run typecheck` covers both clients.
-   `npm run check:test` runs the actual PHPUnit suite. All four run in
-   `npm run check` and must be green before a claim of "done".
+   `npm run check:test` runs the actual PHPUnit suite.
+   `npm run check` is the fast static gate (parse, contract, typecheck) and
+   deliberately skips the suite so it stays usable; `npm run check:full`
+   runs everything. **Rule 9 applies to `check:full`.** A green `check` alone
+   is not a finished change — `check:php` cannot see a file that is
+   syntactically valid and behaviourally broken, and one of those has
+   already shipped through this gate.
    See docs/role-platform-matrix.md and docs/platform-role-audit.md.
 9c. The PHP runtime IS available (PHP 8.5 at
    "C:\Program Files\php-8.5.2\php.exe"; the WinGet PHP 8.2 on PATH is the
