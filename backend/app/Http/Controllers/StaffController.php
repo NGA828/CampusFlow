@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Announcement;
 use App\Models\CampusEvent;
 use App\Models\Course;
+use App\Models\Enrollment;
+use App\Services\Notifications\NotificationFanOut;
 use App\Support\Access\Permissions;
 use App\Support\Access\StaffScope;
 use Illuminate\Validation\Rule;
@@ -39,6 +41,15 @@ class StaffController extends Controller
     private function forbidden(): JsonResponse
     {
         return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+    }
+
+    /**
+     * Publishing is the moment the campus is told, so every create path here writes notifications.
+     * Resolved from the container once per call rather than held on the controller.
+     */
+    private function notifications(): NotificationFanOut
+    {
+        return app(NotificationFanOut::class);
     }
 
     /**
@@ -717,10 +728,32 @@ class StaffController extends Controller
             'course_id', 'term_code', 'room_id', 'type', 'day_of_week', 'starts_at', 'ends_at',
         ]), ['lecturer_id' => $request->user()->id]));
 
+        // Only the students actually enrolled in that course for that term, never the whole campus.
+        $this->notifications()->toUsers(
+            $this->enrolledStudentIds($entry->course_id, $entry->term_code),
+            'class.published',
+            'New session scheduled for ' . ($entry->course?->code ?? 'your course'),
+            sprintf('%s %s–%s', ucfirst((string) $entry->type), $entry->starts_at, $entry->ends_at),
+            ['entry_id' => $entry->id, 'course_id' => $entry->course_id, 'term_code' => $entry->term_code],
+        );
+
         return response()->json([
             'success' => true,
             'data'    => ['entry' => $entry->fresh(['course', 'room.floor.building'])->toApiArray()],
         ], 201);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function enrolledStudentIds(string $courseId, string $termCode): array
+    {
+        return Enrollment::query()
+            ->where('course_id', $courseId)
+            ->where('term_code', $termCode)
+            ->where('status', 'enrolled')
+            ->pluck('student_id')
+            ->all();
     }
 
     /**
@@ -790,6 +823,16 @@ class StaffController extends Controller
             'title', 'description', 'starts_at', 'ends_at', 'venue', 'category', 'capacity',
         ]), ['status' => 'published', 'created_by' => $request->user()->id]));
 
+        // Students and staff are the campus audience for an event; the author already knows.
+        $this->notifications()->toRoles(
+            ['student', 'staff'],
+            'event.published',
+            $event->title,
+            $event->description,
+            ['event_id' => $event->id],
+            $request->user()->id,
+        );
+
         return response()->json(['success' => true, 'data' => ['event' => $event]], 201);
     }
 
@@ -856,7 +899,41 @@ class StaffController extends Controller
             'published_at' => now(),
         ]));
 
+        $this->notifications()->toRoles(
+            $this->announcementAudience($ann->target_roles),
+            'announcement.published',
+            $ann->title,
+            $ann->body,
+            ['announcement_id' => $ann->id],
+            $request->user()->id,
+        );
+
         return response()->json(['success' => true, 'data' => ['announcement' => $ann]], 201);
+    }
+
+    /**
+     * Who an announcement is for, as role codes.
+     *
+     * This mirrors `Announcement::scopeVisibleTo`: a null or empty target list means the whole
+     * campus, and `all` means the same thing inside an explicit list. Resolving it once here keeps
+     * the audience that gets told identical to the audience that can read it.
+     *
+     * @param  list<string>|null  $targetRoles
+     * @return list<string>
+     */
+    private function announcementAudience(?array $targetRoles): array
+    {
+        $campus = ['student', 'staff', 'admin', 'visitor'];
+
+        if ($targetRoles === null || $targetRoles === []) {
+            return $campus;
+        }
+
+        if (in_array('all', $targetRoles, true)) {
+            return $campus;
+        }
+
+        return array_values(array_intersect($targetRoles, $campus));
     }
 
     /**

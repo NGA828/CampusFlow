@@ -12,6 +12,9 @@ import styles from './workspace.module.css';
 import { WorkspaceIcon } from './workspace-visual';
 import { relativeTime } from '@/lib/hooks';
 
+/** How often the bell re-checks the API while the app is open. */
+const NOTIFICATION_POLL_MS = 30_000;
+
 interface NavItem {
   href: string;
   label: string;
@@ -160,17 +163,33 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return;
     let active = true;
-    meApi
-      .notifications({ per_page: 8 })
-      .then((payload) => {
-        if (!active) return;
-        setNotificationError(null);
-        setNotifications(payload.items);
-        setUnread(payload.unread);
-      })
-      .catch(() => { if (active) setNotificationError('Your inbox could not be loaded. Open notifications to retry.'); });
+    const load = () => {
+      meApi
+        .notifications({ per_page: 8 })
+        .then((payload) => {
+          if (!active) return;
+          setNotificationError(null);
+          setNotifications(payload.items);
+          setUnread(payload.unread);
+        })
+        .catch(() => { if (active) setNotificationError('Your inbox could not be loaded. Open notifications to retry.'); });
+    };
+
+    load();
+
+    // The socket in `realtime-context` needs a broadcast server the API does not run yet, so the
+    // bell is refreshed on a timer and whenever the tab comes back to the front. Without this a
+    // colleague publishing something only becomes visible after you happen to navigate.
+    const timer = window.setInterval(load, NOTIFICATION_POLL_MS);
+    const onFocus = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+
     return () => {
       active = false;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
     };
   }, [user, pathname, notificationRevision]);
 
