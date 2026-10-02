@@ -10,13 +10,23 @@ import { ResourceTable, type Column } from '@/components/admin/table';
 import { useToast } from '@/components/ui/toast';
 import type { AuditLogRow } from '@/lib/api/types';
 
-const KNOWN_SETTINGS: { key: string; label: string; description: string; placeholder?: string }[] = [
-  { key: 'campus.timezone', label: 'Campus timezone', description: 'Used for class reminders, service windows and queue deadlines.', placeholder: 'UTC' },
-  { key: 'campus.name', label: 'Campus name', description: 'Displayed on the public landing page.' },
-  { key: 'queue.default_grace_seconds', label: 'Default queue grace (seconds)', description: 'Extra time after the check-in window before a no-show.', placeholder: '180' },
-  { key: 'navigation.off_route_grace_seconds', label: 'Off-route grace (seconds)', description: 'How long a walker may be off-route before the route is recalculated.', placeholder: '20' },
-  { key: 'notifications.class_reminder_minutes', label: 'Class reminder lead (minutes)', description: 'How early class reminders are sent.', placeholder: '15' },
-];
+/**
+ * Presentation only. The editable list is whatever `GET /admin/settings` returns, because the API
+ * refuses to store a key the platform has not registered — offering an invented key here would
+ * only produce a save that fails. Anything registered later appears automatically.
+ */
+const SETTINGS_META: Record<string, { label: string; description: string; placeholder?: string }> = {
+  system_name: { label: 'System name', description: 'Shown in the browser title and system messages.', placeholder: 'CampusFlow Platform' },
+  campus_location: { label: 'Campus location', description: 'The campus these records describe.', placeholder: 'Main Campus' },
+  queue_auto_expire_mins: { label: 'Queue auto-expire (minutes)', description: 'How long a waiting ticket survives without activity.', placeholder: '10' },
+};
+
+const humanise = (key: string) =>
+  key
+    .split(/[._]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 
 export default function AdminSettingsPage() {
   const toast = useToast();
@@ -100,27 +110,35 @@ export default function AdminSettingsPage() {
           <Card>
             <SectionHeading title="Operational settings" description="Changes apply to subsequent requests — no restart required." />
             <div className="space-y-4">
-              {KNOWN_SETTINGS.map((setting) => {
-                const stored = settings.data?.settings.find((item) => item.key === setting.key);
-                const value = valueOf(setting.key, stored?.value);
-                return (
-                  <div key={setting.key} className="flex flex-wrap items-end gap-3">
-                    <div className="min-w-0 basis-[220px] flex-1">
-                      <Field label={setting.label} htmlFor={`setting-${setting.key}`} hint={setting.description}>
-                        <Input
-                          id={`setting-${setting.key}`}
-                          placeholder={setting.placeholder}
-                          value={value}
-                          onChange={(event) => setDrafts({ ...drafts, [setting.key]: event.target.value })}
-                        />
-                      </Field>
+              {settings.loading ? (
+                <CardSkeleton rows={3} />
+              ) : (
+                (settings.data?.settings ?? []).map((setting) => {
+                  const meta = SETTINGS_META[setting.key];
+                  const value = valueOf(setting.key, setting.value);
+                  return (
+                    <div key={setting.key} className="flex flex-wrap items-end gap-3">
+                      <div className="min-w-0 basis-[220px] flex-1">
+                        <Field
+                          label={meta?.label ?? humanise(setting.key)}
+                          htmlFor={`setting-${setting.key}`}
+                          hint={setting.description ?? meta?.description}
+                        >
+                          <Input
+                            id={`setting-${setting.key}`}
+                            placeholder={meta?.placeholder}
+                            value={value}
+                            onChange={(event) => setDrafts({ ...drafts, [setting.key]: event.target.value })}
+                          />
+                        </Field>
+                      </div>
+                      <Button className="mb-1.5" size="sm" loading={savingKey === setting.key} onClick={() => void save(setting.key, value)}>
+                        Save
+                      </Button>
                     </div>
-                    <Button className="mb-1.5" size="sm" loading={savingKey === setting.key} onClick={() => void save(setting.key, value)}>
-                      Save
-                    </Button>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </Card>
 

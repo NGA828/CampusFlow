@@ -1202,6 +1202,9 @@ export interface RoomQueueConfig {
 export interface Setting {
   key: string;
   value: unknown;
+  /** Registered alongside the key; null when the row carries no description. */
+  description?: string | null;
+  group?: string;
   updated_at: string;
 }
 
