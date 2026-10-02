@@ -722,10 +722,14 @@ class StaffController extends Controller
             'day_of_week'=> 'required|integer|between:0,6',
             'starts_at'  => 'required|date_format:H:i:s',
             'ends_at'    => 'required|date_format:H:i:s|after:starts_at',
+            // Optional: without it the session runs for the whole term.
+            'effective_from'  => 'nullable|date_format:Y-m-d',
+            'effective_until' => 'nullable|date_format:Y-m-d|after_or_equal:effective_from',
         ]);
 
         $entry = TimetableEntry::create(array_merge($request->only([
             'course_id', 'term_code', 'room_id', 'type', 'day_of_week', 'starts_at', 'ends_at',
+            'effective_from', 'effective_until',
         ]), ['lecturer_id' => $request->user()->id]));
 
         // Only the students actually enrolled in that course for that term, never the whole campus.
