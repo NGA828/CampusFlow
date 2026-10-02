@@ -1,0 +1,74 @@
+name: check
+
+# `npm run check` alone only parses PHP, which proves a file is syntactically
+# valid and nothing more. A change that is syntactically fine and behaviourally
+# broken has already shipped through that gate, so CI runs the suite too.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-full:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ env.CI_DB_PASSWORD }}
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      CI_DB_PASSWORD: campusflow_ci
+      # phpunit.xml carries local defaults; force="false" means these win.
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${{ env.CI_DB_PASSWORD }}
+      DB_DATABASE: campusflow_testing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          # pdo_pgsql for the suite; the rest are Laravel's own requirements, listed
+          # explicitly so a runner change cannot silently drop one.
+          extensions: mbstring, pdo_pgsql, pdo_sqlite, bcmath, intl, zip, pcntl
+          coverage: none
+          tools: composer:v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          composer install --working-dir=backend --no-interaction --prefer-dist --no-progress
+          npm ci
+          npm --prefix frontend ci
+          npm --prefix mobile ci
+
+      - name: Create the test database
+        # Never the dev `campusflow` database: the feature tests use
+        # RefreshDatabase, so `migrate:fresh` would run against it.
+        run: PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USERNAME" -d postgres -c 'CREATE DATABASE campusflow_testing;'
+
+      - name: Static checks and test suite
+        run: npm run check:full
