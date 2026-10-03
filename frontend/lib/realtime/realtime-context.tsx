@@ -146,12 +146,30 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       closedByUs = true;
       if (heartbeat) clearInterval(heartbeat);
       if (reconnectTimer) clearTimeout(reconnectTimer);
-      socket?.close();
+      if (socket) {
+        const currentSocket = socket;
+        if (currentSocket.readyState === WebSocket.CONNECTING) {
+          currentSocket.onopen = () => {
+            try {
+              currentSocket.close();
+            } catch {
+              /* socket already closed */
+            }
+          };
+        } else if (currentSocket.readyState === WebSocket.OPEN) {
+          try {
+            currentSocket.close();
+          } catch {
+            /* socket already closed */
+          }
+        }
+      }
       if (socketRef.current === socket) socketRef.current = null;
       authenticatedRef.current = false;
       setConnected(false);
     };
   }, [dispatch, send]);
+
 
   const subscribe = useCallback<RealtimeContextValue['subscribe']>((channel, handler) => {
     const set = handlersRef.current.get(channel) ?? new Set<Handler>();
