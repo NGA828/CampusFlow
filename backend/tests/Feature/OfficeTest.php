@@ -58,4 +58,19 @@ class OfficeTest extends TestCase
             ->assertJsonPath('data.ticket.id', $ticketId)
             ->assertJsonStructure(['data' => ['office', 'people_ahead', 'can_cancel']]);
     }
+
+    public function test_student_can_view_office_by_code(): void
+    {
+        $student = User::where('role', 'student')->firstOrFail();
+        $office = Office::firstOrFail();
+
+        $this->actingAs($student, 'sanctum')
+            ->getJson("/api/v1/student/offices/{$office->code}")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.office.id', $office->id)
+            ->assertJsonPath('data.office.code', $office->code);
+    }
 }
+
+

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Office extends Model
 {
@@ -107,4 +108,24 @@ class Office extends Model
             'check_in_radius_m'    => (float) ($this->check_in_radius_m ?? 75.0),
         ];
     }
+
+    /**
+     * Retrieve the model for a bound value (either UUID ID or office code like 'BUR', 'REG', 'SA').
+     */
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if ($field) {
+            return parent::resolveRouteBinding($value, $field);
+        }
+
+        if (Str::isUuid($value)) {
+            return $this->where('id', $value)->first() ?? parent::resolveRouteBinding($value, $field);
+        }
+
+        return $this->where('code', strtoupper($value))
+            ->orWhere('code', $value)
+            ->first() ?? parent::resolveRouteBinding($value, $field);
+    }
 }
+
+

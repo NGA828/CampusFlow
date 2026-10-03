@@ -19,7 +19,15 @@ class OfficeTicket extends Model
         'called_at', 'service_started_at', 'completed_at', 'cancelled_at', 'cancelled_by',
     ];
 
-    protected $dates = ['called_at', 'service_started_at', 'completed_at', 'cancelled_at'];
+    protected function casts(): array
+    {
+        return [
+            'called_at'          => 'datetime',
+            'service_started_at' => 'datetime',
+            'completed_at'       => 'datetime',
+            'cancelled_at'       => 'datetime',
+        ];
+    }
 
     public function office(): BelongsTo  { return $this->belongsTo(Office::class); }
     public function user(): BelongsTo   { return $this->belongsTo(User::class); }

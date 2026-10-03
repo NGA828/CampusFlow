@@ -12,7 +12,7 @@ cd mobile
 npm install
 
 # Point the app at the API. Use your machine's LAN address — a phone cannot reach 127.0.0.1.
-EXPO_PUBLIC_API_URL=http://192.168.1.20:8001/api/v1 npm run start
+EXPO_PUBLIC_API_URL=http://[IP_ADDRESS]/api/v1 npm run start
 ```
 
 Then open the QR code with **Expo Go** (Android/iOS) or press `a` / `i` for an emulator. The API
