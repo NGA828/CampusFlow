@@ -259,7 +259,7 @@ Open Notifications (shared /notifications or student /student/notifications), ap
 
 ## 4.2 Student on web: planning and records
 
-/student/dashboard is the starting point for next class, activity and service summaries. /student/timetable shows the personal schedule derived from enrolments. Move between weeks/days and open room links. /student/campus/map lets you inspect buildings/floors and search; /student/campus/rooms and /student/campus/rooms/[code] provide room details and availability. Web route preview is planning, not live positioning.
+/student/dashboard is the starting point for next class, activity and service summaries. /student/timetable shows the personal schedule derived from enrolments. Move between weeks/days and open room links. /student/campus/map lets you inspect buildings/floors and search; /student/campus/rooms and /student/campus/rooms/[code] provide room details and availability. Web route preview can start from a published anchor or a one-time browser GPS fix that the user explicitly grants; it does not save or track location, so it remains planning rather than live positioning.
 
 /student/services/queues shows the queue board, active ticket information and history/cancellation controls where applicable. Take a physical room-admission ticket from mobile, not web. /student/services/offices lists offices; open /student/services/offices/[code], inspect availability and request an eligible ticket. Open the ticket detail to see number, position, estimates/history and cancellation. Proximity check-in is mobile-only even when an office ticket can be requested on web.
 

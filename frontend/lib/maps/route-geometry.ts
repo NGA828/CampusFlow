@@ -2,6 +2,13 @@ import type { NavigationNode, Route, RouteStep } from '../api/types';
 
 export const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
+/** One-time browser GPS fix for a route preview; web does not start a live navigation session. */
+export interface RouteStartFix {
+  lat: number;
+  lng: number;
+  accuracy_m: number | null;
+}
+
 /** Only adjacent server-returned nodes are connected. Missing coordinates break a path. */
 export function routeSegments(route: Route, floorId: string | null) {
   return route.nodes.slice(1).flatMap((to, i) => {

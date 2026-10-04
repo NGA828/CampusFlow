@@ -11,6 +11,7 @@ import { RoutePreview } from "@/components/maps/route-preview";
 import { Badge, CardSkeleton, Button } from "@/components/ui/kit";
 import { ReadError, momentLabel } from "@/components/layout/student-companion";
 import type { Floor, Position, Room, Route } from "@/lib/api/types";
+import type { RouteStartFix } from "@/lib/maps/route-geometry";
 import s from "@/components/layout/campus-operations.module.css";
 
 export default function MapPage() {
@@ -24,6 +25,7 @@ function MapContent() {
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"campus" | "indoor">("campus");
   const [activeRoute, setActiveRoute] = useState<Route | null>(null);
+  const [activeRouteOriginFix, setActiveRouteOriginFix] = useState<RouteStartFix | null>(null);
   const [leftTab, setLeftTab] = useState<"places" | "route">(params.has("route") ? "route" : "places");
 
   const rows = buildings.data?.buildings ?? [];
@@ -46,14 +48,14 @@ function MapContent() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => { setLeftTab("places"); setActiveRoute(null); }}
+            onClick={() => { setLeftTab("places"); setActiveRoute(null); setActiveRouteOriginFix(null); }}
             className={`rounded-[12px] px-3.5 py-2 text-[13px] font-bold transition-all ${leftTab === "places" && !activeRoute ? "bg-brand-600 text-white shadow-sm" : "bg-white border border-ink-200 text-ink-700 hover:bg-ink-50"}`}
           >
             Explore Places
           </button>
           <button
             type="button"
-            onClick={() => { setLeftTab("route"); setActiveRoute(null); }}
+            onClick={() => { setLeftTab("route"); setActiveRoute(null); setActiveRouteOriginFix(null); }}
             className={`rounded-[12px] px-3.5 py-2 text-[13px] font-bold transition-all ${leftTab === "route" || activeRoute ? "bg-brand-600 text-white shadow-sm" : "bg-white border border-ink-200 text-ink-700 hover:bg-ink-50"}`}
           >
             Plan Route →
@@ -107,7 +109,8 @@ function MapContent() {
           <RoutePreview
             route={activeRoute}
             walking={null}
-            onClearRoute={() => setActiveRoute(null)}
+            startFix={activeRouteOriginFix}
+            onClearRoute={() => { setActiveRoute(null); setActiveRouteOriginFix(null); }}
           />
         </div>
       ) : (
@@ -184,8 +187,9 @@ function MapContent() {
                 <Suspense fallback={<CardSkeleton rows={3} />}>
                   <RoutePlanner
                     hidePreviewCard
-                    onRouteCalculated={(r) => {
+                    onRouteCalculated={(r, startFix) => {
                       setActiveRoute(r);
+                      setActiveRouteOriginFix(startFix);
                     }}
                   />
                 </Suspense>

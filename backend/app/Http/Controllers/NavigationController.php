@@ -376,6 +376,7 @@ class NavigationController extends Controller
 
         if (isset($validated['from_lat'], $validated['from_lng'])) {
             $nodes = (clone $candidates)
+                ->whereNull('floor_id')
                 ->whereNotNull('lat')
                 ->whereNotNull('lng')
                 ->get();

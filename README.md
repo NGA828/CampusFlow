@@ -48,8 +48,9 @@ See [`mobile/README.md`](mobile/README.md) for the screen list and push-notifica
 - **Campus map & indoor positioning** — buildings, floors, rooms, floor plans and signed QR
   anchors validated by the API.
 - **Navigation** — A* over a stored walking graph, turn-by-turn indoor/outdoor steps, accessible
-  (step-free) preference, live tracking, off-route warning with a grace period and automatic
-  recalculation.
+  (step-free) preference, mobile live tracking, off-route warning with a grace period and automatic
+  recalculation. The web map also draws route lines from a chosen anchor or a one-time browser GPS
+  fix; web location is used only for that preview and is not saved or tracked.
 - **Room admission queues** — geofence-checked joins, one active ticket per student enforced by
   transactions, row locks and unique constraints; position, ETA, check-in window and no-show policy.
 - **Administrative office ticketing** — ticket numbers per office, position, expected service
