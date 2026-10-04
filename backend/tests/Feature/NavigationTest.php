@@ -214,4 +214,63 @@ class NavigationTest extends TestCase
             ->assertUnprocessable();
     }
 
+
+    public function test_mobile_route_session_snaps_the_current_gps_fix_to_the_published_path(): void
+    {
+        $start = $this->waypoint('GPS start');
+        $destination = $this->waypoint('GPS destination');
+        $start->update(['lat' => 19.1234, 'lng' => 11.2345]);
+        $destination->update(['lat' => 19.1236, 'lng' => 11.2347]);
+        $this->connect($start, $destination, 28);
+
+        $response = $this->actingAs(User::where('role', 'student')->firstOrFail(), 'sanctum')
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/navigation/sessions', [
+                'to_node_id' => $destination->id,
+                'from_lat' => 19.123401,
+                'from_lng' => 11.234501,
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.session.from_node_id', $start->id)
+            ->assertJsonPath('data.route.origin.node.id', $start->id)
+            ->assertJsonPath('data.route.legs.0.geo.0.lat', 19.1234)
+            ->assertJsonPath('data.destination_label', 'GPS destination');
+    }
+
+
+    public function test_mobile_route_session_snaps_a_qr_plan_fix_to_the_nearest_node_on_its_floor(): void
+    {
+        $floor = \App\Models\Floor::query()->firstOrFail();
+        $start = $this->waypoint('QR start');
+        $destination = $this->waypoint('Indoor destination');
+        $start->update([
+            'building_id' => $floor->building_id,
+            'floor_id' => $floor->id,
+            'plan_x' => 8,
+            'plan_y' => 5,
+        ]);
+        $destination->update([
+            'building_id' => $floor->building_id,
+            'floor_id' => $floor->id,
+            'plan_x' => 18,
+            'plan_y' => 5,
+        ]);
+        $this->connect($start, $destination, 10);
+
+        $this->actingAs(User::where('role', 'student')->firstOrFail(), 'sanctum')
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/navigation/sessions', [
+                'to_node_id' => $destination->id,
+                'from_plan_x' => 8.2,
+                'from_plan_y' => 5.1,
+                'from_floor_id' => $floor->id,
+                'from_building_id' => $floor->building_id,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.session.from_node_id', $start->id)
+            ->assertJsonPath('data.route.legs.0.floor_id', $floor->id)
+            ->assertJsonPath('data.route.legs.0.points.0.x', 8);
+    }
+
 }

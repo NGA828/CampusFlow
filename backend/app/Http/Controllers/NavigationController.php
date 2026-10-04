@@ -38,6 +38,12 @@ class NavigationController extends Controller
             'to_room_code' => ['sometimes', 'nullable', 'string'],
             'to_node_id'   => ['sometimes', 'nullable', 'uuid'],
             'from_node_id' => ['sometimes', 'nullable', 'uuid'],
+            'from_lat' => ['sometimes', 'nullable', 'numeric', 'between:-90,90', 'required_with:from_lng'],
+            'from_lng' => ['sometimes', 'nullable', 'numeric', 'between:-180,180', 'required_with:from_lat'],
+            'from_plan_x' => ['sometimes', 'nullable', 'numeric', 'required_with:from_plan_y,from_floor_id'],
+            'from_plan_y' => ['sometimes', 'nullable', 'numeric', 'required_with:from_plan_x,from_floor_id'],
+            'from_floor_id' => ['sometimes', 'nullable', 'uuid', 'required_with:from_plan_x,from_plan_y'],
+            'from_building_id' => ['sometimes', 'nullable', 'uuid'],
             'accessible'   => ['sometimes', 'boolean'],
         ]);
 
@@ -48,7 +54,8 @@ class NavigationController extends Controller
         }
 
         $accessible = $validated['accessible'] ?? false;
-        $route      = $this->computeRoute($validated['from_node_id'] ?? null, $toNode->id, $accessible);
+        $fromNodeId = $this->resolveOriginNodeId($validated, $accessible);
+        $route      = $this->computeRoute($fromNodeId, $toNode->id, $accessible);
 
         return response()->json([
             'success' => true,
@@ -68,6 +75,12 @@ class NavigationController extends Controller
             'to_room_code' => ['sometimes', 'nullable', 'string'],
             'to_node_id'   => ['sometimes', 'nullable', 'uuid'],
             'from_node_id' => ['sometimes', 'nullable', 'uuid'],
+            'from_lat' => ['sometimes', 'nullable', 'numeric', 'between:-90,90', 'required_with:from_lng'],
+            'from_lng' => ['sometimes', 'nullable', 'numeric', 'between:-180,180', 'required_with:from_lat'],
+            'from_plan_x' => ['sometimes', 'nullable', 'numeric', 'required_with:from_plan_y,from_floor_id'],
+            'from_plan_y' => ['sometimes', 'nullable', 'numeric', 'required_with:from_plan_x,from_floor_id'],
+            'from_floor_id' => ['sometimes', 'nullable', 'uuid', 'required_with:from_plan_x,from_plan_y'],
+            'from_building_id' => ['sometimes', 'nullable', 'uuid'],
             'accessible'   => ['sometimes', 'boolean'],
         ]);
 
@@ -78,20 +91,26 @@ class NavigationController extends Controller
             return $this->error('Destination not found.', 422);
         }
 
-        // Abandon any currently active session
+        $accessible = $validated['accessible'] ?? false;
+        $fromNodeId = $this->resolveOriginNodeId($validated, $accessible);
+        $route      = $this->computeRoute($fromNodeId, $toNode->id, $accessible);
+
+        // Keep an existing walk active unless the new destination and origin form a valid route.
         NavigationSession::where('user_id', $user->id)->where('status', 'active')->update([
             'status' => 'abandoned', 'abandoned_at' => now(),
         ]);
-
-        $accessible = $validated['accessible'] ?? false;
-        $route      = $this->computeRoute($validated['from_node_id'] ?? null, $toNode->id, $accessible);
 
         $toRoom = $toNode->room_id ? Room::find($toNode->room_id) : null;
 
         $session = NavigationSession::create([
             'user_id'        => $user->id,
-            'from_node_id'   => $validated['from_node_id'] ?? null,
+            'from_node_id'   => $fromNodeId,
             'to_node_id'     => $toNode->id,
+            'current_lat'    => $validated['from_lat'] ?? null,
+            'current_lng'    => $validated['from_lng'] ?? null,
+            'current_plan_x' => $validated['from_plan_x'] ?? null,
+            'current_plan_y' => $validated['from_plan_y'] ?? null,
+            'current_floor_id' => $validated['from_floor_id'] ?? null,
             'to_room_id'     => $toRoom?->id,
             'accessible'     => $accessible,
             'route_snapshot' => $route,
@@ -319,6 +338,68 @@ class NavigationController extends Controller
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /** Resolve a phone's precise QR-plan fix or GPS fix to the nearest published route node. */
+    private function resolveOriginNodeId(array $validated, bool $accessible): ?string
+    {
+        if (! empty($validated['from_node_id'])) {
+            return $validated['from_node_id'];
+        }
+
+        $candidates = NavigationNode::query()
+            ->where('is_active', true)
+            ->when($accessible, fn ($query) => $query->where('is_accessible', true)->whereNotIn('type', ['stairs', 'stairwell']));
+
+        if (isset($validated['from_plan_x'], $validated['from_plan_y'], $validated['from_floor_id'])) {
+            $nodes = (clone $candidates)
+                ->where('floor_id', $validated['from_floor_id'])
+                ->when($validated['from_building_id'] ?? null, fn ($query, $id) => $query->where('building_id', $id))
+                ->whereNotNull('plan_x')
+                ->whereNotNull('plan_y')
+                ->get();
+
+            $bestNode = null;
+            $bestDistance = PHP_FLOAT_MAX;
+            foreach ($nodes as $node) {
+                $dx = (float) $node->plan_x - (float) $validated['from_plan_x'];
+                $dy = (float) $node->plan_y - (float) $validated['from_plan_y'];
+                $distance = sqrt($dx * $dx + $dy * $dy);
+                if ($distance < $bestDistance) {
+                    $bestNode = $node;
+                    $bestDistance = $distance;
+                }
+            }
+
+            // A scan far from any route node is not a safe origin; do not draw a made-up shortcut.
+            return $bestDistance <= 150 ? $bestNode?->id : null;
+        }
+
+        if (isset($validated['from_lat'], $validated['from_lng'])) {
+            $nodes = (clone $candidates)
+                ->whereNotNull('lat')
+                ->whereNotNull('lng')
+                ->get();
+
+            $bestNode = null;
+            $bestDistance = PHP_FLOAT_MAX;
+            foreach ($nodes as $node) {
+                $distance = $this->approximateMeters(
+                    (float) $validated['from_lat'],
+                    (float) $validated['from_lng'],
+                    (float) $node->lat,
+                    (float) $node->lng,
+                );
+                if ($distance < $bestDistance) {
+                    $bestNode = $node;
+                    $bestDistance = $distance;
+                }
+            }
+
+            return $bestDistance <= 1000 ? $bestNode?->id : null;
+        }
+
+        return null;
+    }
 
     /** Closest walkable node to a raw fix on a floor — used when rerouting mid-walk. */
     private function nearestNodeOnFloor(?float $lat, ?float $lng, string $floorId): ?string

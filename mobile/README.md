@@ -33,10 +33,20 @@ Demo accounts (seeded by `php ../backend/artisan db:seed`): `student@campusflow.
 | `student/(tabs)/scan` | Camera QR scan plus manual anchor lookup and backend validation feedback |
 | `student/timetable`, `student/room/[code]` | Student timetable and room information/availability |
 | `student/offices`, `student/office/[code]` | Office directory, ticket request, check-in and cancellation |
-| `student/navigate/[code]` | Route steps and GPS tracking with off-route guidance |
+| `student/navigate/[code]` | Live GPS/QR-based route origin, mapped floor/campus route trace, route steps and GPS tracking |
 | `student/notifications`, `student/assistant`, `student/profile` | In-app inbox, campus assistant and account settings |
 | `staff/(tabs)/*`, `staff/line/[id]`, `staff/office/[id]` | Staff queue and office operations for assigned services |
 | `admin/(tabs)/*`, `admin/alert/[key]` | Admin monitoring and alert acknowledgement; no configuration forms on mobile |
+
+## Mobile route tracing
+
+Starting a walk uses a recent QR position on the same indoor floor when available; otherwise the app
+asks for foreground location and sends a GPS fix. The API snaps that point to the nearest active,
+accessible navigation node and returns its published route legs. The mobile navigation screen draws
+those indoor plan-coordinate and outdoor GPS-coordinate legs as a traced line and keeps the user's
+location marker moving while GPS tracking is enabled. Indoor starting points are most accurate after
+scanning a nearby anchor. Sections without published geometry are called out rather than drawn as a
+misleading straight-line shortcut.
 
 ## Push notifications
 

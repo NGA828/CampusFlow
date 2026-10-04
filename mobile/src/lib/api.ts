@@ -301,31 +301,71 @@ export interface MobileRouteStep {
   instruction: string;
   kind: string;
   distance_m: number;
+  duration_s?: number;
   floor_id?: string | null;
   floor_name?: string | null;
   node_id?: string | null;
 }
 
+export interface MobileRouteLeg {
+  floor_id: string | null;
+  floor_name: string | null;
+  floor_level: number | null;
+  building_code: string | null;
+  distance_m: number;
+  duration_s: number;
+  points: { x: number; y: number }[];
+  geo: { lat: number; lng: number }[];
+}
+
+export interface MobileRouteNode {
+  id: string;
+  label?: string | null;
+  floor_id?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  plan_x?: number | null;
+  plan_y?: number | null;
+}
+
 export interface MobileRoute {
+  nodes: MobileRouteNode[];
   steps: MobileRouteStep[];
+  legs: MobileRouteLeg[];
   distance_m: number;
   duration_s: number;
   accessible: boolean;
   uses_stairs: boolean;
-  origin: { label: string };
-  destination: { label: string };
+  origin: { label: string; node?: MobileRouteNode | null };
+  destination: { label: string; node?: MobileRouteNode | null };
 }
 
-export interface NavigationSessionState {
-  session_id: string;
+export interface NavigationSessionRecord {
+  id: string;
+  status: string;
+  accessible: boolean;
+  from_node_id: string | null;
+  to_node_id: string;
+  to_room_id: string | null;
+  current_lat: number | null;
+  current_lng: number | null;
+  current_plan_x: number | null;
+  current_plan_y: number | null;
+  current_floor_id: string | null;
   started_at: string;
-  route: MobileRoute;
-  destination_label: string;
 }
 
-export interface NavigationProgress {
-  position: Position;
-  navigation: {
+/** The API envelope separates its session record from the route snapshot. */
+export interface NavigationSessionState {
+  session: NavigationSessionRecord | null;
+  route: MobileRoute | null;
+  destination_label: string | null;
+}
+
+/** Position updates currently return the refreshed session and route snapshot. */
+export interface NavigationPositionUpdate extends NavigationSessionState {
+  position?: Position;
+  navigation?: {
     off_route: boolean;
     distance_from_route_m: number;
     tolerance_m: number;
@@ -346,12 +386,22 @@ export interface NavigationProgress {
  * registered for this platform alone.
  */
 export const navigationApi = {
-  start: (body: { to_room_code?: string; to_room_id?: string; accessible?: boolean; from_node_id?: string }) =>
-    api.post<NavigationSessionState>('/student/navigation/sessions', body),
-  active: () => api.get<{ session: NavigationSessionState | null; position: Position | null }>('/student/navigation/sessions/active'),
+  start: (body: {
+    to_room_code?: string;
+    to_room_id?: string;
+    accessible?: boolean;
+    from_node_id?: string;
+    from_lat?: number;
+    from_lng?: number;
+    from_plan_x?: number;
+    from_plan_y?: number;
+    from_floor_id?: string;
+    from_building_id?: string;
+  }) => api.post<NavigationSessionState>('/student/navigation/sessions', body),
+  active: () => api.get<NavigationSessionState & { position: Position | null }>('/student/navigation/sessions/active'),
   history: () => api.get<{ sessions: unknown[] }>('/student/navigation/sessions'),
   updatePosition: (sessionId: string, body: { lat: number; lng: number; accuracy_m?: number | null; source?: string }) =>
-    api.post<NavigationProgress>(`/student/navigation/sessions/${sessionId}/position`, body),
+    api.post<NavigationPositionUpdate>(`/student/navigation/sessions/${sessionId}/position`, body),
   /**
    * Pause or resume the walk on the server, not just the timer on the screen.
    *

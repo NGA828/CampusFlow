@@ -55,13 +55,13 @@
 
 ## 4. Positioning & Spatial Navigation (`/positioning`, `/navigation`)
 
-### `POST /positioning/scan`
-- **Body**: `{ qr_payload: string }`
-- **Response**: `{ success: true, position: LocationFix, room: Room, floor: Floor, building: Building }`
+### `POST /student/positioning/scan`
+- **Body**: `{ payload?: string, code?: string, version?: number }`
+- **Response**: `{ success: true, data: { position, qr_node } }`
 
-### `POST /navigation/route`
-- **Body**: `{ origin: { x, y, floor_id }, destination: { room_code } }`
-- **Response**: `{ success: true, path: Node[], total_distance_m: float, instructions: Instruction[] }`
+### `POST /campus/navigation/route`
+- **Body**: destination `{to_room_code}` or `{to_node_id}`, optional `accessible`, and one origin: `{from_node_id}`, `{from_lat, from_lng}`, or `{from_plan_x, from_plan_y, from_floor_id}` (indoor QR fix).
+- **Response**: `{ success: true, data: { route: { nodes, steps, legs, transitions, distance_m, duration_s }, destination_label } }`
 
 ---
 
@@ -182,7 +182,7 @@ Five Laravel feature tests cover these contracts but remain **unexecuted** witho
 Browser verification uses raw-wire fixtures; it is not production authorization/database evidence.
 
 ### Navigation preview integrity (2026-09-29)
-`POST /campus/navigation/route` uses Dijkstra over active nodes and non-negative metre-weighted edges. Accessibility filters apply to both edge endpoints and edges; stairs/stairwells are excluded when step-free is requested. No origin, disconnected destinations, or excluded endpoints produce HTTP 422 instead of a successful empty route. Each returned step includes `node_id`, referencing the ordered `route.nodes` array. Indoor leg `points` are confined to a single floor; `geo` belongs to outdoor/entrance connections. Clients must not connect missing coordinates or floor transitions into a straight line. A room without a navigation node is not silently substituted with an arbitrary node on its floor.
+`POST /campus/navigation/route` uses Dijkstra over active nodes and non-negative metre-weighted edges. Accessibility filters apply to both edge endpoints and edges; stairs/stairwells are excluded when step-free is requested. No origin, disconnected destinations, or excluded endpoints produce HTTP 422 instead of a successful empty route. Each returned step includes `node_id`, referencing the ordered `route.nodes` array. Indoor leg `points` are confined to a single floor; `geo` belongs to outdoor/entrance connections. Clients must not connect missing coordinates or floor transitions into a straight line. A room without a navigation node is not silently substituted with an arbitrary node on its floor. Mobile route starts may provide `from_node_id`, GPS `from_lat/from_lng`, or an indoor QR fix as `from_plan_x/from_plan_y/from_floor_id`; the API snaps a location fix to a nearby active graph node before routing. The mobile navigator renders the returned legs as a route trace and tracks the live GPS marker; QR scanning is the accurate indoor-origin source.
 
 ### Functional corrections (2026-10-04)
 
