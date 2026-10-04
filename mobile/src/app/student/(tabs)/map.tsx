@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Badge, Button, Card, EmptyState, ErrorNote, H3, Loading, Screen, SectionTitle, Small } from '@/components/ui';
 import { IconTile, Notice, PageIntro } from '@/components/visual';
-import { CampusOverview } from '@/components/campus-overview';
+import { CampusMap3D } from '@/components/campus-map-3d';
 import { campusApi, positioningApi } from '@/lib/api';
 import { useLoader } from '@/lib/auth';
 import { colors, relativeTime } from '@/lib/theme';
@@ -37,7 +37,7 @@ export default function MapScreen() {
           {query ? <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setQuery('')} style={styles.clear}><Ionicons name="close-circle" size={22} color={colors.ink400} /></Pressable> : null}
         </View>
 
-        {!searching && buildings.data ? <CampusOverview buildings={buildings.data.buildings} onSelect={setQuery} /> : null}
+        {!searching && buildings.data ? <CampusMap3D buildings={buildings.data.buildings} onSelect={setQuery} /> : null}
         <Notice icon="locate-outline" title={position.data?.position ? 'Your location is anchored' : 'Find your indoor position'} tone="mint">
           {position.data?.position ? `${position.data.position.source} · updated ${relativeTime(position.data.position.updated_at)}` : 'Scan a QR anchor for a trusted starting point inside a building.'}
         </Notice>

@@ -35,6 +35,8 @@ Use **MapLibre GL JS** for the web campus map, while retaining campus-owned GeoJ
 - Browser geolocation control with high-accuracy tracking and heading.
 - Backend route geometry rendered over the real map; missing edge geometry remains dashed.
 - User and destination markers, responsive touch controls, campus recentering, and building labels.
+- Native iOS/Android parity through MapLibre Native: extruded campus GeoJSON, device-location accuracy and heading, pitched/rotatable camera, 2D/3D switch, building selection, and real-world outdoor route lines.
+- Indoor navigation keeps the surveyed floor trace because GPS and an outdoor basemap cannot truthfully identify a room or floor. Native MapLibre requires an Expo development build and is intentionally not advertised as Expo Go compatible.
 
 ## Self-review
 
