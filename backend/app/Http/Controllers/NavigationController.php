@@ -376,7 +376,11 @@ class NavigationController extends Controller
 
         if (isset($validated['from_lat'], $validated['from_lng'])) {
             $nodes = (clone $candidates)
-                ->whereNull('floor_id')
+                ->where(function ($query) {
+                    // Geospatial route origins belong to campus/outdoor anchors. Indoor room nodes
+                    // often carry a building centroid, which is not a walkable starting point.
+                    $query->whereNull('floor_id')->orWhereIn('type', ['entrance', 'exit', 'outdoor']);
+                })
                 ->whereNotNull('lat')
                 ->whereNotNull('lng')
                 ->get();

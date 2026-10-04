@@ -200,7 +200,7 @@ export function RouteTrace({ legs, originPosition, position }: { legs: MobileRou
   return (
     <Card style={styles.card}>
       <SectionTitle title="Route map" />
-      <Small style={styles.caption}>Following the campus’s published walking path. The blue dot is your current position when it can be matched to this section.</Small>
+      <Small style={styles.caption}>The blue line joins published route waypoints with straight segments, so it follows real walkways only when those waypoints are mapped along them. The blue dot is your current position when it can be matched to this section.</Small>
       {originMatchesFirstLeg ? <Small style={styles.indoorNote}>The short dashed line joins your location fix to the nearest published walking node.</Small> : null}
       {originPosition?.floor_id && position?.source === 'gps' ? <Small style={styles.indoorNote}>GPS cannot locate your floor indoors. Scan a nearby QR anchor to refresh your indoor marker.</Small> : null}
       {mapped.length > 0 && mapped.length < legs.length ? <Small style={styles.indoorNote}>Some sections do not have published map geometry and are intentionally left unconnected.</Small> : null}

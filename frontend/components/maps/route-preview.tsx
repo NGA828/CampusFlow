@@ -97,6 +97,6 @@ function RouteContent({ route, onClearRoute, startFix }: Omit<Props, 'walking'>)
         </li>)}</ol>
       </aside>
     </div>
-    <footer className={s.footer}>Routes follow the campus’s published walking network. Unmapped shortcuts are not included. Check local signs and closures; use the mobile app for live positioning.</footer>
+    <footer className={s.footer}>The line connects mapped route waypoints with straight segments; it follows actual walkways only if the campus map has enough waypoints along them. Sparse or misplaced nodes can make a route look misleading. Check local signs and closures; web preview is not live tracking.</footer>
   </section>;
 }

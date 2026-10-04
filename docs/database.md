@@ -10,6 +10,8 @@
 - `navigation_nodes` (id, floor_id, code, name, x_coordinate, y_coordinate, node_type)
 - `navigation_edges` (id, from_node_id, to_node_id, distance_meters, weight, is_accessible)
 
+Navigation edges currently store graph connectivity and routing cost, not a path polyline. Route renderers connect consecutive waypoint coordinates with straight segments. Those lines follow real corridors/walkways only when the published nodes are placed densely and accurately along them; a valid graph route is not proof of a physically verified path. To represent curved paths directly, the schema/API/renderers need edge geometry (or equivalent intermediate waypoints).
+
 ### 2. Queue & Admission Models
 - `room_queues` (id, room_id, status, capacity, current_ticket_number, auto_admit)
 - `queue_tickets` (id, queue_id, user_id, ticket_number, status, called_at, admitted_at, checked_in_at)

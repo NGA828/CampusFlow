@@ -239,6 +239,38 @@ class NavigationTest extends TestCase
     }
 
 
+    public function test_gps_origin_can_snap_to_an_entrance_node_with_indoor_floor_metadata(): void
+    {
+        $floor = \App\Models\Floor::query()->firstOrFail();
+        $entrance = $this->waypoint('GPS entrance');
+        $destination = $this->waypoint('GPS route destination');
+        $entrance->update([
+            'building_id' => $floor->building_id,
+            'floor_id' => $floor->id,
+            'type' => 'exit',
+            'lat' => 20.4321,
+            'lng' => 21.5432,
+        ]);
+        $destination->update([
+            'building_id' => $floor->building_id,
+            'floor_id' => $floor->id,
+            'lat' => 20.4323,
+            'lng' => 21.5434,
+        ]);
+        $this->connect($entrance, $destination, 28);
+
+        $this->actingAs(User::where('role', 'student')->firstOrFail(), 'sanctum')
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/navigation/sessions', [
+                'to_node_id' => $destination->id,
+                'from_lat' => 20.432101,
+                'from_lng' => 21.543201,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.session.from_node_id', $entrance->id)
+            ->assertJsonPath('data.route.origin.node.id', $entrance->id);
+    }
+
     public function test_mobile_route_session_snaps_a_qr_plan_fix_to_the_nearest_node_on_its_floor(): void
     {
         $floor = \App\Models\Floor::query()->firstOrFail();
