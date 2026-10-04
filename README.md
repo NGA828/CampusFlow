@@ -17,7 +17,7 @@ docs/       Architecture, API and design-research documentation
 
 ```bash
 npm run setup        # installs Laravel, frontend and mobile, migrates + seeds the database
-npm run dev          # Laravel API on :8001, web app on :3000
+npm run dev          # API :8001, web :3000, plus the queue worker and ticket-expiry scheduler
 ```
 
 Open <http://localhost:3000>. Seeded accounts (password `password123`):
@@ -54,8 +54,9 @@ See [`mobile/README.md`](mobile/README.md) for the screen list and push-notifica
   transactions, row locks and unique constraints; position, ETA, check-in window and no-show policy.
 - **Administrative office ticketing** — ticket numbers per office, position, expected service
   window, proximity check-in and the full service lifecycle.
-- **Engagement** — events, announcements and notifications delivered in-app, over the websocket
-  (Reverb-style channel model on `/api/ws`) and as push where the device allows it.
+- **Engagement** — events, announcements and durable in-app notifications. Expo push tokens are
+  stored and push jobs are sent through Expo when a physical device is registered. Laravel Reverb
+  live websocket delivery is not wired yet; clients should refresh for updates.
 - **AI Campus Assistant** — a natural-language gateway to a controlled set of backend tools; it
   never issues SQL and never bypasses the caller's own authorization.
 - **Staff and admin consoles** — queue/office operations, timetable publishing, content, users and

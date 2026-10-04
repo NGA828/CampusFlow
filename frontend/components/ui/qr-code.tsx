@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import QRCode from 'qrcode';
 
 interface QRCodeDisplayProps {
@@ -15,25 +16,37 @@ export function QRCodeDisplay({ value, size = 220, className = '', alt = 'QR Cod
   const [error, setError] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!value) {
+    let cancelled = false;
+
+    const generate = async () => {
+      // Defer state changes until after the effect commits, and ignore stale work when the
+      // anchor changes or the badge is unmounted while the QR encoder is still running.
+      await Promise.resolve();
+      if (cancelled) return;
+      setError(false);
       setDataUrl(null);
-      return;
-    }
-    setError(false);
-    QRCode.toDataURL(value, {
-      width: size,
-      margin: 2,
-      color: {
-        dark: '#0f172a',
-        light: '#ffffff',
-      },
-      errorCorrectionLevel: 'M',
-    })
-      .then((url) => setDataUrl(url))
-      .catch((err) => {
+
+      if (!value) return;
+
+      try {
+        const url = await QRCode.toDataURL(value, {
+          width: size,
+          margin: 2,
+          color: {
+            dark: '#0f172a',
+            light: '#ffffff',
+          },
+          errorCorrectionLevel: 'M',
+        });
+        if (!cancelled) setDataUrl(url);
+      } catch (err) {
         console.error('Failed to generate QR code graphic:', err);
-        setError(true);
-      });
+        if (!cancelled) setError(true);
+      }
+    };
+
+    void generate();
+    return () => { cancelled = true; };
   }, [value, size]);
 
   if (error) {
@@ -60,7 +73,7 @@ export function QRCodeDisplay({ value, size = 220, className = '', alt = 'QR Cod
 
   return (
     <div className={`inline-flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${className}`}>
-      <img src={dataUrl} width={size} height={size} alt={alt} className="block rounded-lg border border-slate-100" />
+      <Image src={dataUrl} width={size} height={size} alt={alt} unoptimized className="block rounded-lg border border-slate-100" />
     </div>
   );
 }

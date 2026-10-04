@@ -95,6 +95,7 @@ Route::middleware(['auth:sanctum', 'role:student,staff,admin'])->prefix('me')->g
     Route::post('/notifications/read-all', [MeController::class, 'readAllNotifications']);
 
     Route::post('/devices', [MeController::class, 'registerDevice']);
+    Route::post('/devices/unregister', [MeController::class, 'unregisterDevice']);
 });
 
 // ─────────────────────────────────────────── resident reads — `/campus`

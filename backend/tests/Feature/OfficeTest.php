@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Office;
+use App\Models\OfficeTicket;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -57,6 +58,37 @@ class OfficeTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.ticket.id', $ticketId)
             ->assertJsonStructure(['data' => ['office', 'people_ahead', 'can_cancel']]);
+    }
+
+    public function test_office_call_past_its_grace_period_is_marked_no_show(): void
+    {
+        $student = User::where('role', 'student')->firstOrFail();
+        $office = Office::firstOrFail();
+        $office->forceFill([
+            'requires_appointment' => false,
+            'requires_proximity_to_request' => false,
+            'daily_capacity' => null,
+            'grace_period_seconds' => 60,
+        ])->save();
+
+        $ticketId = $this->actingAs($student, 'sanctum')
+            ->postJson("/api/v1/student/offices/{$office->id}/tickets", ['subject' => 'Timeout test'])
+            ->assertCreated()
+            ->json('data.ticket.id');
+
+        OfficeTicket::whereKey($ticketId)->update([
+            'status' => 'called',
+            'called_at' => now()->subMinutes(5),
+        ]);
+
+        $this->artisan('campusflow:tickets:expire')->assertExitCode(0);
+
+        $this->assertDatabaseHas('office_tickets', [
+            'id' => $ticketId,
+            'status' => 'no_show',
+            'cancelled_by' => 'system',
+        ]);
+        $this->assertDatabaseHas('office_events', ['ticket_id' => $ticketId, 'type' => 'no_show']);
     }
 
     public function test_student_can_view_office_by_code(): void

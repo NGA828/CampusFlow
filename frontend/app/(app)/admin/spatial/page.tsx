@@ -45,7 +45,6 @@ export default function AdminSpatialPage() {
   const [buildingId, setBuildingId] = useState('');
   const [floorId, setFloorId] = useState('');
   const [payload, setPayload] = useState<{ code: string; payload: string; scan_url: string } | null>(null);
-  const [anchorId, setAnchorId] = useState('');
   const [form, setForm] = useState<{ kind: 'qr' | 'node' | 'edge' | 'geofence'; values: Record<string, string> } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ kind: Tab; id: string; label: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -79,7 +78,6 @@ export default function AdminSpatialPage() {
     try {
       const result = await adminApi.qrPayload(id);
       setPayload({ code: knownCode ?? result.code, payload: result.payload, scan_url: result.scan_url });
-      setAnchorId(id);
       writeAnchorParam(id);
     } catch {
       toast.error('Could not load the payload');
@@ -89,7 +87,6 @@ export default function AdminSpatialPage() {
 
   const closeAnchor = useCallback(() => {
     setPayload(null);
-    setAnchorId('');
     writeAnchorParam('');
   }, []);
 
@@ -97,7 +94,11 @@ export default function AdminSpatialPage() {
   useEffect(() => {
     const requested = readAnchorParam();
     if (!requested) return;
-    void openAnchor(requested);
+
+    // Defer the URL-driven request until after the initial render; openAnchor updates the
+    // modal state only when the server returns its signed print payload.
+    const timer = window.setTimeout(() => { void openAnchor(requested); }, 0);
+    return () => window.clearTimeout(timer);
   }, [openAnchor]);
 
   const floorQr = useMemo(() => (plan.data?.qr_nodes ?? []) as QrNode[], [plan.data]);

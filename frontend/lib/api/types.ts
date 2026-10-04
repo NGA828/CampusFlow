@@ -1040,8 +1040,8 @@ export interface AnalyticsOverview {
     sessions_today: number;
     sessions_7d: number;
     completion_rate_7d: number | null;
-    off_route_events_7d: number;
-    recalculations_7d: number;
+    off_route_events_7d: number | null;
+    recalculations_7d: number | null;
     average_distance_m: number | null;
     popular_destinations: { label: string; sessions: number }[];
   };

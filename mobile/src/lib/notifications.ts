@@ -9,10 +9,12 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
 import { accountApi } from './api';
 
 type NotificationsModule = typeof import('expo-notifications');
+const PUSH_TOKEN_KEY = 'campusflow.push-token';
 
 function isExpoGo(): boolean {
   return Constants.appOwnership === 'expo';
@@ -31,6 +33,16 @@ async function loadNotifications(): Promise<NotificationsModule | null> {
     }),
   });
   return notifications;
+}
+
+export async function unregisterForPush(): Promise<void> {
+  let token: string | null = null;
+  try {
+    token = await SecureStore.getItemAsync(PUSH_TOKEN_KEY);
+    if (token) await accountApi.unregisterDevice(token);
+  } finally {
+    await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY).catch(() => undefined);
+  }
 }
 
 export async function registerForPush(): Promise<string | null> {
@@ -58,7 +70,12 @@ export async function registerForPush(): Promise<string | null> {
 
     const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
     const token = (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined)).data;
-    await accountApi.registerDevice({ token, platform: Platform.OS === 'ios' ? 'ios' : 'android' });
+    await accountApi.registerDevice({
+      token,
+      platform: Platform.OS === 'ios' ? 'ios' : 'android',
+      device_name: Device.modelName ?? undefined,
+    });
+    await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
     return token;
   } catch {
     // Silent by design: a missing push token never blocks the app.

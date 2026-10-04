@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
@@ -69,6 +71,41 @@ class AuthTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('data.user.id', $user->id)
             ->assertJsonPath('data.user.email', $user->email);
+    }
+
+    public function test_user_can_reset_password_with_the_complete_contract(): void
+    {
+        $user = User::factory()->create(['email' => 'reset@example.test']);
+        $token = Password::broker()->createToken($user);
+
+        $response = $this->postJson('/api/v1/auth/reset-password', [
+            'email' => $user->email,
+            'token' => $token,
+            'password' => 'UpdatedPass123!',
+            'password_confirmation' => 'UpdatedPass123!',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.reset', true);
+        $this->assertTrue(Hash::check('UpdatedPass123!', $user->fresh()->password));
+
+        // A reset token is single-use; the same payload cannot reset the password twice.
+        $this->postJson('/api/v1/auth/reset-password', [
+            'email' => $user->email,
+            'token' => $token,
+            'password' => 'AnotherPass123!',
+            'password_confirmation' => 'AnotherPass123!',
+        ])->assertUnprocessable();
+    }
+
+    public function test_password_reset_requires_email_and_password_confirmation(): void
+    {
+        $this->postJson('/api/v1/auth/reset-password', [
+            'token' => 'test-token',
+            'password' => 'UpdatedPass123!',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['email', 'password']);
     }
 
     public function test_user_can_logout(): void

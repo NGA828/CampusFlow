@@ -186,7 +186,8 @@ export const accountApi = {
   notifications: (params?: { per_page?: number }) => api.get<{ items: NotificationRow[]; unread: number }>('/me/notifications', params),
   readNotification: (id: string) => api.post<{ unread: number }>(`/me/notifications/${id}/read`),
   readAllNotifications: () => api.post<{ unread: number }>('/me/notifications/read-all'),
-  registerDevice: (body: { token: string; platform: 'ios' | 'android'; name?: string }) => api.post<{ registered: boolean }>('/me/devices', body),
+  registerDevice: (body: { token: string; platform: 'ios' | 'android'; device_name?: string }) => api.post<{ registered: boolean; device_id: string }>('/me/devices', body),
+  unregisterDevice: (token: string) => api.post<{ unregistered: boolean }>('/me/devices/unregister', { token }),
 };
 
 /**

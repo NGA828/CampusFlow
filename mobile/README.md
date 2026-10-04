@@ -26,27 +26,27 @@ Demo accounts (seeded by `php ../backend/artisan db:seed`): `student@campusflow.
 
 | Route | What it does |
 | --- | --- |
-| `(auth)/login`, `(auth)/register` | Session handling; the token is kept in `expo-secure-store` and validated against `GET /auth/me` on launch |
-| `(tabs)/index` | Dashboard: next class with countdown, today's sessions, active queue/office tickets, notices, building alerts |
-| `(tabs)/timetable` | Week selector and per-day sessions derived from enrolments, with navigate and room-detail actions |
-| `(tabs)/map` | Buildings and room search straight from the campus API |
-| `(tabs)/queue` | Live room queues: join (with an optional GPS fix for the geofence), position, ETA, check-in, cancel |
-| `(tabs)/more` | Offices, scanner, assistant, notifications and profile |
-| `scan` | `expo-camera` QR scanning with manual code/payload fallback and the API's rejection reasons |
-| `offices`, `office/[code]` | Office status, service windows, ticket request, check-in and cancel |
-| `room/[code]` | Availability computed from the timetable, free slots, amenities, join queue |
-| `navigate/[code]` | Route steps from the walking graph, live tracking via `expo-location`, off-route warning with the grace countdown |
-| `notifications` | Notification centre with unread state and mark-as-read |
-| `assistant` | Campus assistant chat showing the backend tool calls behind each answer |
-| `profile` | Profile edits, session/device details, push registration status |
+| `(auth)/login`, `(auth)/register` | Session handling; bearer tokens are stored in `expo-secure-store` and validated against `GET /me` on launch |
+| `student/(tabs)/index` | Student home: next class, today's sessions, active tickets and notices |
+| `student/(tabs)/map` | Campus/building and room search with route planning |
+| `student/(tabs)/queue` | Room queue requests, ticket status, proximity check-in and cancellation |
+| `student/(tabs)/scan` | Camera QR scan plus manual anchor lookup and backend validation feedback |
+| `student/timetable`, `student/room/[code]` | Student timetable and room information/availability |
+| `student/offices`, `student/office/[code]` | Office directory, ticket request, check-in and cancellation |
+| `student/navigate/[code]` | Route steps and GPS tracking with off-route guidance |
+| `student/notifications`, `student/assistant`, `student/profile` | In-app inbox, campus assistant and account settings |
+| `staff/(tabs)/*`, `staff/line/[id]`, `staff/office/[id]` | Staff queue and office operations for assigned services |
+| `admin/(tabs)/*`, `admin/alert/[key]` | Admin monitoring and alert acknowledgement; no configuration forms on mobile |
 
 ## Push notifications
 
-`src/lib/notifications.ts` requests permission and registers the Expo push token with
-`POST /me/devices` (best-effort). Expo Go does not load the remote-notification native module on
-Android from SDK 53 onward, so Expo Go skips push-token registration without preventing the app
-from starting. In-app and websocket delivery work regardless, and the notification centre always
-reads `GET /me/notifications`.
+`src/lib/notifications.ts` requests permission, registers the Expo push token with
+`POST /me/devices`, and unregisters it on sign-out. The Laravel API stores tokens in `device_tokens`;
+notifications are delivered by the queued Expo sender. Run the database queue worker (`npm run dev`
+starts it for local development; production must run `php artisan queue:work --queue=notifications,default`).
+Expo Go and simulators may not issue a remote push token, so push delivery requires a compatible
+physical-device development build and configured Expo/EAS project. In-app notifications remain
+available from `GET /me/notifications`. Websocket updates are not yet connected to Laravel Reverb.
 
 To test Android push notifications, use a development build instead of Expo Go:
 

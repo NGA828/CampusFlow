@@ -73,6 +73,40 @@ class MeTest extends TestCase
             ->assertJsonPath('success', true);
     }
 
+    public function test_user_can_register_and_unregister_their_push_device(): void
+    {
+        $user = User::where('role', 'student')->firstOrFail();
+        $token = 'ExponentPushToken[campusflow-test-device]';
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/me/devices', [
+                'token' => $token,
+                'platform' => 'android',
+                'device_name' => 'Test handset',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.registered', true);
+
+        $this->assertDatabaseHas('device_tokens', [
+            'user_id' => $user->id,
+            'token' => $token,
+            'platform' => 'android',
+        ]);
+
+        $other = User::where('role', 'staff')->firstOrFail();
+        $this->actingAs($other, 'sanctum')
+            ->postJson('/api/v1/me/devices/unregister', ['token' => $token])
+            ->assertOk()
+            ->assertJsonPath('data.unregistered', false);
+        $this->assertDatabaseHas('device_tokens', ['user_id' => $user->id, 'token' => $token]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/me/devices/unregister', ['token' => $token])
+            ->assertOk()
+            ->assertJsonPath('data.unregistered', true);
+        $this->assertDatabaseMissing('device_tokens', ['token' => $token]);
+    }
+
     public function test_authenticated_user_can_get_me_notifications(): void
     {
         $student = User::where('role', 'student')->first();

@@ -118,6 +118,10 @@ class AdminController extends Controller
         $issued7d = QueueTicket::where('created_at', '>=', $now->copy()->subDays(7))->count();
         $officeIssued7d = OfficeTicket::where('created_at', '>=', $now->copy()->subDays(7))->count();
         $navigation7d = NavigationSession::where('created_at', '>=', $now->copy()->subDays(7));
+        $queueAnalytics = $this->queueAnalytics($now);
+        $officeAnalytics = $this->officeAnalytics($now);
+        $navigationAnalytics = $this->navigationAnalytics($now);
+        $utilisation = $this->roomUtilisation($now);
         $recentAudit = DB::table('audit_logs')
             ->leftJoin('users', 'users.id', '=', 'audit_logs.user_id')
             ->orderByDesc('audit_logs.created_at')
@@ -142,8 +146,11 @@ class AdminController extends Controller
                 'office_waiting_now' => $activeOfficeTickets,
                 'office_completed_today' => $todayOfficeCompleted,
                 'navigation_sessions_today' => NavigationSession::whereDate('created_at', $now->toDateString())->count(),
-                'average_wait_minutes' => null,
-                'no_show_rate_7d' => null,
+                'average_wait_minutes' => $queueAnalytics['average_wait_minutes'],
+                'no_show_rate_7d' => $queueAnalytics['no_show_rate_7d'],
+                'average_service_minutes' => $queueAnalytics['average_service_minutes'],
+                'busiest_rooms' => $queueAnalytics['busiest_rooms'],
+                'hourly_volume' => $queueAnalytics['hourly_volume'],
                 'rooms' => $roomsCount,
                 'buildings' => $buildingsCount,
             ],
@@ -151,16 +158,195 @@ class AdminController extends Controller
                 'generated_at' => $now->toIso8601String(),
                 'users' => ['students' => $totalStudents, 'staff' => $totalStaff, 'admins' => User::where('role', 'admin')->count(), 'total' => $totalUsers, 'active_7d' => User::where('updated_at', '>=', $now->copy()->subDays(7))->count()],
                 'campus' => ['buildings' => $buildingsCount, 'floors' => Floor::count(), 'rooms' => $roomsCount, 'total_capacity' => Room::sum('capacity'), 'qr_nodes' => QrNode::count(), 'navigation_nodes' => NavigationNode::count(), 'navigation_edges' => NavigationEdge::count()],
-                'queues' => ['configured' => RoomQueue::count(), 'active' => RoomQueue::where('is_open', true)->count(), 'waiting_now' => $activeRoomTickets, 'issued_today' => QueueTicket::whereDate('created_at', $now->toDateString())->count(), 'issued_7d' => $issued7d, 'called_today' => QueueTicket::whereDate('called_at', $now->toDateString())->count(), 'average_wait_minutes' => null, 'average_service_minutes' => null, 'no_show_rate_7d' => null, 'busiest_rooms' => [], 'hourly_volume' => []],
-                'offices' => ['configured' => Office::count(), 'open_now' => Office::where('is_open', true)->count(), 'issued_today' => OfficeTicket::whereDate('created_at', $now->toDateString())->count(), 'completed_today' => $todayOfficeCompleted, 'waiting_now' => $activeOfficeTickets, 'average_service_minutes' => null, 'average_wait_minutes' => null, 'no_show_rate_7d' => null, 'busiest' => []],
-                'navigation' => ['sessions_today' => NavigationSession::whereDate('created_at', $now->toDateString())->count(), 'sessions_7d' => $navigation7d->count(), 'completion_rate_7d' => null, 'off_route_events_7d' => 0, 'recalculations_7d' => 0, 'average_distance_m' => null, 'popular_destinations' => []],
+                'queues' => [
+                    'configured' => RoomQueue::count(),
+                    'active' => RoomQueue::where('is_open', true)->count(),
+                    'waiting_now' => $activeRoomTickets,
+                    'issued_today' => QueueTicket::whereDate('created_at', $now->toDateString())->count(),
+                    'issued_7d' => $issued7d,
+                    'called_today' => QueueTicket::whereDate('called_at', $now->toDateString())->count(),
+                    ...$queueAnalytics,
+                ],
+                'offices' => [
+                    'configured' => Office::count(),
+                    'open_now' => Office::where('is_open', true)->count(),
+                    'issued_today' => OfficeTicket::whereDate('created_at', $now->toDateString())->count(),
+                    'completed_today' => $todayOfficeCompleted,
+                    'waiting_now' => $activeOfficeTickets,
+                    ...$officeAnalytics,
+                ],
+                'navigation' => [
+                    'sessions_today' => NavigationSession::whereDate('created_at', $now->toDateString())->count(),
+                    'sessions_7d' => $navigation7d->count(),
+                    ...$navigationAnalytics,
+                ],
                 'engagement' => ['events_upcoming' => CampusEvent::where('starts_at', '>=', $now)->count(), 'announcements_active' => Announcement::whereNotNull('published_at')->count(), 'notifications_7d' => DB::table('notifications')->where('created_at', '>=', $now->copy()->subDays(7))->count()],
-                'utilisation' => [],
+                'utilisation' => $utilisation,
             ],
             'live_queues' => $queues,
             'recent_audit' => $recentAudit,
             'buildings' => Building::orderBy('code')->get()->map(fn ($building) => ['id' => $building->id, 'code' => $building->code, 'name' => $building->name, 'status' => $building->status, 'is_public' => (bool) ($building->is_public ?? true)])->values(),
         ]);
+    }
+
+    /** Metrics for the seven-day room-queue window and today's hourly volume. */
+    private function queueAnalytics($now): array
+    {
+        $weekStart = $now->copy()->subDays(7);
+        $aggregate = DB::table('queue_tickets')
+            ->where('created_at', '>=', $weekStart)
+            ->selectRaw("COUNT(*) AS issued, COUNT(*) FILTER (WHERE status = 'no_show') AS no_shows")
+            ->selectRaw('AVG(EXTRACT(EPOCH FROM (called_at - created_at)) / 60.0) FILTER (WHERE called_at IS NOT NULL) AS average_wait')
+            ->selectRaw('AVG(EXTRACT(EPOCH FROM (completed_at - admitted_at)) / 60.0) FILTER (WHERE admitted_at IS NOT NULL AND completed_at IS NOT NULL) AS average_service')
+            ->first();
+        $issued = (int) ($aggregate->issued ?? 0);
+
+        $busiestRooms = DB::table('queue_tickets')
+            ->join('room_queues', 'room_queues.id', '=', 'queue_tickets.queue_id')
+            ->join('rooms', 'rooms.id', '=', 'room_queues.room_id')
+            ->where('queue_tickets.created_at', '>=', $weekStart)
+            ->select('rooms.code as room_code', 'rooms.name as room_name')
+            ->selectRaw('COUNT(queue_tickets.id)::integer AS issued')
+            ->groupBy('rooms.id', 'rooms.code', 'rooms.name')
+            ->orderByDesc('issued')
+            ->limit(5)
+            ->get()
+            ->map(fn ($row) => ['room_code' => $row->room_code, 'room_name' => $row->room_name, 'issued' => (int) $row->issued])
+            ->values();
+
+        $hourlyVolume = DB::table('queue_tickets')
+            ->whereDate('created_at', $now->toDateString())
+            ->selectRaw('EXTRACT(HOUR FROM created_at)::integer AS hour, COUNT(*)::integer AS tickets')
+            ->groupByRaw('EXTRACT(HOUR FROM created_at)')
+            ->orderBy('hour')
+            ->get()
+            ->map(fn ($row) => ['hour' => (int) $row->hour, 'tickets' => (int) $row->tickets])
+            ->values();
+
+        return [
+            'average_wait_minutes' => $aggregate->average_wait === null ? null : round((float) $aggregate->average_wait, 1),
+            'average_service_minutes' => $aggregate->average_service === null ? null : round((float) $aggregate->average_service, 1),
+            'no_show_rate_7d' => $issued > 0 ? round(((int) $aggregate->no_shows / $issued) * 100, 1) : null,
+            'busiest_rooms' => $busiestRooms,
+            'hourly_volume' => $hourlyVolume,
+        ];
+    }
+
+    /** Actual office wait/service duration and seven-day demand, derived from ticket timestamps. */
+    private function officeAnalytics($now): array
+    {
+        $weekStart = $now->copy()->subDays(7);
+        $aggregate = DB::table('office_tickets')
+            ->where('created_at', '>=', $weekStart)
+            ->selectRaw("COUNT(*) AS issued, COUNT(*) FILTER (WHERE status = 'no_show') AS no_shows")
+            ->selectRaw('AVG(EXTRACT(EPOCH FROM (called_at - created_at)) / 60.0) FILTER (WHERE called_at IS NOT NULL) AS average_wait')
+            ->selectRaw('AVG(EXTRACT(EPOCH FROM (completed_at - service_started_at)) / 60.0) FILTER (WHERE service_started_at IS NOT NULL AND completed_at IS NOT NULL) AS average_service')
+            ->first();
+        $issued = (int) ($aggregate->issued ?? 0);
+
+        $busiest = DB::table('office_tickets')
+            ->join('offices', 'offices.id', '=', 'office_tickets.office_id')
+            ->where('office_tickets.created_at', '>=', $weekStart)
+            ->select('offices.code', 'offices.name')
+            ->selectRaw('COUNT(office_tickets.id)::integer AS issued')
+            ->groupBy('offices.id', 'offices.code', 'offices.name')
+            ->orderByDesc('issued')
+            ->limit(5)
+            ->get()
+            ->map(fn ($row) => ['code' => $row->code, 'name' => $row->name, 'issued' => (int) $row->issued])
+            ->values();
+
+        return [
+            'average_wait_minutes' => $aggregate->average_wait === null ? null : round((float) $aggregate->average_wait, 1),
+            'average_service_minutes' => $aggregate->average_service === null ? null : round((float) $aggregate->average_service, 1),
+            'no_show_rate_7d' => $issued > 0 ? round(((int) $aggregate->no_shows / $issued) * 100, 1) : null,
+            'busiest' => $busiest,
+        ];
+    }
+
+    /** Destination usage and completion rate for sessions that actually exist. */
+    private function navigationAnalytics($now): array
+    {
+        $weekStart = $now->copy()->subDays(7);
+        $sessions = NavigationSession::query()
+            ->where('created_at', '>=', $weekStart)
+            ->get(['status', 'route_snapshot']);
+        $total = $sessions->count();
+        $completed = $sessions->where('status', 'completed')->count();
+        $distances = $sessions->map(function (NavigationSession $session) {
+            $distance = $session->route_snapshot['distance_m'] ?? null;
+            return is_numeric($distance) ? (float) $distance : null;
+        })->filter(fn ($distance) => $distance !== null);
+
+        $popularDestinations = DB::table('navigation_sessions as sessions')
+            ->leftJoin('rooms', 'rooms.id', '=', 'sessions.to_room_id')
+            ->leftJoin('navigation_nodes', 'navigation_nodes.id', '=', 'sessions.to_node_id')
+            ->where('sessions.created_at', '>=', $weekStart)
+            ->whereNotNull('sessions.to_node_id')
+            ->selectRaw("COALESCE(rooms.code, navigation_nodes.label, 'Unknown destination') AS label")
+            ->selectRaw('COUNT(sessions.id)::integer AS sessions')
+            ->groupByRaw("COALESCE(rooms.code, navigation_nodes.label, 'Unknown destination')")
+            ->orderByDesc('sessions')
+            ->limit(5)
+            ->get()
+            ->map(fn ($row) => ['label' => $row->label, 'sessions' => (int) $row->sessions])
+            ->values();
+
+        return [
+            'completion_rate_7d' => $total > 0 ? round(($completed / $total) * 100, 1) : null,
+            // Off-route and recalculation events are not currently persisted, so report unavailable
+            // rather than presenting a fabricated zero.
+            'off_route_events_7d' => null,
+            'recalculations_7d' => null,
+            'average_distance_m' => $distances->isNotEmpty() ? round((float) $distances->avg(), 1) : null,
+            'popular_destinations' => $popularDestinations,
+        ];
+    }
+
+    /** Representative weekly room booking utilisation from the currently published timetable. */
+    private function roomUtilisation($now): array
+    {
+        $termCode = Term::where('is_current', true)->value('code');
+        if (! $termCode) {
+            return [];
+        }
+
+        $entries = TimetableEntry::with(['room.floor.building'])
+            ->where('term_code', $termCode)
+            ->where(fn ($query) => $query->whereNull('effective_from')->orWhereDate('effective_from', '<=', $now->toDateString()))
+            ->where(fn ($query) => $query->whereNull('effective_until')->orWhereDate('effective_until', '>=', $now->toDateString()))
+            ->get();
+
+        return $entries->filter(fn (TimetableEntry $entry) => $entry->room_id !== null)
+            ->groupBy('room_id')
+            ->map(function ($roomEntries) {
+                /** @var TimetableEntry $first */
+                $first = $roomEntries->first();
+                $room = $first->room;
+                if (! $room) {
+                    return null;
+                }
+
+                $minutes = $roomEntries->sum(function (TimetableEntry $entry): int {
+                    $start = \Carbon\Carbon::parse($entry->starts_at);
+                    $end = \Carbon\Carbon::parse($entry->ends_at);
+                    return max(0, (int) $start->diffInMinutes($end, false));
+                });
+                $hours = round($minutes / 60, 1);
+
+                return [
+                    'room_id' => $room->id,
+                    'room_code' => $room->code,
+                    'room_name' => $room->name,
+                    'building_code' => $room->floor?->building?->code ?? '',
+                    'booked_hours' => $hours,
+                    'utilisation' => min(100, round(($hours / 45) * 100, 1)),
+                ];
+            })
+            ->filter()
+            ->sortByDesc('utilisation')
+            ->values()
+            ->all();
     }
 
     /* ─────────────────────────────────────── analytics */

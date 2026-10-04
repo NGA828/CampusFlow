@@ -152,7 +152,7 @@ export const authApi = {
   changePassword: (body: { current_password: string; password: string; password_confirmation: string }) => api.put<{ changed: boolean }>('/auth/password', body),
   forgotPassword: (body: { email: string }) =>
     request<{ sent: boolean; reset_token?: string; message?: string }>('/auth/forgot-password', { method: 'POST', body, auth: false }),
-  resetPassword: (body: { token: string; password: string }) =>
+  resetPassword: (body: { email: string; token: string; password: string; password_confirmation: string }) =>
     request<{ reset: boolean }>('/auth/reset-password', { method: 'POST', body, auth: false }),
 };
 

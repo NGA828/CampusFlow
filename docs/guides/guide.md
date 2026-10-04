@@ -1089,3 +1089,18 @@ Authoritative source locations used: root package.json and scripts/dev.mjs; back
 Supporting documents: README.md, mobile/README.md, docs/architecture.md, docs/api.md, docs/database.md, docs/role-platform-matrix.md, docs/user-journeys.md, docs/platform-role-audit.md and docs/implementation-audit.md. Where these differ, the executable implementation is the baseline and the discrepancy is a test risk, not an undocumented assumption.
 
 The editable source is docs/guides/guide.md. The PDF is docs/guides/guide.pdf. Regenerate with scripts/build-guide.py using the optional documentation dependencies listed beside the guide. Update this guide whenever routes, validation, roles/platforms, setup scripts or service state machines change; record the new SHA and rerun checks. No live credentials should ever appear in either artifact.
+
+# Implementation update — 2026-10-04
+
+This is a source-level update to the historical 16 September acceptance baseline. Since that review,
+the web password-reset form was corrected to send the full Laravel contract; device tokens are
+persisted, push notifications are queued to Expo, a scheduled backend sweep expires stale room tickets
+and marks overdue room/office calls as no-shows, and admin analytics now derive more metrics from
+stored tickets and navigation sessions.
+
+Remaining gaps: Laravel Reverb live broadcasts are not yet wired into the supported runtime; the
+spatial schema still lacks PostGIS geometry/geography columns and GiST indexes; off-route/recalculation
+events are not persisted; and these backend changes still need execution against PostgreSQL plus a
+physical Expo development build. Production must run a queue worker and Laravel scheduler for
+push/expiry processing. Older acceptance results and fixture-based browser tests do not validate these
+new workflows.
