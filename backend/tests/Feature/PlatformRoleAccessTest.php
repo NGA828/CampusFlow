@@ -237,6 +237,8 @@ class PlatformRoleAccessTest extends TestCase
                         'bidirectional',
                         'is_accessible',
                         'floor_change',
+                        'geometry_space',
+                        'geometry',
                     ]],
                 ],
             ]);
@@ -245,6 +247,35 @@ class PlatformRoleAccessTest extends TestCase
             (float) NavigationEdge::query()->value('weight'),
             (float) $response->json('data.items.0.distance_m'),
         );
+    }
+
+    public function test_admin_can_edit_edge_geometry_and_coordinate_space_is_checked(): void
+    {
+        $edge = NavigationEdge::query()
+            ->where('edge_type', 'corridor')
+            ->whereHas('fromNode', fn ($query) => $query->whereNotNull('floor_id'))
+            ->whereHas('toNode', fn ($query) => $query->whereNotNull('floor_id'))
+            ->firstOrFail();
+        $edge->load(['fromNode', 'toNode']);
+        $this->assertSame($edge->fromNode->floor_id, $edge->toNode->floor_id);
+        $shape = [[12.5, 8], [16, 11.5]];
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->patchJson('/api/v1/admin/navigation-edges/' . $edge->id, [
+                'geometry_space' => 'plan',
+                'geometry' => $shape,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.geometry_space', 'plan')
+            ->assertJsonPath('data.geometry', $shape);
+
+        $outdoor = NavigationEdge::query()->where('edge_type', 'outdoor')->firstOrFail();
+        $this->actingAs($this->admin(), 'sanctum')
+            ->patchJson('/api/v1/admin/navigation-edges/' . $outdoor->id, [
+                'geometry_space' => 'plan',
+                'geometry' => [[12, 8]],
+            ])
+            ->assertUnprocessable();
     }
 
     public function test_admin_may_read_a_students_dashboard_because_it_is_a_student_route_not_a_private_one(): void

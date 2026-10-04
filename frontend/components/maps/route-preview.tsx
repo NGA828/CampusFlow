@@ -28,7 +28,7 @@ function RouteContent({ route, onClearRoute, startFix }: Omit<Props, 'walking'>)
   const [view, setView] = useState<string | null | undefined>(undefined);
   const step = route.steps[active];
   const node = stepNode(route, step, active);
-  const floorId = view === undefined ? (node?.floor_id ?? step.floor_id ?? null) : view;
+  const floorId = view === undefined ? (startFix && active === 0 ? null : node?.floor_id ?? step.floor_id ?? null) : view;
   const buildings = useAsync(() => campusApi.buildings(), []);
   const plan = useAsync(() => floorId ? campusApi.floorPlan(floorId) : Promise.resolve(null), [floorId]);
   const floors = [...new Set(route.nodes.map(n => n.floor_id).filter((id): id is string => !!id))];
@@ -80,7 +80,7 @@ function RouteContent({ route, onClearRoute, startFix }: Omit<Props, 'walking'>)
           buildings.loading ? <CardSkeleton rows={7} /> :
           <CampusMap buildings={buildings.data?.buildings ?? []} route={route} markers={geoMarker} originFix={startFix} height={460} />}
         {!segments.length && <p className={s.notice}>No walking line is published for this view. {floorId ? 'This may be a floor transition or a single location.' : 'Choose an indoor floor to see its corridor route.'} We do not draw a straight-line shortcut.</p>}
-        <div className={s.legend}><span>● {startFix ? 'Your location' : `Start: ${route.origin.label}`}</span>{startFix && <span>┄ Dashed link: nearest walking node</span>}<span>→ Arrows show travel direction</span><span>◎ Destination: {route.destination.label}</span></div>
+        <div className={s.legend}><span>● {startFix ? 'Your location' : `Start: ${route.origin.label}`}</span>{startFix && <span>┄ Dashed link: nearest walking node</span>}<span>→ Arrows show travel direction</span><span>━ Solid: saved edge shape</span><span>┄ Dashed: straight fallback between nodes</span><span>◎ Destination: {route.destination.label}</span></div>
         <div className={s.current} aria-live="polite"><span className={s.stepNumber}>{active + 1}</span><div><strong>{step.instruction}</strong><p>{floorId ? floorLabel(floorId) : 'Campus outdoors'} · {Math.round(remaining)} m after this step</p></div></div>
         {!node && <p className={s.notice}>This instruction has no mapped position. The full published route remains visible.</p>}
         <div className={s.controls}>
@@ -97,6 +97,6 @@ function RouteContent({ route, onClearRoute, startFix }: Omit<Props, 'walking'>)
         </li>)}</ol>
       </aside>
     </div>
-    <footer className={s.footer}>The line connects mapped route waypoints with straight segments; it follows actual walkways only if the campus map has enough waypoints along them. Sparse or misplaced nodes can make a route look misleading. Check local signs and closures; web preview is not live tracking.</footer>
+    <footer className={s.footer}>Where an edge has saved path geometry, the line follows those mapped bends; edges without it are drawn straight between their endpoint nodes. Sparse or misplaced geometry can still be misleading, so check local signs and closures. Web preview is not live tracking.</footer>
   </section>;
 }

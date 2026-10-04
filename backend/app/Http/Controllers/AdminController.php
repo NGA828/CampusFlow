@@ -755,6 +755,57 @@ class AdminController extends Controller
         return $this->ok($this->paginate($q, $request, fn($e) => $e->toApiArray()));
     }
 
+    /** Validate the coordinate space against the edge endpoints before storing its interior points. */
+    private function validatedNavigationEdgeGeometry(array $validated, NavigationNode $from, NavigationNode $to): array
+    {
+        if (! array_key_exists('geometry', $validated) && ! array_key_exists('geometry_space', $validated)) {
+            return [];
+        }
+
+        if (! array_key_exists('geometry', $validated)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'geometry' => 'Geometry points must be sent when changing their coordinate space.',
+            ]);
+        }
+
+        $geometry = $validated['geometry'];
+        $space = $validated['geometry_space'] ?? null;
+        if ($geometry === null || $geometry === []) {
+            return ['geometry' => null, 'geometry_space' => null];
+        }
+
+        if (! $space) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'geometry_space' => 'Choose whether the intermediate points use floor-plan or geographic coordinates.',
+            ]);
+        }
+
+        if ($space === 'plan' && (! $from->floor_id || $from->floor_id !== $to->floor_id || $from->plan_x === null || $from->plan_y === null || $to->plan_x === null || $to->plan_y === null)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'geometry_space' => 'Floor-plan geometry requires both endpoints on the same floor with plan coordinates.',
+            ]);
+        }
+
+        if ($space === 'geo' && ($from->lat === null || $from->lng === null || $to->lat === null || $to->lng === null)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'geometry_space' => 'Geographic geometry requires latitude and longitude on both endpoint nodes.',
+            ]);
+        }
+
+        $geometry = array_map(static fn (array $point) => [(float) $point[0], (float) $point[1]], $geometry);
+        if ($space === 'geo') {
+            foreach ($geometry as [$longitude, $latitude]) {
+                if ($longitude < -180 || $longitude > 180 || $latitude < -90 || $latitude > 90) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'geometry' => 'Geographic points must use [longitude, latitude] within valid world coordinate bounds.',
+                    ]);
+                }
+            }
+        }
+
+        return ['geometry' => $geometry, 'geometry_space' => $space];
+    }
+
     public function createNavigationEdge(Request $request): JsonResponse
     {
         if (!$this->requireAdmin($request)) return $this->forbidden();
@@ -768,7 +819,15 @@ class AdminController extends Controller
             'is_accessible' => 'sometimes|boolean',
             'accessible' => 'sometimes|boolean',
             'bidirectional' => 'sometimes|boolean',
+            'geometry' => 'sometimes|nullable|array|max:500',
+            'geometry.*' => 'required|array|size:2',
+            'geometry.*.0' => 'required|numeric',
+            'geometry.*.1' => 'required|numeric',
+            'geometry_space' => 'sometimes|nullable|string|in:plan,geo',
         ]);
+        $from = NavigationNode::findOrFail($validated['from_node_id']);
+        $to = NavigationNode::findOrFail($validated['to_node_id']);
+        $geometry = $this->validatedNavigationEdgeGeometry($validated, $from, $to);
         $e = NavigationEdge::create([
             'from_node_id' => $validated['from_node_id'],
             'to_node_id' => $validated['to_node_id'],
@@ -776,8 +835,9 @@ class AdminController extends Controller
             'edge_type' => $validated['kind'] ?? $validated['edge_type'] ?? 'corridor',
             'accessible' => (bool) ($validated['is_accessible'] ?? $validated['accessible'] ?? true),
             'bidirectional' => (bool) ($validated['bidirectional'] ?? true),
+            ...$geometry,
         ]);
-        return $this->ok($e->fresh()->toApiArray(), 201);
+        return $this->ok($e->fresh()->load(['fromNode:id,floor_id', 'toNode:id,floor_id'])->toApiArray(), 201);
     }
 
     public function updateNavigationEdge(Request $request, string $id): JsonResponse
@@ -792,8 +852,18 @@ class AdminController extends Controller
             'is_accessible' => 'sometimes|boolean',
             'accessible' => 'sometimes|boolean',
             'bidirectional' => 'sometimes|boolean',
+            'geometry' => 'sometimes|nullable|array|max:500',
+            'geometry.*' => 'required|array|size:2',
+            'geometry.*.0' => 'required|numeric',
+            'geometry.*.1' => 'required|numeric',
+            'geometry_space' => 'sometimes|nullable|string|in:plan,geo',
         ]);
         $attributes = [];
+        if (array_key_exists('geometry', $validated) || array_key_exists('geometry_space', $validated)) {
+            $from = NavigationNode::findOrFail($e->from_node_id);
+            $to = NavigationNode::findOrFail($e->to_node_id);
+            $attributes = array_merge($attributes, $this->validatedNavigationEdgeGeometry($validated, $from, $to));
+        }
         if (array_key_exists('distance_m', $validated) || array_key_exists('weight', $validated)) {
             $attributes['weight'] = (float) ($validated['distance_m'] ?? $validated['weight']);
         }

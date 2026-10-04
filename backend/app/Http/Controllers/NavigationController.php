@@ -586,6 +586,32 @@ class NavigationController extends Controller
             ]);
         }
 
+        // Keep each selected edge with the direction actually traversed. Stored shape points are
+        // ordered from edge.from_node_id to edge.to_node_id, so reverse them for reverse travel.
+        $routeEdges = [];
+        for ($i = 1; $i < count($orderedNodes); $i++) {
+            $from = $orderedNodes[$i - 1];
+            $to = $orderedNodes[$i];
+            $edge = $prev[$to->id]['edge'];
+            $geometry = $edge->geometry ?? [];
+            if ($edge->from_node_id !== $from->id) {
+                $geometry = array_reverse($geometry);
+            }
+            $routeEdges[] = [
+                'id' => $edge->id,
+                'from_node_id' => $from->id,
+                'to_node_id' => $to->id,
+                'kind' => match ($edge->edge_type) {
+                    'stairwell' => 'stairs',
+                    'lift' => 'elevator',
+                    default => $edge->edge_type,
+                },
+                'geometry_space' => $edge->geometry_space,
+                'geometry' => $geometry,
+                'distance_m' => (float) $edge->weight,
+            ];
+        }
+
         $originNode = $orderedNodes[0];
         $destNode   = end($orderedNodes);
 
@@ -619,9 +645,12 @@ class NavigationController extends Controller
 
             $instruction = "Head to {$currNode->label}";
             $stepKind = 'walk';
-            // Floor transition check
-            if ($prevNode->floor_id && $currNode->floor_id && $prevNode->floor_id !== $currNode->floor_id) {
-                $edgeKind = $prev[$currNode->id]['edge']->edge_type;
+            // Only vertical/passsage edges change floors; outdoor geo paths may connect
+            // entrance anchors that carry floor metadata for their building.
+            $transitionEdge = $prev[$currNode->id]['edge'];
+            $isOutdoorEdge = $transitionEdge->edge_type === 'outdoor' || $transitionEdge->geometry_space === 'geo';
+            if ($prevNode->floor_id && $currNode->floor_id && $prevNode->floor_id !== $currNode->floor_id && ! $isOutdoorEdge) {
+                $edgeKind = $transitionEdge->edge_type;
                 $kind = match ($edgeKind) {
                     'lift', 'elevator' => 'elevator',
                     'stairwell', 'stairs' => 'stairs',
@@ -669,28 +698,61 @@ class NavigationController extends Controller
             'floor_name'   => $destNode->floor?->name,
         ];
 
-        // Each leg belongs to one coordinate system. Never append the next floor
-        // to the current floor's geometry (which draws spurious indoor shortcuts).
+        // Group route edges by coordinate space. Outdoor links can join two entrance
+        // nodes that have floor metadata, while a lift/stair transition must not be
+        // drawn as a line between unrelated floor plans.
         $legs = [];
-        $currentLegNodes = [$orderedNodes[0]];
-        foreach (array_slice($orderedNodes, 1) as $node) {
-            $last = end($currentLegNodes);
-            if ($last->floor_id === $node->floor_id) {
-                $currentLegNodes[] = $node;
-            } else {
-                $legs[] = $this->buildLeg($currentLegNodes);
-                // An entrance/exit may have geographic geometry, but never join
-                // two indoor floors in either the outdoor or indoor plane.
-                if ($last->floor_id === null || $node->floor_id === null) {
-                    $legs[] = $this->buildLeg([$last, $node]);
-                }
-                $currentLegNodes = [$node];
+        $currentLegNodes = [];
+        $currentLegEdges = [];
+        $currentLegSpace = null;
+        $currentFloorId = null;
+        $flushLeg = function () use (&$legs, &$currentLegNodes, &$currentLegEdges, &$currentLegSpace, &$currentFloorId): void {
+            if ($currentLegNodes) {
+                $legs[] = $this->buildLeg($currentLegNodes, $currentLegEdges, $currentLegSpace);
             }
+            $currentLegNodes = [];
+            $currentLegEdges = [];
+            $currentLegSpace = null;
+            $currentFloorId = null;
+        };
+
+        foreach ($routeEdges as $index => $edge) {
+            $from = $orderedNodes[$index];
+            $to = $orderedNodes[$index + 1];
+            $space = $edge['geometry_space']
+                ?? (($edge['kind'] === 'outdoor' || $from->floor_id === null || $to->floor_id === null)
+                    ? 'geo'
+                    : ($from->floor_id === $to->floor_id ? 'plan' : null));
+
+            if ($space === null || ($space === 'plan' && $from->floor_id !== $to->floor_id)) {
+                $flushLeg();
+                continue;
+            }
+
+            $floorChanged = $space === 'plan' && $currentFloorId !== $from->floor_id;
+            $disconnected = $currentLegNodes && end($currentLegNodes)->id !== $from->id;
+            if ($currentLegSpace !== $space || $floorChanged || $disconnected) {
+                $flushLeg();
+                $currentLegNodes = [$from];
+                $currentLegSpace = $space;
+                $currentFloorId = $space === 'plan' ? $from->floor_id : null;
+            }
+            if (! $currentLegNodes) {
+                $currentLegNodes = [$from];
+                $currentLegSpace = $space;
+                $currentFloorId = $space === 'plan' ? $from->floor_id : null;
+            }
+            $currentLegEdges[] = $edge;
+            $currentLegNodes[] = $to;
         }
-        $legs[] = $this->buildLeg($currentLegNodes);
+        $flushLeg();
+        if (! $routeEdges) {
+            $legs[] = $this->buildLeg([$originNode], [], $originNode->floor_id ? 'plan' : 'geo');
+        }
 
         return [
             'nodes'       => array_map(fn ($n) => $n->toApiArray(), $orderedNodes),
+            'edges'       => $routeEdges,
             'steps'       => $steps,
             'legs'        => $legs,
             'transitions' => $transitions,
@@ -710,49 +772,82 @@ class NavigationController extends Controller
         ];
     }
 
-    private function buildLeg(array $legNodes): array
+    private function buildLeg(array $legNodes, array $legEdges = [], ?string $spaceOverride = null): array
     {
         $first = $legNodes[0];
         $allSameFloor = true;
         $firstFloorId = $first->floor_id;
-        foreach ($legNodes as $n) {
-            if ($n->floor_id !== $firstFloorId) {
+        foreach ($legNodes as $node) {
+            if ($node->floor_id !== $firstFloorId) {
                 $allSameFloor = false;
                 break;
             }
         }
 
-        $floorId = $allSameFloor ? $firstFloorId : null;
-        $floorName = $allSameFloor ? ($first->floor?->name ?? 'Floor Plan') : 'Campus Grounds';
-
-        $points = [];
-        $geo = [];
-
-        foreach ($legNodes as $node) {
-            if ($floorId !== null && $node->plan_x !== null && $node->plan_y !== null) {
-                $points[] = ['x' => (float) $node->plan_x, 'y' => (float) $node->plan_y];
+        $space = $spaceOverride ?? ($allSameFloor && $firstFloorId !== null ? 'plan' : 'geo');
+        $floorId = $space === 'plan' && $allSameFloor ? $firstFloorId : null;
+        $floorName = $floorId !== null ? ($first->floor?->name ?? 'Floor Plan') : 'Campus Grounds';
+        $getCoordinate = static function ($node) use ($space): ?array {
+            if ($space === 'plan' && $node->plan_x !== null && $node->plan_y !== null) {
+                return [(float) $node->plan_x, (float) $node->plan_y];
             }
-            if ($floorId === null && $node->lat !== null && $node->lng !== null) {
-                $geo[] = ['lat' => (float) $node->lat, 'lng' => (float) $node->lng];
+            if ($space === 'geo' && $node->lat !== null && $node->lng !== null) {
+                return [(float) $node->lng, (float) $node->lat];
             }
+            return null;
+        };
+        $isCoordinate = static fn ($point): bool => is_array($point)
+            && count($point) === 2
+            && is_numeric($point[0])
+            && is_numeric($point[1])
+            && is_finite((float) $point[0])
+            && is_finite((float) $point[1]);
+
+        $coordinates = [];
+        $segmentGeometry = [];
+        $complete = count($legEdges) === max(0, count($legNodes) - 1);
+        $firstCoordinate = $getCoordinate($legNodes[0]);
+        if ($firstCoordinate === null) {
+            $complete = false;
+        } else {
+            $coordinates[] = $firstCoordinate;
         }
 
-        // Missing geometry must not connect the points on either side of a gap.
-        if (count($points) !== count($legNodes)) $points = [];
-        if (count($geo) !== count($legNodes)) $geo = [];
-
-        $distance = 0.0;
-        for ($i = 1; $i < count($legNodes); $i++) {
-            $prev = $legNodes[$i - 1];
-            $curr = $legNodes[$i];
-            if ($prev->lat && $prev->lng && $curr->lat && $curr->lng) {
-                $distance += $this->approximateMeters($prev->lat, $prev->lng, $curr->lat, $curr->lng);
-            } else {
-                $dx = ($curr->plan_x ?? 0) - ($prev->plan_x ?? 0);
-                $dy = ($curr->plan_y ?? 0) - ($prev->plan_y ?? 0);
-                $distance += sqrt($dx * $dx + $dy * $dy);
+        foreach ($legEdges as $index => $edge) {
+            $shape = $edge['geometry'] ?? [];
+            if ($shape && ($edge['geometry_space'] ?? null) !== $space) {
+                $complete = false;
+                break;
             }
+            $hasSavedShape = count($shape) > 0;
+            foreach ($shape as $point) {
+                if (! $isCoordinate($point)) {
+                    $complete = false;
+                    break 2;
+                }
+                $coordinates[] = [(float) $point[0], (float) $point[1]];
+                $segmentGeometry[] = true;
+            }
+            $nextCoordinate = $getCoordinate($legNodes[$index + 1] ?? null);
+            if ($nextCoordinate === null) {
+                $complete = false;
+                break;
+            }
+            $coordinates[] = $nextCoordinate;
+            $segmentGeometry[] = $hasSavedShape;
         }
+        if (! $complete) {
+            $coordinates = [];
+            $segmentGeometry = [];
+        }
+
+        $distance = array_sum(array_map(static fn ($edge) => (float) ($edge['distance_m'] ?? 0), $legEdges));
+        $points = $space === 'plan'
+            ? array_map(static fn ($point) => ['x' => $point[0], 'y' => $point[1]], $coordinates)
+            : [];
+        $geo = $space === 'geo'
+            ? array_map(static fn ($point) => ['lat' => $point[1], 'lng' => $point[0]], $coordinates)
+            : [];
 
         return [
             'floor_id'      => $floorId,
@@ -763,6 +858,7 @@ class NavigationController extends Controller
             'duration_s'    => (int) round($distance / 1.2),
             'points'        => $points,
             'geo'           => $geo,
+            'segment_geometry' => $segmentGeometry,
         ];
     }
 

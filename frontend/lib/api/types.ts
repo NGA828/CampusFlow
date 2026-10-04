@@ -182,6 +182,9 @@ export interface NavigationEdge {
   is_accessible: boolean;
   is_active: boolean;
   floor_change: boolean;
+  geometry_space: 'plan' | 'geo' | null;
+  /** Intermediate points only; endpoints come from the connected nodes. */
+  geometry: [number, number][] | null;
 }
 
 export interface QrNode {
@@ -277,10 +280,24 @@ export interface RouteLeg {
   duration_s: number;
   points: { x: number; y: number }[];
   geo: { lat: number; lng: number }[];
+  /** Per drawn segment: true when saved intermediate edge geometry backs the line. */
+  segment_geometry?: boolean[];
+}
+
+export interface RouteEdge {
+  id: UUID;
+  from_node_id: UUID;
+  to_node_id: UUID;
+  kind: string;
+  geometry_space: 'plan' | 'geo' | null;
+  /** Intermediate points only; endpoints come from the adjacent navigation nodes. */
+  geometry: [number, number][] | null;
+  distance_m: number;
 }
 
 export interface Route {
   nodes: NavigationNode[];
+  edges?: RouteEdge[];
   steps: RouteStep[];
   legs: RouteLeg[];
   transitions: { kind: string; instruction: string; floor_name?: string | null; distance_m?: number }[];

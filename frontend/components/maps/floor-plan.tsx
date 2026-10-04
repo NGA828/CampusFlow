@@ -74,9 +74,11 @@ export function FloorPlan({
   const nodeById = useMemo(() => new Map(navigationNodes.map((node) => [node.id, node])), [navigationNodes]);
 
   const routePaths = useMemo(() => {
-    if (!route) return [] as string[];
-    return routeSegments(route, plan.floor.id).map(({ from, to }) =>
-      `M${from.x},${from.y} L${to.x},${to.y}`);
+    if (!route) return [] as { d: string; hasSavedGeometry: boolean }[];
+    return routeSegments(route, plan.floor.id).map(({ points, hasSavedGeometry }) => ({
+      d: points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`).join(' '),
+      hasSavedGeometry,
+    }));
 
   }, [route, plan.floor.id]);
 
@@ -277,19 +279,21 @@ export function FloorPlan({
           ? navigationEdges.map((edge) => {
               const from = nodeById.get(edge.from_node_id);
               const to = nodeById.get(edge.to_node_id);
-              if (!from || !to || from.plan_x === null || to.plan_x === null || from.plan_y === null || to.plan_y === null) return null;
-              if (from.floor_id !== plan.floor.id && to.floor_id !== plan.floor.id) return null;
+              if (!from || !to || from.floor_id !== plan.floor.id || to.floor_id !== plan.floor.id ||
+                  from.plan_x === null || to.plan_x === null || from.plan_y === null || to.plan_y === null ||
+                  edge.geometry_space === 'geo') return null;
+              const shape = edge.geometry ?? [];
+              const coordinates = [[from.plan_x, from.plan_y], ...shape, [to.plan_x, to.plan_y]];
+              const d = coordinates.map(([x, y], index) => `${index === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
               const isVertical = edge.kind === 'stairs' || edge.kind === 'elevator' || edge.floor_change;
               return (
-                <line
+                <path
                   key={edge.id}
-                  x1={from.plan_x}
-                  y1={from.plan_y}
-                  x2={to.plan_x}
-                  y2={to.plan_y}
-                  stroke={edge.is_accessible ? '#38bdf8' : '#64748b'}
+                  d={d}
+                  fill="none"
+                  stroke={edge.is_accessible ? (edge.geometry?.length ? '#38bdf8' : '#fbbf24') : '#64748b'}
                   strokeWidth={0.25}
-                  strokeDasharray={isVertical ? '0.6 0.5' : undefined}
+                  strokeDasharray={isVertical ? '0.6 0.5' : edge.geometry?.length ? undefined : '0.6 0.5'}
                   opacity={0.7}
                 />
               );
@@ -332,9 +336,9 @@ export function FloorPlan({
 
         {routePaths.map((path, index) => (
           <g key={index}>
-            <path d={path} fill="none" stroke="#0f172a" strokeWidth={2} />
-            <path data-testid="indoor-route" d={path} fill="none" stroke="#67e8f9" strokeWidth={0.65}
-              strokeLinecap="round" markerEnd={`url(#${planId}-direction)`} />
+            <path d={path.d} fill="none" stroke="#0f172a" strokeWidth={2} />
+            <path data-testid="indoor-route" d={path.d} fill="none" stroke={path.hasSavedGeometry ? '#67e8f9' : '#fbbf24'} strokeWidth={0.65}
+              strokeDasharray={path.hasSavedGeometry ? undefined : '1.5 1'} strokeLinecap="round" markerEnd={`url(#${planId}-direction)`} />
 
           </g>
         ))}

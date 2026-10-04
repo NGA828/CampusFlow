@@ -215,6 +215,48 @@ class NavigationTest extends TestCase
     }
 
 
+    public function test_route_serializes_polyline_points_in_the_direction_the_walker_travels(): void
+    {
+        $floor = \App\Models\Floor::query()->firstOrFail();
+        $start = $this->waypoint('Polyline start');
+        $destination = $this->waypoint('Polyline destination');
+        $start->update([
+            'building_id' => $floor->building_id,
+            'floor_id' => $floor->id,
+            'plan_x' => 4,
+            'plan_y' => 6,
+        ]);
+        $destination->update([
+            'building_id' => $floor->building_id,
+            'floor_id' => $floor->id,
+            'plan_x' => 24,
+            'plan_y' => 16,
+        ]);
+        $this->connect($start, $destination, 24);
+        \App\Models\NavigationEdge::query()
+            ->where('from_node_id', $start->id)
+            ->where('to_node_id', $destination->id)
+            ->firstOrFail()
+            ->update(['geometry_space' => 'plan', 'geometry' => [[9, 6], [9, 14], [18, 14]]]);
+
+        $this->actingAs(User::where('role', 'student')->firstOrFail(), 'sanctum')
+            ->postJson('/api/v1/campus/navigation/route', [
+                'from_node_id' => $destination->id,
+                'to_node_id' => $start->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.route.edges.0.from_node_id', $destination->id)
+            ->assertJsonPath('data.route.edges.0.geometry', [[18, 14], [9, 14], [9, 6]])
+            ->assertJsonPath('data.route.legs.0.points', [
+                ['x' => 24, 'y' => 16],
+                ['x' => 18, 'y' => 14],
+                ['x' => 9, 'y' => 14],
+                ['x' => 9, 'y' => 6],
+                ['x' => 4, 'y' => 6],
+            ])
+            ->assertJsonPath('data.route.legs.0.segment_geometry', [true, true, true, true]);
+    }
+
     public function test_mobile_route_session_snaps_the_current_gps_fix_to_the_published_path(): void
     {
         $start = $this->waypoint('GPS start');
@@ -235,6 +277,7 @@ class NavigationTest extends TestCase
             ->assertJsonPath('data.session.from_node_id', $start->id)
             ->assertJsonPath('data.route.origin.node.id', $start->id)
             ->assertJsonPath('data.route.legs.0.geo.0.lat', 19.1234)
+            ->assertJsonPath('data.route.legs.0.segment_geometry', [false])
             ->assertJsonPath('data.destination_label', 'GPS destination');
     }
 

@@ -105,13 +105,15 @@ export function CampusMap({
   const scaleMetres = Math.max(10, Math.round(geometry.width / 5 / 10) * 10);
   const scaleWidth = Math.max(44, Math.min(116, (scaleMetres / geometry.width) * 100));
 
-  const routePath = useMemo(() => {
-    if (!route) return '';
-    return routeSegments(route, null).map(({ from, to }) => {
-      const a = project(from.y, from.x, origin);
-      const b = project(to.y, to.x, origin);
-      return `M${a.x},${a.y} L${b.x},${b.y}`;
-    }).join(' ');
+  const routePaths = useMemo(() => {
+    if (!route) return [];
+    return routeSegments(route, null).map(({ points, hasSavedGeometry }) => ({
+      d: points.map((point, index) => {
+        const projected = project(point.y, point.x, origin);
+        return `${index === 0 ? 'M' : 'L'}${projected.x},${projected.y}`;
+      }).join(' '),
+      hasSavedGeometry,
+    }));
   }, [route, origin]);
 
   const routeOriginSnap = useMemo(() => {
@@ -262,14 +264,13 @@ export function CampusMap({
         })}
 
         {routeOriginSnap ? <path data-testid="route-origin-snap" d={routeOriginSnap} fill="none" stroke="#129a84" strokeWidth="2" strokeDasharray="4 4" strokeLinecap="round" /> : null}
-        {routePath ? (
-          <>
-            <path d={routePath} fill="none" stroke="white" strokeWidth="7" strokeLinecap="round" />
-            <path data-testid="outdoor-route" d={routePath} fill="none" stroke="#2458b8" strokeWidth="3"
-              strokeLinecap="round" markerEnd={`url(#${mapId}-arrow)`} />
-
-          </>
-        ) : null}
+        {routePaths.map((path, index) => (
+          <g key={`route-${index}`}>
+            <path d={path.d} fill="none" stroke="white" strokeWidth="7" strokeLinecap="round" />
+            <path data-testid="outdoor-route" d={path.d} fill="none" stroke={path.hasSavedGeometry ? '#2458b8' : '#b7791f'} strokeWidth="3"
+              strokeDasharray={path.hasSavedGeometry ? undefined : '5 4'} strokeLinecap="round" markerEnd={`url(#${mapId}-arrow)`} />
+          </g>
+        ))}
 
         {markersWithTones.map((marker, index) => {
           const point = toSvg(marker.lat, marker.lng);

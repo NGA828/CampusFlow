@@ -279,7 +279,7 @@ export default function NavigateScreen() {
               </AdaptiveRow>
             </Card>
 
-            <RouteTrace legs={route.legs} originPosition={routeOrigin} position={currentPosition} />
+            <RouteTrace legs={route.legs} originPosition={routeOrigin} position={currentPosition} originNode={route.origin?.node} />
 
             <Card style={{ marginTop: spacing.lg }}>
               <SectionTitle title="Steps" />

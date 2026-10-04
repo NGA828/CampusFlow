@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Card, Small, SectionTitle } from '@/components/ui';
 import { colors, spacing } from '@/lib/theme';
-import type { MobileRouteLeg } from '@/lib/api';
+import type { MobileRouteLeg, MobileRouteNode } from '@/lib/api';
 import type { Position } from '@/lib/types';
 
 type Point = { x: number; y: number };
@@ -11,6 +11,17 @@ type ScreenPoint = Point & { key: string };
 
 function isFinitePoint(point: Point): boolean {
   return Number.isFinite(point.x) && Number.isFinite(point.y);
+}
+
+function geoDistanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const radians = (degrees: number) => degrees * Math.PI / 180;
+  const lat1 = radians(a.lat);
+  const lat2 = radians(b.lat);
+  const deltaLat = radians(b.lat - a.lat);
+  const deltaLng = radians(b.lng - a.lng);
+  const haversine = Math.sin(deltaLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
+  return 6_371_000 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 }
 
 function geometry(leg: MobileRouteLeg): Point[] {
@@ -36,12 +47,13 @@ function livePoint(leg: MobileRouteLeg, position: Position | null): Point | null
     : null;
 }
 
-function RouteLegTrace({ leg, originPosition, position, isFirst, isLast }: {
+function RouteLegTrace({ leg, originPosition, position, isFirst, isLast, isOriginSnap = false }: {
   leg: MobileRouteLeg;
   originPosition: Position | null;
   position: Position | null;
   isFirst: boolean;
   isLast: boolean;
+  isOriginSnap?: boolean;
 }) {
   const [size, setSize] = useState({ width: 0, height: 0 });
   const path = useMemo(() => geometry(leg), [leg]);
@@ -79,7 +91,7 @@ function RouteLegTrace({ leg, originPosition, position, isFirst, isLast }: {
   const screenHere = here ? toScreen(here, 'you') : null;
   const screenOrigin = origin ? toScreen(origin, 'origin') : null;
   const screenStart = isFirst ? screenOrigin ?? screenPath[0] ?? null : null;
-  const title = leg.floor_id
+  const title = isOriginSnap ? 'GPS start snap to nearest mapped node' : leg.floor_id
     ? `${leg.building_code ? `${leg.building_code} · ` : ''}${leg.floor_name ?? 'Indoor floor'}`
     : 'Campus grounds';
   const hasLine = screenPath.length > 1;
@@ -137,12 +149,13 @@ function RouteLegTrace({ leg, originPosition, position, isFirst, isLast }: {
             const dy = point.y - from.y;
             const length = Math.sqrt(dx * dx + dy * dy);
             if (!Number.isFinite(length) || length < 1) return null;
+            const hasSavedGeometry = leg.segment_geometry?.[index] ?? false;
             return (
               <View
                 key={point.key}
                 pointerEvents="none"
                 style={[
-                  styles.routeLine,
+                  isOriginSnap ? styles.routeConnector : hasSavedGeometry ? styles.routeLine : styles.routeFallbackLine,
                   {
                     left: (from.x + point.x) / 2 - length / 2,
                     top: (from.y + point.y) / 2 - 2,
@@ -189,28 +202,60 @@ function RouteLegTrace({ leg, originPosition, position, isFirst, isLast }: {
   );
 }
 
-export function RouteTrace({ legs, originPosition, position }: { legs: MobileRouteLeg[]; originPosition: Position | null; position: Position | null }) {
+export function RouteTrace({ legs, originPosition, position, originNode }: { legs: MobileRouteLeg[]; originPosition: Position | null; position: Position | null; originNode?: MobileRouteNode | null }) {
+  const gpsOrigin = originPosition?.source === 'gps'
+    && Number.isFinite(originPosition.lat) && Number.isFinite(originPosition.lng);
+  const canMeasureGpsSnap = gpsOrigin && Number.isFinite(originNode?.lat) && Number.isFinite(originNode?.lng);
+  const gpsSnapDistance = canMeasureGpsSnap
+    ? geoDistanceMeters(originPosition, { lat: originNode!.lat!, lng: originNode!.lng! })
+    : null;
+  const gpsSnapLeg: MobileRouteLeg | null = canMeasureGpsSnap && gpsSnapDistance !== null && gpsSnapDistance <= 350
+    ? {
+      floor_id: null,
+      floor_name: 'GPS start snap',
+      floor_level: null,
+      building_code: null,
+      distance_m: gpsSnapDistance,
+      duration_s: 0,
+      points: [],
+      geo: [
+        { lat: originPosition.lat, lng: originPosition.lng },
+        { lat: originNode!.lat!, lng: originNode!.lng! },
+      ],
+    }
+    : null;
   const mapped = legs
     .map((leg, routeIndex) => ({ leg, routeIndex }))
     .filter(({ leg }) => geometry(leg).length > 0);
   // GPS cannot distinguish floors; do not place an outdoor fix on an indoor floor map.
   const mappedPosition = originPosition?.floor_id && position?.source === 'gps' ? null : position;
   const positionLegIndex = mapped.findIndex(({ leg }) => livePoint(leg, mappedPosition) !== null);
-  const originMatchesFirstLeg = mapped[0]?.routeIndex === 0 && livePoint(mapped[0].leg, originPosition) !== null;
+  const originMatchesFirstLeg = !gpsSnapLeg && mapped[0]?.routeIndex === 0 && livePoint(mapped[0].leg, originPosition) !== null;
   return (
     <Card style={styles.card}>
       <SectionTitle title="Route map" />
-      <Small style={styles.caption}>The blue line joins published route waypoints with straight segments, so it follows real walkways only when those waypoints are mapped along them. The blue dot is your current position when it can be matched to this section.</Small>
+      <Small style={styles.caption}>Solid blue segments use saved edge bends; amber dashed segments are straight fallbacks between route nodes. Saved geometry still needs checking against real walkways and closures. The blue dot is your current position when it can be matched to this section.</Small>
+      {gpsSnapLeg ? <Small style={styles.indoorNote}>Dashed line: your GPS fix to the nearest mapped route node. This is a snap connector, not a verified walkway.</Small> : null}
+      {gpsOrigin && gpsSnapDistance !== null && gpsSnapDistance > 350 ? <Small style={styles.indoorNote}>Your GPS fix is {Math.round(gpsSnapDistance)} m from the route’s starting node; no snap connector is drawn at that distance.</Small> : null}
       {originMatchesFirstLeg ? <Small style={styles.indoorNote}>The short dashed line joins your location fix to the nearest published walking node.</Small> : null}
       {originPosition?.floor_id && position?.source === 'gps' ? <Small style={styles.indoorNote}>GPS cannot locate your floor indoors. Scan a nearby QR anchor to refresh your indoor marker.</Small> : null}
       {mapped.length > 0 && mapped.length < legs.length ? <Small style={styles.indoorNote}>Some sections do not have published map geometry and are intentionally left unconnected.</Small> : null}
+      {gpsSnapLeg ? <RouteLegTrace
+        key="gps-origin-snap"
+        leg={gpsSnapLeg}
+        originPosition={originPosition}
+        position={position}
+        isFirst
+        isLast={false}
+        isOriginSnap
+      /> : null}
       {mapped.length ? mapped.map(({ leg, routeIndex }, index) => (
         <RouteLegTrace
           key={`${leg.floor_id ?? 'outdoor'}-${routeIndex}`}
           leg={leg}
           originPosition={originPosition}
           position={index === positionLegIndex ? mappedPosition : null}
-          isFirst={routeIndex === 0}
+          isFirst={!gpsSnapLeg && routeIndex === 0}
           isLast={routeIndex === legs.length - 1}
         />
       )) : (
@@ -238,6 +283,7 @@ const styles = StyleSheet.create({
   canvas: { height: 176, position: 'relative', overflow: 'hidden' },
   gridLine: { position: 'absolute', backgroundColor: '#dce8e1' },
   routeLine: { position: 'absolute', height: 4, borderRadius: 4, backgroundColor: colors.brand600 },
+  routeFallbackLine: { position: 'absolute', height: 2, borderTopWidth: 2, borderColor: '#b7791f', borderStyle: 'dashed' },
   routeConnector: { position: 'absolute', height: 2, borderTopWidth: 2, borderColor: colors.mint600, borderStyle: 'dashed' },
   waypoint: { position: 'absolute', width: 8, height: 8, borderWidth: 2, borderRadius: 4 },
   startPin: { position: 'absolute', width: 12, height: 12, borderRadius: 6, backgroundColor: colors.brand600, borderWidth: 2, borderColor: colors.white },

@@ -316,6 +316,8 @@ export interface MobileRouteLeg {
   duration_s: number;
   points: { x: number; y: number }[];
   geo: { lat: number; lng: number }[];
+  /** Per drawn segment: true when saved intermediate edge geometry backs the line. */
+  segment_geometry?: boolean[];
 }
 
 export interface MobileRouteNode {
@@ -328,8 +330,19 @@ export interface MobileRouteNode {
   plan_y?: number | null;
 }
 
+export interface MobileRouteEdge {
+  id: string;
+  from_node_id: string;
+  to_node_id: string;
+  kind: string;
+  geometry_space: 'plan' | 'geo' | null;
+  geometry: [number, number][] | null;
+  distance_m: number;
+}
+
 export interface MobileRoute {
   nodes: MobileRouteNode[];
+  edges?: MobileRouteEdge[];
   steps: MobileRouteStep[];
   legs: MobileRouteLeg[];
   distance_m: number;
