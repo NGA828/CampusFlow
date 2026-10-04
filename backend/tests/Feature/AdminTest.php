@@ -3,6 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Building;
+use App\Models\Office;
+use App\Models\OfficeTicket;
+use App\Models\QueueTicket;
+use App\Models\RoomQueue;
+use App\Models\NavigationSession;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -26,6 +31,75 @@ class AdminTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonPath('success', true);
+    }
+
+    public function test_analytics_are_derived_from_ticket_and_navigation_records(): void
+    {
+        $admin = User::where('role', 'admin')->firstOrFail();
+        $student = User::where('role', 'student')->firstOrFail();
+        $queue = RoomQueue::firstOrFail();
+        $now = now();
+
+        QueueTicket::create([
+            'queue_id' => $queue->id,
+            'user_id' => $student->id,
+            'position' => 9001,
+            'status' => 'completed',
+            'idempotency_key' => 'analytics-completed-' . $student->id,
+            'called_at' => $now->copy()->subMinutes(50),
+            'admitted_at' => $now->copy()->subMinutes(40),
+            'completed_at' => $now->copy()->subMinutes(20),
+            'created_at' => $now->copy()->subMinutes(60),
+            'updated_at' => $now,
+        ]);
+        QueueTicket::create([
+            'queue_id' => $queue->id,
+            'user_id' => User::factory()->create(['role' => 'student'])->id,
+            'position' => 9002,
+            'status' => 'no_show',
+            'idempotency_key' => 'analytics-no-show-' . \Illuminate\Support\Str::uuid(),
+            'created_at' => $now->copy()->subMinutes(30),
+            'updated_at' => $now,
+        ]);
+
+        $office = Office::firstOrFail();
+        OfficeTicket::create([
+            'office_id' => $office->id,
+            'user_id' => $student->id,
+            'ticket_number' => 'AN-001',
+            'subject' => 'Analytics test',
+            'status' => 'completed',
+            'idempotency_key' => 'analytics-office-' . $student->id,
+            'called_at' => $now->copy()->subMinutes(40),
+            'service_started_at' => $now->copy()->subMinutes(30),
+            'completed_at' => $now->copy()->subMinutes(10),
+            'created_at' => $now->copy()->subMinutes(50),
+            'updated_at' => $now,
+        ]);
+
+        NavigationSession::create([
+            'user_id' => $student->id,
+            'status' => 'completed',
+            'route_snapshot' => ['distance_m' => 345.5],
+            'completed_at' => $now,
+            'created_at' => $now->copy()->subMinutes(15),
+            'updated_at' => $now,
+        ]);
+
+        $data = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/admin/analytics')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertSame(50.0, $data['queues']['no_show_rate_7d']);
+        $this->assertSame(10.0, $data['queues']['average_wait_minutes']);
+        $this->assertSame(20.0, $data['queues']['average_service_minutes']);
+        $this->assertSame(10.0, $data['offices']['average_wait_minutes']);
+        $this->assertSame(20.0, $data['offices']['average_service_minutes']);
+        $this->assertSame(100.0, $data['navigation']['completion_rate_7d']);
+        $this->assertSame(345.5, $data['navigation']['average_distance_m']);
+        $this->assertNotEmpty($data['queues']['busiest_rooms']);
+        $this->assertNotEmpty($data['offices']['busiest']);
     }
 
     public function test_admin_can_list_users(): void

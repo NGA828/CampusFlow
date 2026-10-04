@@ -45,7 +45,6 @@ export default function AdminSpatialPage() {
   const [buildingId, setBuildingId] = useState('');
   const [floorId, setFloorId] = useState('');
   const [payload, setPayload] = useState<{ code: string; payload: string; scan_url: string } | null>(null);
-  const [anchorId, setAnchorId] = useState('');
   const [form, setForm] = useState<{ kind: 'qr' | 'node' | 'edge' | 'geofence'; values: Record<string, string> } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ kind: Tab; id: string; label: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -79,7 +78,6 @@ export default function AdminSpatialPage() {
     try {
       const result = await adminApi.qrPayload(id);
       setPayload({ code: knownCode ?? result.code, payload: result.payload, scan_url: result.scan_url });
-      setAnchorId(id);
       writeAnchorParam(id);
     } catch {
       toast.error('Could not load the payload');
@@ -89,7 +87,6 @@ export default function AdminSpatialPage() {
 
   const closeAnchor = useCallback(() => {
     setPayload(null);
-    setAnchorId('');
     writeAnchorParam('');
   }, []);
 
@@ -97,19 +94,25 @@ export default function AdminSpatialPage() {
   useEffect(() => {
     const requested = readAnchorParam();
     if (!requested) return;
-    void openAnchor(requested);
+
+    // Defer the URL-driven request until after the initial render; openAnchor updates the
+    // modal state only when the server returns its signed print payload.
+    const timer = window.setTimeout(() => { void openAnchor(requested); }, 0);
+    return () => window.clearTimeout(timer);
   }, [openAnchor]);
 
   const floorQr = useMemo(() => (plan.data?.qr_nodes ?? []) as QrNode[], [plan.data]);
-  const floorNodes = useMemo(() => (plan.data?.navigation_nodes ?? []) as NavigationNode[], [plan.data]);
-  const floorEdges = useMemo(() => (plan.data?.navigation_edges ?? []) as NavigationEdge[], [plan.data]);
+  const floorNodes = useMemo(() => navNodes.data?.items.filter((node) => node.floor_id === activeFloorId) ?? [], [navNodes.data, activeFloorId]);
+  const floorNodeIds = useMemo(() => new Set(floorNodes.map((node) => node.id)), [floorNodes]);
+  const floorEdges = useMemo(() => navEdges.data?.items.filter((edge) => floorNodeIds.has(edge.from_node_id) && floorNodeIds.has(edge.to_node_id)) ?? [], [navEdges.data, floorNodeIds]);
+  const editorPlan = useMemo(() => plan.data ? { ...plan.data, navigation_nodes: floorNodes, navigation_edges: floorEdges } : null, [plan.data, floorNodes, floorEdges]);
 
   const openCreate = (kind: 'qr' | 'node' | 'edge' | 'geofence') => {
     setFormError(null);
     const base: Record<string, string> = {};
     if (kind === 'qr') Object.assign(base, { code: '', label: '', building_id: buildingId || buildingOptions[0]?.id || '', floor_id: buildingId ? activeFloorId : '', plan_x: '0', plan_y: '0' });
     if (kind === 'node') Object.assign(base, { code: '', label: '', floor_id: activeFloorId, kind: 'corridor', plan_x: '0', plan_y: '0' });
-    if (kind === 'edge') Object.assign(base, { from_node_id: '', to_node_id: '', kind: 'corridor', distance_m: '5', is_accessible: 'true' });
+    if (kind === 'edge') Object.assign(base, { from_node_id: '', to_node_id: '', kind: 'corridor', distance_m: '5', is_accessible: 'true', geometry_space: '', geometry: '[]' });
     if (kind === 'geofence') Object.assign(base, { name: '', target_type: 'room', target_id: '', radius_m: '25', purpose: 'check_in' });
     setForm({ kind, values: base });
   };
@@ -156,13 +159,26 @@ export default function AdminSpatialPage() {
         plan.reload();
       }
       if (form.kind === 'edge') {
-        await adminApi.createNavigationEdge({
+        const parsedGeometry: unknown = JSON.parse(form.values.geometry || '[]');
+        if (!Array.isArray(parsedGeometry) || !parsedGeometry.every((point) =>
+          Array.isArray(point) && point.length === 2 && point.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate)))) {
+          throw new Error('Geometry must be a JSON array of coordinate pairs, such as [[12, 8], [16, 10]].');
+        }
+        const geometry = parsedGeometry.length ? parsedGeometry : null;
+        if (geometry && !form.values.geometry_space) {
+          throw new Error('Choose floor-plan XY or geographic longitude/latitude for the geometry.');
+        }
+        const edgeInput = {
           from_node_id: form.values.from_node_id,
           to_node_id: form.values.to_node_id,
           kind: form.values.kind,
           distance_m: Number(form.values.distance_m),
           is_accessible: form.values.is_accessible === 'true',
-        });
+          geometry_space: geometry ? form.values.geometry_space : null,
+          geometry,
+        };
+        if (form.values.id) await adminApi.updateNavigationEdge(form.values.id, edgeInput);
+        else await adminApi.createNavigationEdge(edgeInput);
         navEdges.reload();
         plan.reload();
       }
@@ -176,12 +192,12 @@ export default function AdminSpatialPage() {
         });
         geofences.reload();
       }
-      toast.success('Created');
+      toast.success(form.values.id ? 'Path geometry saved' : 'Created');
       setForm(null);
     } catch (caught) {
-      const message = caught instanceof ApiError ? (caught.firstError ?? caught.message) : 'Could not create the record.';
+      const message = caught instanceof ApiError ? (caught.firstError ?? caught.message) : caught instanceof Error ? caught.message : 'Could not save the record.';
       setFormError(message);
-      toast.error('Create failed', message);
+      toast.error(form.values.id ? 'Path save failed' : 'Create failed', message);
     } finally {
       setSaving(false);
     }
@@ -246,6 +262,7 @@ export default function AdminSpatialPage() {
       render: (row) => <span className="font-mono text-[12px]">{nodeOptions.find((node) => node.id === row.to_node_id)?.code ?? row.to_node_id.slice(0, 8)}</span>,
     },
     { key: 'kind', header: 'Kind', render: (row) => <Badge tone={row.floor_change ? 'warning' : 'neutral'}>{row.kind}</Badge> },
+    { key: 'shape', header: 'Path geometry', render: (row) => row.geometry?.length ? <Badge tone="success">{row.geometry.length} bends · {row.geometry_space}</Badge> : <span className="text-[12px] text-ink-400">Straight node link</span> },
     {
       key: 'distance',
       header: 'Distance',
@@ -271,7 +288,7 @@ export default function AdminSpatialPage() {
     <div>
       <PageHeader
         title="Navigation & QR"
-        description="QR anchors, the walking graph and geofences. The plan editor writes room geometry straight back to the database."
+        description="Manage QR anchors, navigation nodes, path edges and geofences. Edge geometry can store floor-plan or geographic bends; edges without it remain straight links between nodes."
       />
 
       <div className="mb-4">
@@ -345,9 +362,24 @@ export default function AdminSpatialPage() {
           onCreate={() => openCreate('edge')}
           createLabel="New edge"
           rowActions={(row) => (
-            <Button size="sm" variant="ghost" onClick={() => setPendingDelete({ kind: 'edges', id: row.id, label: `${row.kind} edge` })}>
-              Remove
-            </Button>
+            <div className="flex justify-end gap-1.5">
+              <Button size="sm" variant="secondary" onClick={() => {
+                setFormError(null);
+                setForm({ kind: 'edge', values: {
+                  id: row.id,
+                  from_node_id: row.from_node_id,
+                  to_node_id: row.to_node_id,
+                  kind: row.kind,
+                  distance_m: String(row.distance_m),
+                  is_accessible: String(row.is_accessible),
+                  geometry_space: row.geometry_space ?? '',
+                  geometry: JSON.stringify(row.geometry ?? [], null, 2),
+                } });
+              }}>Edit path</Button>
+              <Button size="sm" variant="ghost" onClick={() => setPendingDelete({ kind: 'edges', id: row.id, label: `${row.kind} edge` })}>
+                Remove
+              </Button>
+            </div>
           )}
         />
       ) : null}
@@ -428,7 +460,7 @@ export default function AdminSpatialPage() {
           ) : (
             <>
               <FloorPlan
-                plan={plan.data}
+                plan={editorPlan ?? plan.data}
                 showGraph
                 showQr
                 editable
@@ -492,14 +524,14 @@ export default function AdminSpatialPage() {
       <Modal
         open={form !== null}
         onClose={() => setForm(null)}
-        title={form ? `New ${form.kind === 'qr' ? 'QR anchor' : form.kind === 'node' ? 'graph node' : form.kind === 'edge' ? 'graph edge' : 'geofence'}` : ''}
+        title={form ? `${form.values.id ? 'Edit' : 'New'} ${form.kind === 'qr' ? 'QR anchor' : form.kind === 'node' ? 'graph node' : form.kind === 'edge' ? 'graph edge' : 'geofence'}` : ''}
         footer={
           <>
             <Button variant="secondary" onClick={() => setForm(null)}>
               Cancel
             </Button>
             <Button loading={saving} onClick={() => void save()}>
-              Create
+              {form?.values.id ? 'Save changes' : 'Create'}
             </Button>
           </>
         }
@@ -602,7 +634,7 @@ export default function AdminSpatialPage() {
                     ))}
                   </Select>
                 </Field>
-                <Field label="Distance (m)" htmlFor="edge-distance" hint="Leave 0 to let the server compute it.">
+                <Field label="Distance / routing cost (m)" htmlFor="edge-distance" hint="Used to choose routes and estimate walking time; enter the measured path length in metres.">
                   <Input id="edge-distance" value={form.values.distance_m} onChange={(event) => setForm({ ...form, values: { ...form.values, distance_m: event.target.value } })} />
                 </Field>
                 <Field label="Step-free" htmlFor="edge-accessible">
@@ -611,6 +643,19 @@ export default function AdminSpatialPage() {
                     <option value="false">No — stairs or restricted</option>
                   </Select>
                 </Field>
+                <Field label="Path coordinate space" htmlFor="edge-geometry-space" hint="Use floor-plan XY for corridors, or geographic coordinates for outdoor paths.">
+                  <Select id="edge-geometry-space" value={form.values.geometry_space} onChange={(event) => setForm({ ...form, values: { ...form.values, geometry_space: event.target.value } })}>
+                    <option value="">No intermediate path</option>
+                    <option value="plan">Floor-plan XY (metres)</option>
+                    <option value="geo">Geographic [longitude, latitude]</option>
+                  </Select>
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label="Intermediate path points (JSON)" htmlFor="edge-geometry" hint="Enter bends only; endpoint coordinates come from the selected nodes. Example: [[12, 8], [16, 10]]. Use [x, y] for plans or [longitude, latitude] for GPS.">
+                    <Textarea id="edge-geometry" rows={5} value={form.values.geometry} onChange={(event) => setForm({ ...form, values: { ...form.values, geometry: event.target.value } })} className="font-mono text-[12px]" />
+                  </Field>
+                </div>
+                {formError ? <p className="sm:col-span-2 text-[13px] text-coral-600">{formError}</p> : null}
               </>
             ) : null}
 

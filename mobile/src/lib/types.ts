@@ -348,6 +348,7 @@ export interface Position {
   source: string;
   accuracy_m: number | null;
   updated_at: string;
+  recorded_at?: string;
   building_name?: string | null;
   floor_name?: string | null;
 }

@@ -10,7 +10,7 @@
  * campus-sized area).
  */
 import { useId, useMemo, useState } from 'react';
-import { routeSegments } from '@/lib/maps/route-geometry';
+import { routeSegments, type RouteStartFix } from '@/lib/maps/route-geometry';
 import { cx } from '@/components/ui/kit';
 import type { Building, Position, Route } from '@/lib/api/types';
 
@@ -36,6 +36,7 @@ interface CampusMapProps {
     | 'has_elevator'
   >[];
   route?: Route | null;
+  originFix?: RouteStartFix | null;
   markers?: MapMarker[];
   selectedBuildingId?: string | null;
   onSelectBuilding?: (buildingId: string) => void;
@@ -54,6 +55,7 @@ function project(lat: number, lng: number, origin: { lat: number; lng: number })
 export function CampusMap({
   buildings,
   route,
+  originFix = null,
   markers = [],
   selectedBuildingId,
   onSelectBuilding,
@@ -80,6 +82,7 @@ export function CampusMap({
       for (const [lng, lat] of building.footprint ?? []) points.push(project(lat, lng, origin));
     }
     for (const marker of markers) points.push(project(marker.lat, marker.lng, origin));
+    if (originFix) points.push(project(originFix.lat, originFix.lng, origin));
     for (const node of route?.nodes ?? []) {
       if (typeof node.lat === 'number' && typeof node.lng === 'number') points.push(project(node.lat, node.lng, origin));
     }
@@ -95,25 +98,40 @@ export function CampusMap({
     const minY = Math.min(...ys) - padding;
     const maxY = Math.max(...ys) + padding;
     return { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY };
-  }, [buildings, markers, origin, route]);
+  }, [buildings, markers, origin, originFix, route]);
 
   const toSvg = (lat: number, lng: number) => project(lat, lng, origin);
   const selectedBuilding = buildings.find((building) => building.id === selectedBuildingId) ?? null;
   const scaleMetres = Math.max(10, Math.round(geometry.width / 5 / 10) * 10);
   const scaleWidth = Math.max(44, Math.min(116, (scaleMetres / geometry.width) * 100));
 
-  const routePath = useMemo(() => {
-    if (!route) return '';
-    return routeSegments(route, null).map(({ from, to }) => {
-      const a = project(from.y, from.x, origin);
-      const b = project(to.y, to.x, origin);
-      return `M${a.x},${a.y} L${b.x},${b.y}`;
-    }).join(' ');
+  const routePaths = useMemo(() => {
+    if (!route) return [];
+    return routeSegments(route, null).map(({ points, hasSavedGeometry }) => ({
+      d: points.map((point, index) => {
+        const projected = project(point.y, point.x, origin);
+        return `${index === 0 ? 'M' : 'L'}${projected.x},${projected.y}`;
+      }).join(' '),
+      hasSavedGeometry,
+    }));
   }, [route, origin]);
 
+  const routeOriginSnap = useMemo(() => {
+    const node = route?.origin?.node;
+    if (!originFix || typeof node?.lat !== 'number' || typeof node.lng !== 'number') return '';
+    const from = project(originFix.lat, originFix.lng, origin);
+    const to = project(node.lat, node.lng, origin);
+    // This dashed connector is only for a nearby GPS-to-network snap, never a replacement route.
+    if (Math.hypot(to.x - from.x, to.y - from.y) > 350) return '';
+    return `M${from.x},${from.y} L${to.x},${to.y}`;
+  }, [originFix, origin, route]);
+
   const markersWithTones: MapMarker[] = [];
-  if (typeof route?.origin?.node?.lat === 'number' && typeof route.origin.node.lng === 'number') {
+  if (!originFix && typeof route?.origin?.node?.lat === 'number' && typeof route.origin.node.lng === 'number') {
     markersWithTones.push({ lat: route.origin.node.lat, lng: route.origin.node.lng, label: route.origin.label, tone: 'user' });
+  }
+  if (originFix) {
+    markersWithTones.push({ lat: originFix.lat, lng: originFix.lng, label: 'Your current location', tone: 'user' });
   }
   if (typeof route?.destination?.node?.lat === 'number' && typeof route.destination.node.lng === 'number') {
     markersWithTones.push({ lat: route.destination.node.lat, lng: route.destination.node.lng, label: route.destination.label, tone: 'destination' });
@@ -245,14 +263,14 @@ export function CampusMap({
           );
         })}
 
-        {routePath ? (
-          <>
-            <path d={routePath} fill="none" stroke="white" strokeWidth="7" strokeLinecap="round" />
-            <path data-testid="outdoor-route" d={routePath} fill="none" stroke="#2458b8" strokeWidth="3"
-              strokeLinecap="round" markerEnd={`url(#${mapId}-arrow)`} />
-
-          </>
-        ) : null}
+        {routeOriginSnap ? <path data-testid="route-origin-snap" d={routeOriginSnap} fill="none" stroke="#129a84" strokeWidth="2" strokeDasharray="4 4" strokeLinecap="round" /> : null}
+        {routePaths.map((path, index) => (
+          <g key={`route-${index}`}>
+            <path d={path.d} fill="none" stroke="white" strokeWidth="7" strokeLinecap="round" />
+            <path data-testid="outdoor-route" d={path.d} fill="none" stroke={path.hasSavedGeometry ? '#2458b8' : '#b7791f'} strokeWidth="3"
+              strokeDasharray={path.hasSavedGeometry ? undefined : '5 4'} strokeLinecap="round" markerEnd={`url(#${mapId}-arrow)`} />
+          </g>
+        ))}
 
         {markersWithTones.map((marker, index) => {
           const point = toSvg(marker.lat, marker.lng);

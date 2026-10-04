@@ -13,6 +13,13 @@ const nodes = [
 ].map(n => ({ ...n, code: n.id, kind: 'junction' as const, type: 'waypoint', building_id: n.floor_id ? 'b1' : null, room_id: null, qr_node_id: null, is_active: true, is_accessible: true }));
 const route: Route = {
   nodes, distance_m: 150, duration_s: 125, accessible: false, uses_stairs: false,
+  edges: [
+    { id: 'e01', from_node_id: 'n0', to_node_id: 'n1', kind: 'outdoor', geometry_space: 'geo', geometry: [[11.512, 3.8635]], distance_m: 20 },
+    { id: 'e12', from_node_id: 'n1', to_node_id: 'n2', kind: 'corridor', geometry_space: 'plan', geometry: [[10, 5]], distance_m: 16 },
+    { id: 'e23', from_node_id: 'n2', to_node_id: 'n3', kind: 'corridor', geometry_space: null, geometry: null, distance_m: 15 },
+    { id: 'e34', from_node_id: 'n3', to_node_id: 'n4', kind: 'stairs', geometry_space: null, geometry: null, distance_m: 20 },
+    { id: 'e45', from_node_id: 'n4', to_node_id: 'n5', kind: 'corridor', geometry_space: 'plan', geometry: [[12, 4]], distance_m: 21 },
+  ],
   origin: { label: 'Gate', node: nodes[0] }, destination: { label: 'Seminar room', node: nodes[5] },
   legs: [], transitions: [],
   steps: [...nodes.map((n, index) => ({ index, node_id: n.id, instruction: index ? `Head to ${n.label}` : 'Start at Gate', kind: index ? 'walk' : 'start', distance_m: index ? 30 : 0, duration_s: index ? 25 : 0, floor_id: n.floor_id, floor_name: n.floor_id === 'f2' ? 'First floor' : n.floor_id ? 'Ground floor' : null })),
@@ -21,10 +28,14 @@ const route: Route = {
 
 test('geometry connects only adjacent nodes on the same floor and never bridges missing coordinates', () => {
   expect(routeSegments(route, 'f1')).toEqual([
-    { from: { x: 2, y: 5 }, to: { x: 18, y: 5 } },
-    { from: { x: 18, y: 5 }, to: { x: 18, y: 20 } },
+    { from: { x: 2, y: 5 }, to: { x: 18, y: 5 }, points: [{ x: 2, y: 5 }, { x: 10, y: 5 }, { x: 18, y: 5 }], hasSavedGeometry: true },
+    { from: { x: 18, y: 5 }, to: { x: 18, y: 20 }, points: [{ x: 18, y: 5 }, { x: 18, y: 20 }], hasSavedGeometry: false },
   ]);
-  expect(routeSegments(route, null)).toHaveLength(1);
+  expect(routeSegments(route, null)).toEqual([{
+    from: { x: 11.512, y: 3.863 }, to: { x: 11.512, y: 3.864 },
+    points: [{ x: 11.512, y: 3.863 }, { x: 11.512, y: 3.8635 }, { x: 11.512, y: 3.864 }],
+    hasSavedGeometry: true,
+  }]);
   const missing = { ...route, nodes: nodes.map(n => n.id === 'n2' ? { ...n, plan_x: null } : n) };
   expect(routeSegments(missing, 'f1')).toHaveLength(0);
   expect(stepNode(route, route.steps[3], 3)?.id).toBe('n3');
@@ -58,6 +69,21 @@ for (const width of [390, 1280]) test(`visual route follows steps and changes fl
   await page.screenshot({ path: `test-results/campus-route-${width}.png`, fullPage: true });
   await page.getByRole('button', { name: 'Explore Places' }).click();
   await expect(page.getByRole('heading', { name: 'Places on campus' })).toBeVisible();
+});
+
+test('outdoor polylines can connect entrance nodes that carry floor metadata', () => {
+  const betweenEntrances: Route = {
+    ...route,
+    nodes: [nodes[1], { ...nodes[4], lat: 3.865, lng: 11.514 }],
+    edges: [{
+      id: 'outdoor-entrance-link', from_node_id: 'n1', to_node_id: 'n4', kind: 'outdoor',
+      geometry_space: 'geo', geometry: [[11.513, 3.8645]], distance_m: 110,
+    }],
+  };
+  expect(routeSegments(betweenEntrances, null)[0].points).toEqual([
+    { x: 11.512, y: 3.864 }, { x: 11.513, y: 3.8645 }, { x: 11.514, y: 3.865 },
+  ]);
+  expect(routeSegments(betweenEntrances, 'f1')).toHaveLength(0);
 });
 
 test('empty route responses are not presented as successful guidance', async ({ page }) => {

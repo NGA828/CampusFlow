@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { AdaptiveRow, Badge, Button, Card, ErrorNote, Eyebrow, H2, H3, KeyValue, Loading, ProgressBar, Screen, SectionTitle, Small, Stat, Title } from '@/components/ui';
-import { ApiError, navigationApi, type MobileRoute, type NavigationProgress, type NavigationSessionState } from '@/lib/api';
+import { RouteTrace } from '@/components/route-trace';
+import { ApiError, navigationApi, positioningApi, type MobileRoute, type NavigationPositionUpdate, type NavigationSessionState } from '@/lib/api';
+import type { Position } from '@/lib/types';
 import { colors, countdown, spacing } from '@/lib/theme';
 
 export default function NavigateScreen() {
@@ -15,7 +17,9 @@ export default function NavigateScreen() {
   const [accessible, setAccessible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState<NavigationProgress | null>(null);
+  const [progress, setProgress] = useState<NavigationPositionUpdate | null>(null);
+  const [routeOrigin, setRouteOrigin] = useState<Position | null>(null);
+  const [currentPosition, setCurrentPosition] = useState<Position | null>(null);
   const [tracking, setTracking] = useState(false);
   const subscription = useRef<Location.LocationSubscription | null>(null);
   const sessionRef = useRef<NavigationSessionState | null>(null);
@@ -27,11 +31,64 @@ export default function NavigateScreen() {
     setBusy(true);
     setError(null);
     try {
-      const result = await navigationApi.start({ to_room_code: String(code), accessible });
+      const { position: saved } = await positioningApi.current().catch(() => ({ position: null }));
+      const savedAt = saved?.recorded_at ?? saved?.updated_at;
+      const freshIndoorFix = saved?.source === 'qr'
+        && Boolean(saved.floor_id)
+        && Number.isFinite(saved.plan_x)
+        && Number.isFinite(saved.plan_y)
+        && (!savedAt || Date.now() - Date.parse(savedAt) < 30 * 60 * 1000);
+
+      let origin: Parameters<typeof navigationApi.start>[0];
+      if (freshIndoorFix && saved) {
+        origin = {
+          from_plan_x: saved.plan_x as number,
+          from_plan_y: saved.plan_y as number,
+          from_floor_id: saved.floor_id as string,
+          from_building_id: saved.building_id ?? undefined,
+        };
+        setCurrentPosition(saved);
+        setRouteOrigin(saved);
+      } else {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (permission.status !== 'granted') {
+          if (freshIndoorFix && saved?.floor_id && Number.isFinite(saved.plan_x) && Number.isFinite(saved.plan_y)) {
+            origin = {
+              from_plan_x: saved.plan_x as number,
+              from_plan_y: saved.plan_y as number,
+              from_floor_id: saved.floor_id,
+              from_building_id: saved.building_id ?? undefined,
+            };
+            setCurrentPosition(saved);
+            setRouteOrigin(saved);
+          } else {
+            throw new Error('Allow location access or scan a nearby CampusFlow QR anchor to set your starting point.');
+          }
+        } else {
+          const fix = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          origin = { from_lat: fix.coords.latitude, from_lng: fix.coords.longitude };
+          const gpsPosition: Position = {
+            lat: fix.coords.latitude,
+            lng: fix.coords.longitude,
+            plan_x: null,
+            plan_y: null,
+            building_id: null,
+            floor_id: null,
+            source: 'gps',
+            accuracy_m: fix.coords.accuracy,
+            updated_at: new Date(fix.timestamp).toISOString(),
+          };
+          setCurrentPosition(gpsPosition);
+          setRouteOrigin(gpsPosition);
+        }
+      }
+
+      const result = await navigationApi.start({ to_room_code: String(code), accessible, ...origin });
+      if (!result.session || !result.route) throw new Error('The navigation service returned an incomplete route.');
       setSession(result);
       setProgress(null);
     } catch (caught) {
-      setError(caught instanceof ApiError ? (caught.firstError ?? caught.message) : 'Could not compute a route to that room.');
+      setError(caught instanceof ApiError ? (caught.firstError ?? caught.message) : caught instanceof Error ? caught.message : 'Could not compute a route to that room.');
     } finally {
       setBusy(false);
     }
@@ -39,17 +96,29 @@ export default function NavigateScreen() {
 
   const push = async (coords: { latitude: number; longitude: number; accuracy: number | null }) => {
     const current = sessionRef.current;
-    if (!current) return;
+    if (!current?.session) return;
     try {
-      const result = await navigationApi.updatePosition(current.session_id, {
+      setCurrentPosition((previous) => ({
+        lat: coords.latitude,
+        lng: coords.longitude,
+        plan_x: null,
+        plan_y: null,
+        building_id: null,
+        floor_id: null,
+        source: 'gps',
+        accuracy_m: coords.accuracy,
+        updated_at: new Date().toISOString(),
+        ...(previous?.building_name ? { building_name: previous.building_name } : {}),
+      }));
+      const result = await navigationApi.updatePosition(current.session.id, {
         lat: coords.latitude,
         lng: coords.longitude,
         accuracy_m: coords.accuracy,
         source: 'gps',
       });
       setProgress(result);
-      if (result.navigation.arrived) {
-        Alert.alert('Arrived', `You have reached ${current.destination_label}.`);
+      if (result.navigation?.arrived) {
+        Alert.alert('Arrived', `You have reached ${current.destination_label ?? 'your destination'}.`);
         stopTracking();
       }
     } catch {
@@ -60,9 +129,9 @@ export default function NavigateScreen() {
   /** Pause is a server state, not just a stopped watch: the ticket and the ETA both depend on it. */
   const setPaused = async (paused: boolean) => {
     const current = sessionRef.current;
-    if (!current) return;
+    if (!current?.session) return;
     try {
-      await navigationApi.update(current.session_id, { action: paused ? 'pause' : 'resume' });
+      await navigationApi.update(current.session.id, { action: paused ? 'pause' : 'resume' });
     } catch {
       // The walk continues locally even if the pause never lands; the next position fix resynchronises it.
     }
@@ -100,10 +169,10 @@ export default function NavigateScreen() {
   useEffect(() => () => subscription.current?.remove(), []);
 
   const complete = async () => {
-    if (!session) return;
+    if (!session?.session) return;
     stopTracking();
     try {
-      await navigationApi.complete(session.session_id);
+      await navigationApi.complete(session.session.id);
       Alert.alert('Route finished', 'Session closed. Thanks for walking with CampusFlow.');
       router.back();
     } catch (caught) {
@@ -111,8 +180,9 @@ export default function NavigateScreen() {
     }
   };
 
-  const route: MobileRoute | undefined = session?.route;
-  const currentStepIndex = progress?.navigation.current_step_index ?? 0;
+  const route: MobileRoute | undefined = session?.route ?? undefined;
+  const liveNavigation = progress?.navigation;
+  const currentStepIndex = liveNavigation?.current_step_index ?? 0;
   const currentStep = route?.steps?.[currentStepIndex];
 
   return (
@@ -134,7 +204,7 @@ export default function NavigateScreen() {
           <Card>
             <H3>Plan the walk</H3>
             <Small style={{ marginTop: 4 }}>
-              We compute the route from your last known position (or the nearest entrance). Turn on the accessible option to avoid stairs.
+              Use your current GPS position outdoors or scan a nearby QR anchor indoors. Turn on the step-free option to avoid stairs.
             </Small>
             <View style={styles.toggleRow}>
               <Button
@@ -163,15 +233,15 @@ export default function NavigateScreen() {
                 {currentStep?.floor_name ? ` · ${currentStep.floor_name}` : ''}
               </Small>
               <View style={{ marginTop: spacing.md }}>
-                <ProgressBar value={progress ? progress.navigation.progress : 0} tone="mint" />
+                <ProgressBar value={liveNavigation?.progress ?? 0} tone="mint" />
               </View>
               <AdaptiveRow style={styles.stats}>
-                <Stat label="Remaining" value={progress ? `${Math.round(progress.navigation.remaining_m)} m` : `${Math.round(route.distance_m)} m`} />
-                <Stat label="From route" value={progress ? `${Math.round(progress.navigation.distance_from_route_m)} m` : '—'} tone={progress?.navigation.off_route ? 'signal' : 'neutral'} />
-                <Stat label="Grace" value={progress?.navigation.grace_seconds_remaining ? countdown(progress.navigation.grace_seconds_remaining) : '—'} />
+                <Stat label="Remaining" value={`${Math.round(liveNavigation?.remaining_m ?? route.distance_m)} m`} />
+                <Stat label="From route" value={liveNavigation ? `${Math.round(liveNavigation.distance_from_route_m)} m` : '—'} tone={liveNavigation?.off_route ? 'signal' : 'neutral'} />
+                <Stat label="Grace" value={liveNavigation?.grace_seconds_remaining ? countdown(liveNavigation.grace_seconds_remaining) : '—'} />
               </AdaptiveRow>
 
-              {progress?.navigation.off_route ? (
+              {liveNavigation?.off_route ? (
                 <Card style={{ marginTop: spacing.md, backgroundColor: colors.signal100, borderColor: colors.signal100 }}>
                   <Small style={{ color: colors.signal700, fontWeight: '700' }}>You seem to be off the route</Small>
                   <Small style={{ color: colors.signal700, marginTop: 2 }}>
@@ -180,7 +250,7 @@ export default function NavigateScreen() {
                 </Card>
               ) : null}
 
-              {progress?.navigation.recalculated ? (
+              {liveNavigation?.recalculated ? (
                 <Small style={{ marginTop: spacing.md, color: colors.brand700, fontWeight: '700' }}>Route recalculated from your nearest point.</Small>
               ) : null}
 
@@ -208,6 +278,8 @@ export default function NavigateScreen() {
                 <Button label="Finish" variant="ghost" onPress={() => void complete()} style={{ flex: 1 }} />
               </AdaptiveRow>
             </Card>
+
+            <RouteTrace legs={route.legs} originPosition={routeOrigin} position={currentPosition} originNode={route.origin?.node} />
 
             <Card style={{ marginTop: spacing.lg }}>
               <SectionTitle title="Steps" />

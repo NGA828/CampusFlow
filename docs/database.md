@@ -8,7 +8,9 @@
 - `rooms` (id, floor_id, building_id, code, name, capacity, room_type, is_active, requires_admission)
 - `qr_nodes` (id, floor_id, room_id, code, payload, x_coordinate, y_coordinate)
 - `navigation_nodes` (id, floor_id, code, name, x_coordinate, y_coordinate, node_type)
-- `navigation_edges` (id, from_node_id, to_node_id, distance_meters, weight, is_accessible)
+- `navigation_edges` (id, from_node_id, to_node_id, weight, edge_type, geometry_space, geometry, accessible, bidirectional)
+
+Navigation edges store graph connectivity and routing cost plus optional intermediate path coordinates in `geometry`; `geometry_space` is `plan` for floor-plan `[x, y]` pairs or `geo` for outdoor `[longitude, latitude]` pairs. Endpoints are taken from the connected nodes. Route renderers use saved bends when available and fall back to straight node-to-node segments for legacy edges with no geometry. A valid graph route is not proof of a physically verified path: campus staff still need to map and check the geometry against real corridors and walkways.
 
 ### 2. Queue & Admission Models
 - `room_queues` (id, room_id, status, capacity, current_ticket_number, auto_admit)

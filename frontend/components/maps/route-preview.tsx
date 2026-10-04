@@ -6,29 +6,29 @@ import { campusApi } from '@/lib/api/endpoints';
 import { CampusMap } from './campus-map';
 import { FloorPlan } from './floor-plan';
 import { Card, CardSkeleton, ErrorState } from '@/components/ui/kit';
-import { finite, routeSegments, stepNode } from '@/lib/maps/route-geometry';
+import { finite, routeSegments, stepNode, type RouteStartFix } from '@/lib/maps/route-geometry';
 import type { NavigationWalking, Route } from '@/lib/api/types';
 import s from './route-preview.module.css';
 
-interface Props { route: Route; walking: NavigationWalking | null; onClearRoute?: () => void }
+interface Props { route: Route; walking: NavigationWalking | null; onClearRoute?: () => void; startFix?: RouteStartFix | null }
 
-export function RoutePreview({ route, onClearRoute }: Props) {
+export function RoutePreview({ route, onClearRoute, startFix }: Props) {
   if (!Array.isArray(route.nodes) || !route.nodes.length || !Array.isArray(route.steps) || !route.steps.length || !Array.isArray(route.legs) || !route.origin || !route.destination) {
     return <Card><ErrorState message="No walkable route is available. Choose another starting point or ask campus staff to check the published paths." />
       {onClearRoute && <button onClick={onClearRoute}>Change route</button>}
     </Card>;
   }
   // A newly calculated route starts at its origin, not the previous route's step.
-  return <RouteContent key={JSON.stringify(route)} route={route} onClearRoute={onClearRoute} />;
+  return <RouteContent key={JSON.stringify(route)} route={route} onClearRoute={onClearRoute} startFix={startFix} />;
 }
 
-function RouteContent({ route, onClearRoute }: Omit<Props, 'walking'>) {
+function RouteContent({ route, onClearRoute, startFix }: Omit<Props, 'walking'>) {
   const [active, setActive] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [view, setView] = useState<string | null | undefined>(undefined);
   const step = route.steps[active];
   const node = stepNode(route, step, active);
-  const floorId = view === undefined ? (node?.floor_id ?? step.floor_id ?? null) : view;
+  const floorId = view === undefined ? (startFix && active === 0 ? null : node?.floor_id ?? step.floor_id ?? null) : view;
   const buildings = useAsync(() => campusApi.buildings(), []);
   const plan = useAsync(() => floorId ? campusApi.floorPlan(floorId) : Promise.resolve(null), [floorId]);
   const floors = [...new Set(route.nodes.map(n => n.floor_id).filter((id): id is string => !!id))];
@@ -54,8 +54,8 @@ function RouteContent({ route, onClearRoute }: Omit<Props, 'walking'>) {
 
   return <section className={s.preview} aria-label="Visual route preview">
     <header className={s.header}>
-      <div><p className={s.eyebrow}>YOUR WALK ACROSS CAMPUS</p><h2>{route.origin.label} <span aria-hidden="true">→</span> {route.destination.label}</h2>
-        <p>Shortest published {route.accessible ? 'step-free ' : ''}path · Preview, not live location</p></div>
+      <div><p className={s.eyebrow}>YOUR WALK ACROSS CAMPUS</p><h2>{startFix ? 'Your location' : route.origin.label} <span aria-hidden="true">→</span> {route.destination.label}</h2>
+        <p>Shortest published {route.accessible ? 'step-free ' : ''}path · Preview, not live tracking{startFix && startFix.accuracy_m !== null ? ` · GPS accuracy ±${Math.round(startFix.accuracy_m)} m` : ''}</p></div>
       {onClearRoute && <button className={s.button} onClick={onClearRoute}>Change route</button>}
     </header>
     <div className={s.metrics}>
@@ -78,9 +78,9 @@ function RouteContent({ route, onClearRoute }: Omit<Props, 'walking'>) {
           <FloorPlan plan={plan.data} route={route} marker={marker} />
         ) : buildings.error ? <ErrorState message={buildings.error} onRetry={buildings.reload} /> :
           buildings.loading ? <CardSkeleton rows={7} /> :
-          <CampusMap buildings={buildings.data?.buildings ?? []} route={route} markers={geoMarker} height={460} />}
+          <CampusMap buildings={buildings.data?.buildings ?? []} route={route} markers={geoMarker} originFix={startFix} height={460} />}
         {!segments.length && <p className={s.notice}>No walking line is published for this view. {floorId ? 'This may be a floor transition or a single location.' : 'Choose an indoor floor to see its corridor route.'} We do not draw a straight-line shortcut.</p>}
-        <div className={s.legend}><span>● Start: {route.origin.label}</span><span>→ Arrows show travel direction</span><span>◎ Destination: {route.destination.label}</span></div>
+        <div className={s.legend}><span>● {startFix ? 'Your location' : `Start: ${route.origin.label}`}</span>{startFix && <span>┄ Dashed link: nearest walking node</span>}<span>→ Arrows show travel direction</span><span>━ Solid: saved edge shape</span><span>┄ Dashed: straight fallback between nodes</span><span>◎ Destination: {route.destination.label}</span></div>
         <div className={s.current} aria-live="polite"><span className={s.stepNumber}>{active + 1}</span><div><strong>{step.instruction}</strong><p>{floorId ? floorLabel(floorId) : 'Campus outdoors'} · {Math.round(remaining)} m after this step</p></div></div>
         {!node && <p className={s.notice}>This instruction has no mapped position. The full published route remains visible.</p>}
         <div className={s.controls}>
@@ -97,6 +97,6 @@ function RouteContent({ route, onClearRoute }: Omit<Props, 'walking'>) {
         </li>)}</ol>
       </aside>
     </div>
-    <footer className={s.footer}>Routes follow the campus’s published walking network. Unmapped shortcuts are not included. Check local signs and closures; use the mobile app for live positioning.</footer>
+    <footer className={s.footer}>Where an edge has saved path geometry, the line follows those mapped bends; edges without it are drawn straight between their endpoint nodes. Sparse or misplaced geometry can still be misleading, so check local signs and closures. Web preview is not live tracking.</footer>
   </section>;
 }

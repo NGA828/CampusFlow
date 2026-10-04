@@ -11,11 +11,11 @@ class NavigationEdge extends Model
 
     protected $table = 'navigation_edges';
 
-    protected $fillable = ['from_node_id', 'to_node_id', 'weight', 'bidirectional', 'accessible', 'edge_type'];
+    protected $fillable = ['from_node_id', 'to_node_id', 'weight', 'bidirectional', 'accessible', 'edge_type', 'geometry', 'geometry_space'];
 
     protected function casts(): array
     {
-        return ['weight' => 'float', 'bidirectional' => 'boolean', 'accessible' => 'boolean'];
+        return ['weight' => 'float', 'bidirectional' => 'boolean', 'accessible' => 'boolean', 'geometry' => 'array'];
     }
 
     public function fromNode()
@@ -47,6 +47,8 @@ class NavigationEdge extends Model
             'bidirectional' => $this->bidirectional,
             'is_accessible' => $this->accessible,
             'floor_change' => $fromFloorId !== null && $toFloorId !== null && $fromFloorId !== $toFloorId,
+            'geometry_space' => $this->geometry_space,
+            'geometry' => $this->geometry,
         ];
     }
 }

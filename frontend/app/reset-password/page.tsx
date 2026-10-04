@@ -17,6 +17,7 @@ export default function ResetPasswordPage() {
 
 function ResetPasswordForm() {
   const params = useSearchParams();
+  const [email, setEmail] = useState(params.get('email') ?? '');
   const [token, setToken] = useState(params.get('token') ?? '');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -33,7 +34,12 @@ function ResetPasswordForm() {
     setLoading(true);
     setError(null);
     try {
-      await authApi.resetPassword({ token: token.trim(), password });
+      await authApi.resetPassword({
+        email: email.trim(),
+        token: token.trim(),
+        password,
+        password_confirmation: confirm,
+      });
       setDone(true);
     } catch (caught) {
       setError(caught instanceof ApiError ? (caught.firstError ?? caught.message) : 'The reset failed. Please try again.');
@@ -62,6 +68,9 @@ function ResetPasswordForm() {
           </div>
         ) : (
           <form onSubmit={submit} className="mt-6 space-y-4">
+            <Field label="Email address" htmlFor="reset-email">
+              <Input id="reset-email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" />
+            </Field>
             <Field label="Reset token" htmlFor="token" hint="Paste the token from the reset email.">
               <Input id="token" required value={token} onChange={(event) => setToken(event.target.value)} className="font-mono text-[12.5px]" />
             </Field>

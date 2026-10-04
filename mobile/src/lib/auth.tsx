@@ -9,6 +9,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { ApiError, authApi, loadToken, saveToken } from './api';
+import { unregisterForPush } from './notifications';
 import type { SessionInfo, User } from './types';
 
 /**
@@ -86,6 +87,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Stop delivery to this installation before revoking the current API session. A network
+    // failure must still never trap the person inside the app.
+    try {
+      await unregisterForPush();
+    } catch {
+      // Push cleanup is best-effort; logout remains authoritative for the API session.
+    }
     try {
       await authApi.logout();
     } catch (error) {

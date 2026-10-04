@@ -107,6 +107,40 @@ test.describe('Web workspace redesign', () => {
     await expect(page.getByText('Route type', { exact: true })).toBeHidden();
   });
 
+  test('web route preview starts at an explicitly shared browser location and draws the snap to the walking path', async ({ page }) => {
+    await webSession(page, 'student');
+    await page.context().grantPermissions(['geolocation']);
+    await page.context().setGeolocation({ latitude: 3.86305, longitude: 11.51205 });
+    let submitted: Record<string, unknown> | null = null;
+    const start = { id: 'origin-node', label: 'Learning centre entrance', type: 'entrance', building_id: 'b1', floor_id: null, lat: 3.863, lng: 11.512, plan_x: null, plan_y: null };
+    const destination = { id: 'destination-node', label: 'Science entrance', type: 'entrance', building_id: 'b2', floor_id: null, lat: 3.864, lng: 11.514, plan_x: null, plan_y: null };
+    await page.route('**/api/v1/campus/navigation/route', async (request) => {
+      submitted = request.request().postDataJSON();
+      await request.fulfill({ json: { success: true, data: { route: {
+        nodes: [start, destination],
+        steps: [
+          { index: 0, node_id: start.id, instruction: 'Start at the Learning centre entrance', kind: 'start', distance_m: 0, floor_id: null },
+          { index: 1, node_id: destination.id, instruction: 'Arrive at the Science entrance', kind: 'arrive', distance_m: 80, floor_id: null },
+        ],
+        legs: [{ floor_id: null, floor_name: 'Campus grounds', floor_level: 0, building_code: null, distance_m: 80, duration_s: 67, points: [], geo: [{ lat: 3.863, lng: 11.512 }, { lat: 3.864, lng: 11.514 }] }],
+        transitions: [], distance_m: 80, duration_s: 67, accessible: false, uses_stairs: false,
+        origin: { label: start.label, node: start }, destination: { label: destination.label, node: destination },
+      }, destination_label: destination.label } } });
+    });
+
+    await page.goto('/student/campus/map?route=B204');
+    await page.getByRole('link', { name: 'Plan a route →', exact: true }).click();
+    await page.getByRole('button', { name: 'Use my current location', exact: true }).click();
+    await expect(page.getByText(/Using one-time browser fix/)).toBeVisible();
+    await page.getByLabel('Destination room code').fill('B204');
+    await page.getByRole('button', { name: 'Preview route', exact: true }).click();
+
+    await expect(page.getByTestId('outdoor-route')).toBeVisible();
+    await expect(page.getByTestId('route-origin-snap')).toBeVisible();
+    await expect(page.getByRole('img', { name: 'Your current location' })).toBeVisible();
+    expect(submitted).toMatchObject({ from_lat: 3.86305, from_lng: 11.51205, to_room_code: 'B204' });
+  });
+
   test('outdoor-only route previews render instead of waiting for an indoor plan', async ({ page }) => {
     await webSession(page, 'student');
     await page.goto('/student/campus/map?route=B204');

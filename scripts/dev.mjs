@@ -2,11 +2,12 @@
 /**
  * CampusFlow development launcher.
  *
- * Starts the Laravel API and Next.js web client used by the project.
+ * Starts the Laravel API, database queue worker, scheduler and Next.js web client.
  *
  * The Laravel API runs on port 8001 and the Next.js development server runs on port 3000.
  * Web requests use Next's rewrite to reach Laravel, while mobile clients call Laravel
- * directly using EXPO_PUBLIC_API_URL.
+ * directly using EXPO_PUBLIC_API_URL. The worker and scheduler execute notification jobs
+ * and ticket expiry rules in development just as they must in production.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -18,7 +19,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const apiPort = process.env.API_PORT ?? '8001';
 const webPort = process.env.WEB_DEV_PORT ?? '3000';
 
-const COLORS = { api: '\u001b[36m', web: '\u001b[35m', reset: '\u001b[0m' };
+const COLORS = { api: '\u001b[36m', worker: '\u001b[33m', scheduler: '\u001b[32m', web: '\u001b[35m', reset: '\u001b[0m' };
 
 /** @type {import('node:child_process').ChildProcess[]} */
 const children = [];
@@ -147,6 +148,8 @@ if (requiredVersionId > 0) {
 }
 
 start('api', phpBin, ['artisan', 'serve', '--host=0.0.0.0', `--port=${apiPort}`], backendDir);
+start('worker', phpBin, ['artisan', 'queue:work', '--queue=notifications,default', '--sleep=2', '--tries=4', '--timeout=60'], backendDir);
+start('scheduler', phpBin, ['artisan', 'schedule:work'], backendDir);
 
 if (existsSync(join(frontendDir, 'node_modules'))) {
   const apiOrigin = process.env.API_PROXY_TARGET ?? `http://127.0.0.1:${apiPort}`;

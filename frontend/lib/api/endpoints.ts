@@ -152,7 +152,7 @@ export const authApi = {
   changePassword: (body: { current_password: string; password: string; password_confirmation: string }) => api.put<{ changed: boolean }>('/auth/password', body),
   forgotPassword: (body: { email: string }) =>
     request<{ sent: boolean; reset_token?: string; message?: string }>('/auth/forgot-password', { method: 'POST', body, auth: false }),
-  resetPassword: (body: { token: string; password: string }) =>
+  resetPassword: (body: { email: string; token: string; password: string; password_confirmation: string }) =>
     request<{ reset: boolean }>('/auth/reset-password', { method: 'POST', body, auth: false }),
 };
 
@@ -321,7 +321,19 @@ export const campusApi = {
   courses: () => api.get<Course[]>('/campus/academic/courses'),
   terms: () => api.get<Term[]>('/campus/academic/terms'),
   /** Route *preview*: planning a walk, which the web may do. Starting a live session is mobile-only. */
-  route: async (body: { to_room_id?: string; to_room_code?: string; to_node_id?: string; from_node_id?: string; accessible?: boolean }) => {
+  route: async (body: {
+    to_room_id?: string;
+    to_room_code?: string;
+    to_node_id?: string;
+    from_node_id?: string;
+    from_lat?: number;
+    from_lng?: number;
+    from_plan_x?: number;
+    from_plan_y?: number;
+    from_floor_id?: string;
+    from_building_id?: string;
+    accessible?: boolean;
+  }) => {
     const response = await api.post<{ route: unknown; destination_label: string }>('/campus/navigation/route', body);
     return { ...response, route: requireRenderableRoute(response.route) };
   },

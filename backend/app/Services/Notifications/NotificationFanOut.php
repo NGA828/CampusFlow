@@ -2,6 +2,7 @@
 
 namespace App\Services\Notifications;
 
+use App\Jobs\SendExpoPushNotifications;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -79,6 +80,10 @@ class NotificationFanOut
             ], $chunk));
 
             $sent += count($chunk);
+        }
+
+        if ($sent > 0) {
+            SendExpoPushNotifications::dispatch($userIds, $title, $body, $data)->afterCommit();
         }
 
         return $sent;

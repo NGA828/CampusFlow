@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\QueueTicket;
 use App\Models\Room;
 use App\Models\RoomQueue;
 use App\Models\User;
@@ -148,6 +149,51 @@ class QueueTest extends TestCase
                 ->getJson('/api/v1/campus/queues')
                 ->assertOk();
         }
+    }
+
+    public function test_waiting_ticket_is_expired_by_the_scheduled_sweep(): void
+    {
+        $student = User::where('role', 'student')->firstOrFail();
+        $queue = $this->openQueue();
+        $ticketId = $this->actingAs($student, 'sanctum')
+            ->postJson("/api/v1/student/queues/{$queue->id}/tickets", ['idempotency_key' => 'expire-waiting-test'])
+            ->assertCreated()
+            ->json('data.ticket.id');
+
+        QueueTicket::whereKey($ticketId)->update(['created_at' => now()->subMinutes(20)]);
+
+        $this->artisan('campusflow:tickets:expire')->assertExitCode(0);
+
+        $this->assertDatabaseHas('queue_tickets', [
+            'id' => $ticketId,
+            'status' => 'cancelled',
+            'cancelled_by' => 'system',
+        ]);
+        $this->assertDatabaseHas('queue_events', ['ticket_id' => $ticketId, 'type' => 'expired']);
+    }
+
+    public function test_called_ticket_past_its_check_in_deadline_becomes_no_show(): void
+    {
+        $student = User::where('role', 'student')->firstOrFail();
+        $queue = $this->openQueue();
+        $ticketId = $this->actingAs($student, 'sanctum')
+            ->postJson("/api/v1/student/queues/{$queue->id}/tickets", ['idempotency_key' => 'expire-called-test'])
+            ->assertCreated()
+            ->json('data.ticket.id');
+
+        QueueTicket::whereKey($ticketId)->update([
+            'status' => 'called',
+            'called_at' => now()->subMinutes(20),
+        ]);
+
+        $this->artisan('campusflow:tickets:expire')->assertExitCode(0);
+
+        $this->assertDatabaseHas('queue_tickets', [
+            'id' => $ticketId,
+            'status' => 'no_show',
+            'cancelled_by' => 'system',
+        ]);
+        $this->assertDatabaseHas('queue_events', ['ticket_id' => $ticketId, 'type' => 'no_show']);
     }
 
     public function test_cancelling_a_ticket_releases_the_place_in_line(): void

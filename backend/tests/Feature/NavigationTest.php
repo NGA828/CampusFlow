@@ -214,4 +214,138 @@ class NavigationTest extends TestCase
             ->assertUnprocessable();
     }
 
+
+    public function test_route_serializes_polyline_points_in_the_direction_the_walker_travels(): void
+    {
+        $floor = \App\Models\Floor::query()->firstOrFail();
+        $start = $this->waypoint('Polyline start');
+        $destination = $this->waypoint('Polyline destination');
+        $start->update([
+            'building_id' => $floor->building_id,
+            'floor_id' => $floor->id,
+            'plan_x' => 4,
+            'plan_y' => 6,
+        ]);
+        $destination->update([
+            'building_id' => $floor->building_id,
+            'floor_id' => $floor->id,
+            'plan_x' => 24,
+            'plan_y' => 16,
+        ]);
+        $this->connect($start, $destination, 24);
+        \App\Models\NavigationEdge::query()
+            ->where('from_node_id', $start->id)
+            ->where('to_node_id', $destination->id)
+            ->firstOrFail()
+            ->update(['geometry_space' => 'plan', 'geometry' => [[9, 6], [9, 14], [18, 14]]]);
+
+        $this->actingAs(User::where('role', 'student')->firstOrFail(), 'sanctum')
+            ->postJson('/api/v1/campus/navigation/route', [
+                'from_node_id' => $destination->id,
+                'to_node_id' => $start->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.route.edges.0.from_node_id', $destination->id)
+            ->assertJsonPath('data.route.edges.0.geometry', [[18, 14], [9, 14], [9, 6]])
+            ->assertJsonPath('data.route.legs.0.points', [
+                ['x' => 24, 'y' => 16],
+                ['x' => 18, 'y' => 14],
+                ['x' => 9, 'y' => 14],
+                ['x' => 9, 'y' => 6],
+                ['x' => 4, 'y' => 6],
+            ])
+            ->assertJsonPath('data.route.legs.0.segment_geometry', [true, true, true, true]);
+    }
+
+    public function test_mobile_route_session_snaps_the_current_gps_fix_to_the_published_path(): void
+    {
+        $start = $this->waypoint('GPS start');
+        $destination = $this->waypoint('GPS destination');
+        $start->update(['lat' => 19.1234, 'lng' => 11.2345]);
+        $destination->update(['lat' => 19.1236, 'lng' => 11.2347]);
+        $this->connect($start, $destination, 28);
+
+        $response = $this->actingAs(User::where('role', 'student')->firstOrFail(), 'sanctum')
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/navigation/sessions', [
+                'to_node_id' => $destination->id,
+                'from_lat' => 19.123401,
+                'from_lng' => 11.234501,
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.session.from_node_id', $start->id)
+            ->assertJsonPath('data.route.origin.node.id', $start->id)
+            ->assertJsonPath('data.route.legs.0.geo.0.lat', 19.1234)
+            ->assertJsonPath('data.route.legs.0.segment_geometry', [false])
+            ->assertJsonPath('data.destination_label', 'GPS destination');
+    }
+
+
+    public function test_gps_origin_can_snap_to_an_entrance_node_with_indoor_floor_metadata(): void
+    {
+        $floor = \App\Models\Floor::query()->firstOrFail();
+        $entrance = $this->waypoint('GPS entrance');
+        $destination = $this->waypoint('GPS route destination');
+        $entrance->update([
+            'building_id' => $floor->building_id,
+            'floor_id' => $floor->id,
+            'type' => 'exit',
+            'lat' => 20.4321,
+            'lng' => 21.5432,
+        ]);
+        $destination->update([
+            'building_id' => $floor->building_id,
+            'floor_id' => $floor->id,
+            'lat' => 20.4323,
+            'lng' => 21.5434,
+        ]);
+        $this->connect($entrance, $destination, 28);
+
+        $this->actingAs(User::where('role', 'student')->firstOrFail(), 'sanctum')
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/navigation/sessions', [
+                'to_node_id' => $destination->id,
+                'from_lat' => 20.432101,
+                'from_lng' => 21.543201,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.session.from_node_id', $entrance->id)
+            ->assertJsonPath('data.route.origin.node.id', $entrance->id);
+    }
+
+    public function test_mobile_route_session_snaps_a_qr_plan_fix_to_the_nearest_node_on_its_floor(): void
+    {
+        $floor = \App\Models\Floor::query()->firstOrFail();
+        $start = $this->waypoint('QR start');
+        $destination = $this->waypoint('Indoor destination');
+        $start->update([
+            'building_id' => $floor->building_id,
+            'floor_id' => $floor->id,
+            'plan_x' => 8,
+            'plan_y' => 5,
+        ]);
+        $destination->update([
+            'building_id' => $floor->building_id,
+            'floor_id' => $floor->id,
+            'plan_x' => 18,
+            'plan_y' => 5,
+        ]);
+        $this->connect($start, $destination, 10);
+
+        $this->actingAs(User::where('role', 'student')->firstOrFail(), 'sanctum')
+            ->withHeader('X-CampusFlow-Client', 'mobile')
+            ->postJson('/api/v1/student/navigation/sessions', [
+                'to_node_id' => $destination->id,
+                'from_plan_x' => 8.2,
+                'from_plan_y' => 5.1,
+                'from_floor_id' => $floor->id,
+                'from_building_id' => $floor->building_id,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.session.from_node_id', $start->id)
+            ->assertJsonPath('data.route.legs.0.floor_id', $floor->id)
+            ->assertJsonPath('data.route.legs.0.points.0.x', 8);
+    }
+
 }

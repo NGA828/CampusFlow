@@ -55,13 +55,13 @@
 
 ## 4. Positioning & Spatial Navigation (`/positioning`, `/navigation`)
 
-### `POST /positioning/scan`
-- **Body**: `{ qr_payload: string }`
-- **Response**: `{ success: true, position: LocationFix, room: Room, floor: Floor, building: Building }`
+### `POST /student/positioning/scan`
+- **Body**: `{ payload?: string, code?: string, version?: number }`
+- **Response**: `{ success: true, data: { position, qr_node } }`
 
-### `POST /navigation/route`
-- **Body**: `{ origin: { x, y, floor_id }, destination: { room_code } }`
-- **Response**: `{ success: true, path: Node[], total_distance_m: float, instructions: Instruction[] }`
+### `POST /campus/navigation/route`
+- **Body**: destination `{to_room_code}` or `{to_node_id}`, optional `accessible`, and one origin: `{from_node_id}`, `{from_lat, from_lng}`, or `{from_plan_x, from_plan_y, from_floor_id}` (indoor QR fix).
+- **Response**: `{ success: true, data: { route: { nodes, steps, legs, transitions, distance_m, duration_s }, destination_label } }`
 
 ---
 
@@ -182,4 +182,13 @@ Five Laravel feature tests cover these contracts but remain **unexecuted** witho
 Browser verification uses raw-wire fixtures; it is not production authorization/database evidence.
 
 ### Navigation preview integrity (2026-09-29)
-`POST /campus/navigation/route` uses Dijkstra over active nodes and non-negative metre-weighted edges. Accessibility filters apply to both edge endpoints and edges; stairs/stairwells are excluded when step-free is requested. No origin, disconnected destinations, or excluded endpoints produce HTTP 422 instead of a successful empty route. Each returned step includes `node_id`, referencing the ordered `route.nodes` array. Indoor leg `points` are confined to a single floor; `geo` belongs to outdoor/entrance connections. Clients must not connect missing coordinates or floor transitions into a straight line. A room without a navigation node is not silently substituted with an arbitrary node on its floor.
+`POST /campus/navigation/route` uses Dijkstra over active nodes and non-negative metre-weighted edges. Accessibility filters apply to both edge endpoints and edges; stairs/stairwells are excluded when step-free is requested. No origin, disconnected destinations, or excluded endpoints produce HTTP 422 instead of a successful empty route. Each returned step includes `node_id`, referencing the ordered `route.nodes` array. Indoor leg `points` are confined to a single floor; `geo` belongs to outdoor/entrance connections. Clients must not connect missing coordinates or floor transitions into a straight line. A room without a navigation node is not silently substituted with an arbitrary node on its floor. Route previews and mobile starts may provide `from_node_id`, GPS `from_lat/from_lng`, or an indoor QR fix as `from_plan_x/from_plan_y/from_floor_id`; the API snaps a location fix to a nearby active graph node before routing. The web map can request a one-time browser GPS fix by explicit user action and never saves or tracks it. Both clients render returned leg geometry as a route trace; mobile tracks the live GPS marker, while QR scanning is the accurate indoor-origin source.
+
+### Functional corrections (2026-10-04)
+
+- `POST /auth/reset-password` requires `{email, token, password, password_confirmation}`. The web reset form now asks for the account email and sends all four required fields.
+- `POST /me/devices` accepts an Expo token, `platform: ios|android`, and optional `device_name`; it upserts the token for the authenticated account. `POST /me/devices/unregister` accepts `{token}` and only removes a token belonging to the caller.
+- `NotificationFanOut` keeps the in-app notification as the durable record and queues Expo push delivery for registered devices. Invalid Expo tokens are removed on `DeviceNotRegistered`. A queue worker must be running for push delivery.
+- `campusflow:tickets:expire` expires stale waiting room tickets according to the registered `queue_auto_expire_mins` setting and marks called room/office tickets as no-shows after their configured grace window. Laravel schedules this sweep every minute; production must run the scheduler and worker.
+- Admin analytics now derive queue/office wait and service times, no-show rates, queue volume, destination popularity, navigation completion/distance, and current-term room utilisation from stored data. Off-route/recalculation counts remain unavailable because those events are not persisted.
+- Websocket delivery still is not connected to Laravel Reverb, and the spatial schema still lacks PostGIS geometry/geography columns and spatial indexes. Do not represent those as complete.

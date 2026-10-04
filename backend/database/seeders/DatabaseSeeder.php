@@ -174,15 +174,15 @@ class DatabaseSeeder extends Seeder
         // Connect Central Plaza Hub to Building Entrances
         $outdoorNodes = [$nStbOut, $nSubOut, $nLibOut, $nEngOut, $nBusOut, $nSacOut, $nAdmOut];
         foreach ($outdoorNodes as $index => $node) {
-            NavigationEdge::create(['from_node_id' => $hubPlaza->id, 'to_node_id' => $node->id, 'weight' => 25.0 + ($index * 6.0), 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+            NavigationEdge::create(['from_node_id' => $hubPlaza->id, 'to_node_id' => $node->id, 'weight' => 25.0 + ($index * 6.0), 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'outdoor']);
         }
 
         // Direct Outdoor Pathways between nearby buildings
-        NavigationEdge::create(['from_node_id' => $nStbOut->id, 'to_node_id' => $nEngOut->id, 'weight' => 35.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
-        NavigationEdge::create(['from_node_id' => $nStbOut->id, 'to_node_id' => $nLibOut->id, 'weight' => 40.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
-        NavigationEdge::create(['from_node_id' => $nSubOut->id, 'to_node_id' => $nSacOut->id, 'weight' => 30.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
-        NavigationEdge::create(['from_node_id' => $nSubOut->id, 'to_node_id' => $nBusOut->id, 'weight' => 45.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
-        NavigationEdge::create(['from_node_id' => $nLibOut->id, 'to_node_id' => $nAdmOut->id, 'weight' => 38.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);
+        NavigationEdge::create(['from_node_id' => $nStbOut->id, 'to_node_id' => $nEngOut->id, 'weight' => 35.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'outdoor']);
+        NavigationEdge::create(['from_node_id' => $nStbOut->id, 'to_node_id' => $nLibOut->id, 'weight' => 40.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'outdoor']);
+        NavigationEdge::create(['from_node_id' => $nSubOut->id, 'to_node_id' => $nSacOut->id, 'weight' => 30.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'outdoor']);
+        NavigationEdge::create(['from_node_id' => $nSubOut->id, 'to_node_id' => $nBusOut->id, 'weight' => 45.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'outdoor']);
+        NavigationEdge::create(['from_node_id' => $nLibOut->id, 'to_node_id' => $nAdmOut->id, 'weight' => 38.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'outdoor']);
 
         // Indoor Edges via Hallway Corridors
         NavigationEdge::create(['from_node_id' => $nStbOut->id, 'to_node_id' => $nStbCorr->id, 'weight' => 6.0, 'bidirectional' => true, 'accessible' => true, 'edge_type' => 'corridor']);

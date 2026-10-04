@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DeviceToken;
 use App\Models\UserNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -92,20 +93,48 @@ class MeController extends Controller
         ]);
     }
 
-    /**
-     * Register a push-notification device token (stub — extend when push provider added).
-     */
+    /** Register or refresh this account's Expo push token. */
     public function registerDevice(Request $request): JsonResponse
     {
-        $request->validate([
-            'token'    => 'required|string',
-            'platform' => 'required|in:ios,android,web',
+        $validated = $request->validate([
+            'token' => ['required', 'string', 'max:255', 'regex:/^(ExpoPushToken|ExponentPushToken)\[[^\]]+\]$/'],
+            'platform' => ['required', 'in:ios,android'],
+            'device_name' => ['sometimes', 'nullable', 'string', 'max:120'],
         ]);
 
-        // Stub: persist to a device_tokens table when push provider is integrated.
+        // A physical device token can only notify the most recently signed-in account on that device.
+        // Upserting by token makes registration safe to retry after intermittent connectivity.
+        $device = DeviceToken::updateOrCreate(
+            ['token' => $validated['token']],
+            [
+                'user_id' => $request->user()->id,
+                'platform' => $validated['platform'],
+                'device_name' => $validated['device_name'] ?? null,
+                'last_seen_at' => now(),
+            ],
+        );
+
         return response()->json([
             'success' => true,
-            'data'    => ['registered' => true],
+            'data' => ['registered' => true, 'device_id' => $device->id],
+        ]);
+    }
+
+    /** Remove only the calling account's copy of a device token (used on sign-out). */
+    public function unregisterDevice(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'token' => ['required', 'string', 'max:255'],
+        ]);
+
+        $deleted = DeviceToken::query()
+            ->where('user_id', $request->user()->id)
+            ->where('token', $validated['token'])
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'data' => ['unregistered' => $deleted > 0],
         ]);
     }
 

@@ -140,7 +140,7 @@ export default function AdminAnalyticsPage() {
             </div>
           </dl>
           <p className="mt-3 text-[12px] text-ink-500">
-            {data.navigation.recalculations_7d} route recalculations and {data.navigation.off_route_events_7d} off-route events this week. Average planned walk{' '}
+            {data.navigation.recalculations_7d === null ? '—' : data.navigation.recalculations_7d} route recalculations and {data.navigation.off_route_events_7d === null ? '—' : data.navigation.off_route_events_7d} off-route events this week. Average planned walk{' '}
             {data.navigation.average_distance_m === null ? '—' : `${data.navigation.average_distance_m} m`}.
           </p>
         </Card>
