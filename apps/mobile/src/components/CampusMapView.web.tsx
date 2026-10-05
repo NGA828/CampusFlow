@@ -3,7 +3,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Text, View } from 'react-native';
 import { colours, styles } from '../theme';
-import { STYLE_URL, type CampusMapProps } from './map-types';
+import { LANDMARK_GLYPH, STYLE_URL, type CampusMapProps } from './map-types';
 
 /**
  * Web campus map — the same MapLibre style and the same data as the native map,
@@ -11,7 +11,7 @@ import { STYLE_URL, type CampusMapProps } from './map-types';
  * native build. Markers and the route line are reconciled on every prop change
  * rather than rebuilt with the map, which keeps panning stable while routing.
  */
-export function CampusMapView({ centre, zoom, buildings, gps, indoor, route }: CampusMapProps) {
+export function CampusMapView({ centre, zoom, boundary, buildings, landmarks, gps, indoor, route }: CampusMapProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markers = useRef<maplibregl.Marker[]>([]);
@@ -42,6 +42,38 @@ export function CampusMapView({ centre, zoom, buildings, gps, indoor, route }: C
     instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     instance.on('load', () => {
       ready.current = true;
+
+      // The surveyed perimeter and the building footprints sit under everything else.
+      instance.addSource('campus', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      instance.addLayer({
+        id: 'campus-perimeter-fill',
+        type: 'fill',
+        source: 'campus',
+        filter: ['==', ['get', 'role'], 'perimeter'],
+        paint: { 'fill-color': colours.brand, 'fill-opacity': 0.07 },
+      });
+      instance.addLayer({
+        id: 'campus-perimeter-line',
+        type: 'line',
+        source: 'campus',
+        filter: ['==', ['get', 'role'], 'perimeter'],
+        paint: { 'line-color': colours.brand, 'line-width': 2, 'line-dasharray': [3, 2], 'line-opacity': 0.8 },
+      });
+      instance.addLayer({
+        id: 'campus-building-fill',
+        type: 'fill',
+        source: 'campus',
+        filter: ['==', ['get', 'role'], 'building'],
+        paint: { 'fill-color': colours.ink, 'fill-opacity': 0.5 },
+      });
+      instance.addLayer({
+        id: 'campus-building-line',
+        type: 'line',
+        source: 'campus',
+        filter: ['==', ['get', 'role'], 'building'],
+        paint: { 'line-color': colours.ink, 'line-width': 1.5 },
+      });
+
       instance.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       instance.addLayer({
         id: 'route-line',
@@ -68,6 +100,34 @@ export function CampusMapView({ centre, zoom, buildings, gps, indoor, route }: C
   useEffect(() => {
     const instance = map.current;
     if (!instance) return;
+    const draw = () => {
+      const source = instance.getSource('campus') as maplibregl.GeoJSONSource | undefined;
+      if (!source) return;
+      const features = [];
+      if (boundary) {
+        features.push({
+          type: 'Feature' as const,
+          properties: { role: 'perimeter' },
+          geometry: { type: 'Polygon' as const, coordinates: [boundary] },
+        });
+      }
+      for (const building of buildings) {
+        if (!building.footprint) continue;
+        features.push({
+          type: 'Feature' as const,
+          properties: { role: 'building', code: building.code },
+          geometry: { type: 'Polygon' as const, coordinates: [building.footprint] },
+        });
+      }
+      source.setData({ type: 'FeatureCollection', features });
+    };
+    if (ready.current) draw();
+    else instance.once('load', draw);
+  }, [boundary, buildings]);
+
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance) return;
 
     for (const marker of markers.current) marker.remove();
     markers.current = [];
@@ -84,6 +144,15 @@ export function CampusMapView({ centre, zoom, buildings, gps, indoor, route }: C
       add(building.coordinates, label);
     }
 
+    for (const landmark of landmarks) {
+      const glyph = document.createElement('div');
+      glyph.textContent = LANDMARK_GLYPH[landmark.kind] ?? '•';
+      glyph.title = landmark.name;
+      glyph.style.cssText =
+        'display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:white;border:1px solid #cfd6ec;font:12px/1 system-ui';
+      add(landmark.coordinates, glyph);
+    }
+
     const dot = (colour: string, size: number) => {
       const element = document.createElement('div');
       element.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:${colour};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)`;
@@ -92,7 +161,7 @@ export function CampusMapView({ centre, zoom, buildings, gps, indoor, route }: C
 
     if (gps) add(gps, dot(colours.brand, 16));
     if (indoor) add(indoor, dot(colours.gold, 18));
-  }, [buildings, gps?.[0], gps?.[1], indoor?.[0], indoor?.[1]]);
+  }, [buildings, landmarks, gps?.[0], gps?.[1], indoor?.[0], indoor?.[1]]);
 
   useEffect(() => {
     const instance = map.current;

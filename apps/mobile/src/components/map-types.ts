@@ -10,12 +10,35 @@ export interface MapBuilding {
   code: string;
   name: string;
   coordinates: [number, number];
+  footprint: [number, number][] | null;
 }
+
+export interface MapLandmark {
+  id: string;
+  name: string;
+  kind: string;
+  coordinates: [number, number];
+}
+
+/** One glyph per landmark kind — a gate and a fountain should not look alike. */
+export const LANDMARK_GLYPH: Record<string, string> = {
+  GATE: '⛩',
+  PLAZA: '▣',
+  FOUNTAIN: '⛲',
+  MONUMENT: '🗿',
+  PARKING: 'P',
+  GARDEN: '❦',
+  VIEWPOINT: '◭',
+  SPORT: '⚽',
+};
 
 export interface CampusMapProps {
   centre: [number, number];
   zoom: number;
+  /** The surveyed campus perimeter, drawn under everything else. */
+  boundary: [number, number][] | null;
   buildings: MapBuilding[];
+  landmarks: MapLandmark[];
   gps: [number, number] | null;
   indoor: [number, number] | null;
   route: [number, number][] | null;

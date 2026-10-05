@@ -74,14 +74,13 @@ export function MapScreen({ position }: { position: Position | null }) {
   }, []);
 
   async function plan() {
-    if (!position) {
-      setError('Scannez d’abord une ancre QR : un itinéraire a besoin d’un point de départ.');
-      return;
-    }
+    // A student who has not scanned anything yet is almost always arriving: routing
+    // from the main gate is more useful than refusing to route at all.
+    const from = position?.nodeId ?? 'lm-gate';
     try {
       const payload = await api<{ route: IndoorRoute }>('/navigation/route', {
         method: 'POST',
-        body: { from: position.nodeId, to: destination, stepFree },
+        body: { from, to: destination, stepFree },
       });
       setRoute(payload.route);
       setError(null);
@@ -104,7 +103,9 @@ export function MapScreen({ position }: { position: Position | null }) {
       <Text style={styles.title}>Carte et itinéraires</Text>
       <Text style={styles.subtitle}>
         {gps ? 'Position GPS acquise. ' : `${gpsNote} `}
-        {position ? `Position intérieure : ${position.label}.` : 'Scannez une ancre pour l’intérieur.'}
+        {position
+          ? `Position intérieure : ${position.label}.`
+          : 'Sans scan, l’itinéraire part du portail principal.'}
       </Text>
 
       {error ? <Text style={[styles.notice, styles.noticeError]}>{error}</Text> : null}
@@ -114,7 +115,9 @@ export function MapScreen({ position }: { position: Position | null }) {
           <CampusMapView
             centre={centre}
             zoom={position ? 18 : 16}
+            boundary={campus?.boundary?.ring ?? null}
             buildings={campus?.buildings ?? []}
+            landmarks={campus?.landmarks ?? []}
             gps={gps}
             indoor={position?.coordinates ?? null}
             route={routeLine}

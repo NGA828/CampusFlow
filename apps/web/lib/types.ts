@@ -97,9 +97,29 @@ export interface IndoorRoute {
   steps: RouteStep[];
 }
 
+export interface CampusBoundary {
+  universitySlug: string;
+  ring: [number, number][];
+  areaHectares: number;
+  source: 'OSM' | 'PHOTO_SURVEY';
+  sourceRef: { claim: string; url: string };
+}
+
+export interface Landmark {
+  id: string;
+  kind: 'GATE' | 'PLAZA' | 'FOUNTAIN' | 'MONUMENT' | 'PARKING' | 'GARDEN' | 'VIEWPOINT' | 'SPORT';
+  name: string;
+  description: string;
+  coordinates: [number, number];
+  nodeId: string | null;
+  source: 'OSM' | 'PHOTO_SURVEY';
+}
+
 export interface CampusModel {
   university: University;
-  buildings: { id: string; code: string; name: string; description: string; coordinates: [number, number]; floors: { id: string; level: number; name: string }[] }[];
+  boundary: CampusBoundary | null;
+  landmarks: Landmark[];
+  buildings: { id: string; code: string; name: string; description: string; coordinates: [number, number]; footprint: [number, number][] | null; floors: { id: string; level: number; name: string }[] }[];
   rooms: { id: string; buildingId: string; floorId: string; code: string; name: string; kind: RoomSummary['kind']; capacity: number; bookable: boolean; nodeId: string }[];
   anchors: { code: string; buildingId: string; floorId: string; nodeId: string; label: string }[];
   nodes: { id: string; buildingId: string; floorId: string; label: string; coordinates: [number, number] }[];

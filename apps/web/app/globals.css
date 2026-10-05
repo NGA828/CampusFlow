@@ -358,6 +358,16 @@ a:focus-visible {
   cursor: pointer;
 }
 
+.markerLandmark {
+  width: 22px;
+  height: 22px;
+  background: var(--white);
+  color: var(--ink-700, #2b3557);
+  border: 1px solid #cfd6ec;
+  font-size: 12px;
+  box-shadow: 0 4px 10px -6px rgba(11, 16, 32, 0.7);
+}
+
 .markerPriority {
   background: var(--gold-500);
   color: #2a1d00;

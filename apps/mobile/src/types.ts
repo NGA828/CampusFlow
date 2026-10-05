@@ -19,9 +19,27 @@ export interface University {
   indoorMappingPriority: number | null;
 }
 
+export interface CampusBoundary {
+  ring: [number, number][];
+  areaHectares: number;
+  source: 'OSM' | 'PHOTO_SURVEY';
+  sourceRef: { claim: string; url: string };
+}
+
+export interface Landmark {
+  id: string;
+  kind: 'GATE' | 'PLAZA' | 'FOUNTAIN' | 'MONUMENT' | 'PARKING' | 'GARDEN' | 'VIEWPOINT' | 'SPORT';
+  name: string;
+  description: string;
+  coordinates: [number, number];
+  nodeId: string | null;
+}
+
 export interface CampusModel {
   university: University;
-  buildings: { id: string; code: string; name: string; coordinates: [number, number] }[];
+  boundary: CampusBoundary | null;
+  landmarks: Landmark[];
+  buildings: { id: string; code: string; name: string; coordinates: [number, number]; footprint: [number, number][] | null }[];
   rooms: { id: string; code: string; name: string; bookable: boolean; nodeId: string; floorId: string }[];
   anchors: { code: string; label: string; nodeId: string }[];
   nodes: { id: string; label: string; coordinates: [number, number] }[];

@@ -54,7 +54,53 @@ export interface Building {
   name: string;
   description: string;
   coordinates: [number, number];
+  /**
+   * The building outline, [longitude, latitude] ring, first point repeated last.
+   * Present when the shape is known well enough to draw; a label-only building has
+   * `null` rather than an invented rectangle.
+   */
+  footprint: [number, number][] | null;
   floors: Floor[];
+}
+
+/** Where an outline came from, so the map can say what it is showing. */
+export type GeometrySource = 'OSM' | 'PHOTO_SURVEY';
+
+/**
+ * Something on the campus a student navigates by rather than enters: the gate, the
+ * flag plaza, the fountain, the esplanade. These come from photographs of the campus
+ * and are what makes an outdoor instruction readable — "past the flagpoles" beats
+ * "head east 40 m".
+ */
+export type LandmarkKind =
+  | 'GATE'
+  | 'PLAZA'
+  | 'FOUNTAIN'
+  | 'MONUMENT'
+  | 'PARKING'
+  | 'GARDEN'
+  | 'VIEWPOINT'
+  | 'SPORT';
+
+export interface Landmark {
+  id: string;
+  universitySlug: string;
+  kind: LandmarkKind;
+  name: string;
+  description: string;
+  coordinates: [number, number];
+  /** The node a student is placed on when routing from or to this landmark. */
+  nodeId: string | null;
+  source: GeometrySource;
+}
+
+/** The campus perimeter, as mapped. */
+export interface CampusBoundary {
+  universitySlug: string;
+  ring: [number, number][];
+  areaHectares: number;
+  source: GeometrySource;
+  sourceRef: SourceRef;
 }
 
 export interface Floor {
@@ -102,8 +148,11 @@ export interface NavNode {
 export interface NavEdge {
   from: string;
   to: string;
-  /** Stairs and lifts connect floors; `accessible` drives the step-free option. */
-  kind: 'CORRIDOR' | 'DOOR' | 'STAIRS' | 'LIFT';
+  /**
+   * `PATH` is outdoors — the alleys and the esplanade between blocks. Stairs and
+   * lifts connect floors; `accessible` drives the step-free option.
+   */
+  kind: 'CORRIDOR' | 'DOOR' | 'STAIRS' | 'LIFT' | 'PATH';
   accessible: boolean;
 }
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { router } from '../src/routes.ts';
+import { BUILDINGS, LANDMARKS, NAV_NODES, insideCampus } from '../src/data/campus.ts';
 import { DEMO_PASSWORD, disablePersistence, seed } from '../src/store.ts';
 
 /**
@@ -207,4 +208,49 @@ test('only an administrator can list accounts', async () => {
   const asAdmin = await call<{ total: number }>({ method: 'GET', path: '/api/v1/admin/users', token: admin.payload.token });
   assert.equal(asAdmin.status, 200);
   assert.ok(asAdmin.payload.total >= 3);
+});
+
+test('every mapped feature lies inside the surveyed campus perimeter', () => {
+  // The perimeter is OSM way 455178620; the layout inside it is modelled from
+  // photographs. A node outside the fence would be a modelling mistake, and would
+  // send a student across somebody else's land.
+  for (const node of NAV_NODES) {
+    assert.ok(insideCampus(node.coordinates), `${node.id} (${node.label}) is outside the campus perimeter`);
+  }
+  for (const landmark of LANDMARKS) {
+    assert.ok(insideCampus(landmark.coordinates), `${landmark.id} is outside the campus perimeter`);
+  }
+  for (const building of BUILDINGS) {
+    for (const point of building.footprint ?? []) {
+      assert.ok(insideCampus(point), `${building.code} has a corner outside the campus perimeter`);
+    }
+  }
+});
+
+test('the campus payload carries the perimeter, the footprints and the landmarks', async () => {
+  const { status, payload } = await call<{
+    boundary: { ring: unknown[]; source: string; areaHectares: number };
+    buildings: { code: string; footprint: unknown[] | null }[];
+    landmarks: { id: string; name: string }[];
+  }>({ method: 'GET', path: '/api/v1/universities/iai-cameroun/campus' });
+
+  assert.equal(status, 200);
+  assert.equal(payload.boundary.source, 'OSM');
+  assert.ok(payload.boundary.ring.length >= 5);
+  assert.ok(payload.boundary.areaHectares > 1);
+  assert.ok(payload.buildings.every((building) => Array.isArray(building.footprint)));
+  assert.ok(payload.landmarks.some((landmark) => landmark.id === 'lm-flags'));
+});
+
+test('a visitor can be routed from the main gate to a room indoors', async () => {
+  const { payload } = await call<{ route: { steps: { edgeKind: string | null; instruction: string }[] } }>({
+    method: 'POST',
+    path: '/api/v1/navigation/route',
+    token: studentToken,
+    body: { from: 'lm-gate', to: 'r-adm-d11' },
+  });
+  const kinds = payload.route.steps.map((step) => step.edgeKind);
+  assert.ok(kinds.includes('PATH'), 'the route must start outdoors');
+  assert.ok(kinds.includes('DOOR'), 'the route must enter the building');
+  assert.ok(kinds.includes('STAIRS') || kinds.includes('LIFT'), 'the council room is upstairs');
 });

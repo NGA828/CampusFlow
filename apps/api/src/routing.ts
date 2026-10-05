@@ -59,6 +59,8 @@ function instructionFor(edge: NavEdge | null, node: NavNode, previous: NavNode |
       return `Prenez l’ascenseur jusqu’au ${floorName(node.buildingId, node.floorId)}`;
     case 'DOOR':
       return `Entrez : ${node.label}`;
+    case 'PATH':
+      return `Dehors, continuez jusqu’à ${node.label}`;
     default:
       return `Continuez vers ${node.label}`;
   }

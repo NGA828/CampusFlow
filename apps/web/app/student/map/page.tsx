@@ -71,15 +71,14 @@ export default function StudentMapPage() {
   }
 
   async function plan() {
-    if (!position) {
-      setError('Scan or select a QR anchor first — a route needs a starting point.');
-      return;
-    }
+    // Nobody has scanned anything on their first visit, and they are usually walking
+    // in through the gate — so that is where an unanchored route starts.
+    const from = position?.nodeId ?? 'lm-gate';
     setError(null);
     try {
       const payload = await api<{ route: IndoorRoute }>('/navigation/route', {
         method: 'POST',
-        body: { from: position.nodeId, to: destination, stepFree },
+        body: { from, to: destination, stepFree },
       });
       setRoute(payload.route);
       setNotice(null);
@@ -95,7 +94,7 @@ export default function StudentMapPage() {
       <h1 style={{ marginTop: 8 }}>Campus map & indoor routes</h1>
       <p className="muted" style={{ marginTop: 8, maxWidth: 720 }}>
         {campus
-          ? `${campus.university.name} — ${campus.buildings.length} buildings, ${campus.rooms.length} rooms and ${campus.anchors.length} QR anchors mapped.`
+          ? `${campus.university.name} — ${campus.buildings.length} buildings, ${campus.rooms.length} rooms, ${campus.landmarks.length} landmarks and ${campus.anchors.length} QR anchors inside a ${campus.boundary?.areaHectares ?? '—'} ha perimeter mapped in OpenStreetMap. Without a scan, routes start at the main gate.`
           : 'Loading the campus model…'}
       </p>
 

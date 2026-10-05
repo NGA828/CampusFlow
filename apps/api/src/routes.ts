@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BUILDINGS, NAV_EDGES, NAV_NODES, QR_ANCHORS, ROOMS, buildingById, floorName, roomById } from './data/campus.ts';
+import { BUILDINGS, CAMPUS_BOUNDARY, LANDMARKS, NAV_EDGES, NAV_NODES, QR_ANCHORS, ROOMS, buildingById, floorName, roomById } from './data/campus.ts';
 import { UNIVERSITIES, findUniversity } from './data/universities.ts';
 import { HttpError, Router, bool, isoDate, optionalStr, requireRole, requireUser, str } from './http.ts';
 import { findRoute } from './routing.ts';
@@ -79,7 +79,9 @@ router.get('/api/v1/universities/:slug/campus', (ctx) => {
   const ids = new Set(campusBuildings.map((building) => building.id));
   return {
     university,
+    boundary: CAMPUS_BOUNDARY.universitySlug === university.slug ? CAMPUS_BOUNDARY : null,
     buildings: campusBuildings,
+    landmarks: LANDMARKS.filter((landmark) => landmark.universitySlug === university.slug),
     rooms: ROOMS.filter((room) => ids.has(room.buildingId)),
     anchors: QR_ANCHORS.filter((anchor) => ids.has(anchor.buildingId)),
     nodes: NAV_NODES.filter((node) => ids.has(node.buildingId)),
@@ -369,11 +371,18 @@ router.post('/api/v1/positioning/scan', (ctx) => {
   };
 });
 
-/** Accepts a node id, a room id, or a QR anchor code at either end of the route. */
+/**
+ * Accepts a node id, a room id, a QR anchor code or a landmark id at either end.
+ *
+ * A visitor asks for "the main gate to the Salle du Conseil", not for a graph node,
+ * and the landmarks are exactly the words they would use.
+ */
 function resolveNode(value: string): string | null {
   if (NAV_NODES.some((node) => node.id === value)) return value;
   const room = roomById(value);
   if (room) return room.nodeId;
+  const landmark = LANDMARKS.find((item) => item.id === value);
+  if (landmark?.nodeId) return landmark.nodeId;
   const anchor = QR_ANCHORS.find((item) => item.code === value.toUpperCase());
   return anchor ? anchor.nodeId : null;
 }
