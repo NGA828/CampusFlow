@@ -72,6 +72,8 @@ import type {
   TimetableWeek,
   User,
   University,
+  Facility,
+  FacilityCategory,
 } from './types';
 
 export interface ListQuery {
@@ -290,8 +292,14 @@ export const campusApi = {
   universities: () =>
     api.get<{ universities: University[]; attribution: string }>('/campus/universities', { timeoutMs: 12_000 }),
   university: (idOrCode: string) =>
-    api.get<{ university: University; buildings: Building[]; attribution: string }>(
+    api.get<{ university: University; buildings: Building[]; facilities: Facility[]; attribution: string }>(
       `/campus/universities/${idOrCode}`,
+    ),
+  /** Campus amenities: food, water, toilets, pharmacy, cash, study space. */
+  facilities: (query?: { category?: FacilityCategory; university?: string }) =>
+    api.get<{ facilities: Facility[]; categories: FacilityCategory[]; attribution: string }>(
+      '/campus/facilities',
+      { query, timeoutMs: 12_000 },
     ),
   buildings: () => api.get<{ buildings: Building[] }>('/campus/buildings', { timeoutMs: 12_000 }),
   building: async (idOrCode: string) => normalizeBuildingPayload(await api.get<unknown>(`/campus/buildings/${idOrCode}`)),

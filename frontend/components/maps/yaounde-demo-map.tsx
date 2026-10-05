@@ -31,6 +31,17 @@ export interface DemoUniversity {
   osm: { type: string; id: number };
 }
 
+export interface DemoFacility {
+  osm_id: number;
+  name: string | null;
+  category: string;
+  osm_amenity: string | null;
+  lat: number;
+  lng: number;
+  cuisine: string | null;
+  phone: string | null;
+}
+
 export interface DemoBuilding {
   code: string;
   name: string;
@@ -47,6 +58,7 @@ export interface DemoBuilding {
 interface Props {
   universities: DemoUniversity[];
   buildings: DemoBuilding[];
+  facilities: DemoFacility[];
   center: { lat: number; lng: number };
   attribution: string;
 }
@@ -58,6 +70,28 @@ const TYPE_COLOR: Record<DemoUniversity['type'], string> = {
   private: '#b45309',
   confessional: '#7e22ce',
 };
+
+const FACILITY_ICON: Record<string, string> = {
+  food: '🍽️', study: '📚', health: '⚕️', money: '💳', water: '🚰',
+  sanitation: '🚻', parking: '🅿️', worship: '🛐', culture: '🎭',
+};
+
+const FACILITY_LABEL: Record<string, string> = {
+  food: 'Food & drink', study: 'Study', health: 'Health', money: 'Money',
+  water: 'Drinking water', sanitation: 'Toilets', parking: 'Parking',
+  worship: 'Worship', culture: 'Culture',
+};
+
+/** OSM leaves many water points and toilet blocks unnamed; say so rather than invent a name. */
+function facilityLabel(facility: DemoFacility): string {
+  if (facility.name) return facility.name;
+  return {
+    food: 'Unnamed food outlet', study: 'Unnamed library', health: 'Unnamed health service',
+    money: 'Unnamed bank or cash point', water: 'Drinking water point',
+    sanitation: 'Public toilets', parking: 'Parking area',
+    worship: 'Place of worship', culture: 'Cultural venue',
+  }[facility.category] ?? 'Unnamed facility';
+}
 
 const CATEGORY_COLOR: Record<string, string> = {
   lecture: '#0f766e',
@@ -76,7 +110,7 @@ function accessibility(value: DemoUniversity['wheelchair']): string {
   return 'Not surveyed';
 }
 
-export function YaoundeDemoMap({ universities, buildings, center, attribution }: Props) {
+export function YaoundeDemoMap({ universities, buildings, facilities, center, attribution }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
@@ -84,6 +118,7 @@ export function YaoundeDemoMap({ universities, buildings, center, attribution }:
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showBuildings, setShowBuildings] = useState(true);
+  const [facilityFilter, setFacilityFilter] = useState<string | 'none' | 'all'>('all');
   const [selected, setSelected] = useState<DemoUniversity | null>(
     universities.find((u) => u.is_primary) ?? null,
   );
@@ -197,6 +232,36 @@ export function YaoundeDemoMap({ universities, buildings, center, attribution }:
         );
       }
 
+      if (facilityFilter !== 'none') {
+        const shown = facilityFilter === 'all'
+          ? facilities
+          : facilities.filter((f) => f.category === facilityFilter);
+
+        for (const facility of shown) {
+          const el = document.createElement('div');
+          el.title = facilityLabel(facility);
+          el.style.cssText =
+            'display:grid;place-items:center;width:20px;height:20px;border-radius:9999px;' +
+            'background:#fff;border:1.5px solid #94a3b8;box-shadow:0 1px 3px rgba(0,0,0,.3);font-size:11px';
+          el.textContent = FACILITY_ICON[facility.category] ?? '📍';
+
+          const popup = new maplibre.Popup({ offset: 14, closeButton: false }).setHTML(
+            `<strong style="font-size:12px">${facilityLabel(facility)}</strong><br/>` +
+              `<span style="font-size:11px;color:#555">${FACILITY_LABEL[facility.category] ?? facility.category}` +
+              (facility.cuisine ? ` · ${facility.cuisine}` : '') +
+              (facility.phone ? `<br/>${facility.phone}` : '') +
+              `</span>`,
+          );
+
+          markersRef.current.push(
+            new maplibre.Marker({ element: el })
+              .setLngLat([facility.lng, facility.lat])
+              .setPopup(popup)
+              .addTo(map),
+          );
+        }
+      }
+
       if (showBuildings) {
         for (const building of buildings) {
           const el = document.createElement('div');
@@ -229,7 +294,7 @@ export function YaoundeDemoMap({ universities, buildings, center, attribution }:
     return () => {
       cancelled = true;
     };
-  }, [ready, locatable, buildings, showBuildings]);
+  }, [ready, locatable, buildings, showBuildings, facilities, facilityFilter]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
@@ -259,6 +324,27 @@ export function YaoundeDemoMap({ universities, buildings, center, attribution }:
               </li>
             ))}
           </ul>
+          <div className="mt-3 border-t border-slate-200 pt-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Facilities ({facilities.length})
+            </p>
+            <select
+              value={facilityFilter}
+              onChange={(event) => setFacilityFilter(event.target.value)}
+              aria-label="Filter campus facilities"
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-[12px]"
+            >
+              <option value="all">All facilities</option>
+              <option value="none">Hide facilities</option>
+              {[...new Set(facilities.map((f) => f.category))].sort().map((c) => (
+                <option key={c} value={c}>
+                  {FACILITY_ICON[c] ?? ''} {FACILITY_LABEL[c] ?? c} (
+                  {facilities.filter((f) => f.category === c).length})
+                </option>
+              ))}
+            </select>
+          </div>
+
           <label className="mt-3 flex items-center gap-2 text-[12px] text-slate-700">
             <input
               type="checkbox"

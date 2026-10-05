@@ -107,6 +107,8 @@ Route::middleware(['auth:sanctum', 'role:student,staff,admin'])->prefix('campus'
     // to an institution, so the map can show every campus in the city, not just the one operated here.
     Route::get('/universities', [CampusController::class, 'universities']);
     Route::get('/universities/{id}', [CampusController::class, 'university']);
+    // Campus amenities a student actually searches for: food, water, toilets, pharmacy, cash.
+    Route::get('/facilities', [CampusController::class, 'facilities']);
     Route::get('/buildings', [CampusController::class, 'buildings']);
     Route::get('/buildings/{id}', [CampusController::class, 'building']);
     Route::get('/buildings/{buildingId}/floors', [CampusController::class, 'floors']);

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Building;
+use App\Models\Facility;
 use App\Models\University;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -154,14 +155,96 @@ class UniversityTest extends TestCase
             ->assertStatus(404);
     }
 
+    // ── Facilities ──────────────────────────────────────────────────────────
+
+    public function test_seeds_uy1_campus_facilities(): void
+    {
+        $uy1 = University::where('code', 'UY1')->firstOrFail();
+
+        $this->assertGreaterThanOrEqual(35, Facility::count());
+        $this->assertSame(Facility::count(), $uy1->facilities()->count());
+
+        $canteen = Facility::where('name', 'Restaurant Universitaire n°1')->first();
+        $this->assertNotNull($canteen);
+        $this->assertSame('food', $canteen->category);
+        $this->assertSame('restaurant', $canteen->osm_amenity);
+    }
+
+    public function test_every_facility_category_is_known(): void
+    {
+        foreach (Facility::all() as $facility) {
+            $this->assertContains($facility->category, Facility::CATEGORIES, "{$facility->id} category");
+        }
+    }
+
+    /** Unnamed facilities are kept, and must never be given an invented name. */
+    public function test_unnamed_facilities_fall_back_to_a_generic_label(): void
+    {
+        $water = Facility::where('category', 'water')->whereNull('name')->first();
+
+        $this->assertNotNull($water, 'OSM records unnamed drinking-water points; they must be seeded.');
+        $this->assertSame('Drinking water point', $water->displayName());
+        $this->assertNull($water->name);
+    }
+
+    /** Opening hours are not surveyed for these rows, so nothing may claim them. */
+    public function test_opening_hours_are_never_invented(): void
+    {
+        $this->assertSame(0, Facility::whereNotNull('opening_hours')->count());
+    }
+
+    public function test_student_can_list_facilities(): void
+    {
+        $response = $this->actingAs($this->student(), 'sanctum')
+            ->getJson('/api/v1/campus/facilities');
+
+        $response->assertStatus(200)->assertJsonPath('success', true);
+        $this->assertNotEmpty($response->json('data.facilities'));
+        $this->assertContains('water', $response->json('data.categories'));
+    }
+
+    public function test_facilities_can_be_filtered_by_category(): void
+    {
+        $response = $this->actingAs($this->student(), 'sanctum')
+            ->getJson('/api/v1/campus/facilities?category=health');
+
+        $response->assertStatus(200);
+
+        $categories = array_column($response->json('data.facilities'), 'category');
+
+        $this->assertNotEmpty($categories);
+        $this->assertSame(['health'], array_values(array_unique($categories)));
+    }
+
+    /** A bad filter is rejected, not silently ignored — a silent ignore reads as "none nearby". */
+    public function test_unknown_facility_category_is_rejected(): void
+    {
+        $this->actingAs($this->student(), 'sanctum')
+            ->getJson('/api/v1/campus/facilities?category=teleporter')
+            ->assertStatus(422);
+    }
+
+    public function test_university_detail_includes_its_facilities(): void
+    {
+        $code = University::where('code', 'UY1')->firstOrFail()->code;
+
+        $response = $this->actingAs($this->student(), 'sanctum')
+            ->getJson('/api/v1/campus/universities/' . $code);
+
+        $response->assertStatus(200);
+        $this->assertNotEmpty($response->json('data.facilities'));
+    }
+
     public function test_seeder_is_idempotent(): void
     {
         $before = University::count();
         $buildingsBefore = Building::count();
+        $facilitiesBefore = Facility::count();
 
         $this->seed();
 
         $this->assertSame($before, University::count());
         $this->assertSame($buildingsBefore, Building::count());
+        $this->assertSame($facilitiesBefore, Facility::count());
     }
 }

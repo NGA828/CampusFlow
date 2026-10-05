@@ -9,9 +9,10 @@ import { FloorPlan } from "@/components/maps/floor-plan";
 import { RoutePlanner } from "@/components/maps/route-planner";
 import { RoutePreview } from "@/components/maps/route-preview";
 import { UniversityDirectory } from "@/components/maps/university-directory";
+import { FacilityDirectory } from "@/components/maps/facility-directory";
 import { Badge, CardSkeleton, Button } from "@/components/ui/kit";
 import { ReadError, momentLabel } from "@/components/layout/student-companion";
-import type { Floor, Position, Room, Route, University } from "@/lib/api/types";
+import type { Facility, Floor, Position, Room, Route, University } from "@/lib/api/types";
 import type { RouteStartFix } from "@/lib/maps/route-geometry";
 import s from "@/components/layout/campus-operations.module.css";
 
@@ -23,14 +24,17 @@ function MapContent() {
   const buildings = useAsync(() => campusApi.buildings(), []);
   // Every institution in Yaoundé, not just the one this deployment operates.
   const universities = useAsync(() => campusApi.universities(), []);
+  // Campus amenities: food, water, toilets, pharmacy, cash.
+  const facilities = useAsync(() => campusApi.facilities(), []);
   const position = useAsync(() => positioningApi.current(), []);
   const [buildingId, setBuildingId] = useState("");
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"campus" | "indoor">("campus");
   const [activeRoute, setActiveRoute] = useState<Route | null>(null);
   const [activeRouteOriginFix, setActiveRouteOriginFix] = useState<RouteStartFix | null>(null);
-  const [leftTab, setLeftTab] = useState<"places" | "route" | "institutions">(params.has("route") ? "route" : "places");
+  const [leftTab, setLeftTab] = useState<"places" | "route" | "institutions" | "facilities">(params.has("route") ? "route" : "places");
   const [focusedUniversity, setFocusedUniversity] = useState<University | null>(null);
+  const [focusedFacility, setFocusedFacility] = useState<Facility | null>(null);
 
   const rows = buildings.data?.buildings ?? [];
   const selected = rows.find((b) => b.id === buildingId) ?? rows[0];
@@ -128,8 +132,8 @@ function MapContent() {
           <aside className={s.places}>
             <div className="flex items-center justify-between border-b border-ink-100 pb-2.5">
               <div>
-                <p className={s.eyebrow}>{leftTab === "places" ? "Browse buildings" : leftTab === "institutions" ? "Yaoundé" : "Wayfinding"}</p>
-                <h2>{leftTab === "places" ? "Places on campus" : leftTab === "institutions" ? "Institutions" : "Plan a route"}</h2>
+                <p className={s.eyebrow}>{leftTab === "places" ? "Browse buildings" : leftTab === "institutions" ? "Yaoundé" : leftTab === "facilities" ? "On campus" : "Wayfinding"}</p>
+                <h2>{leftTab === "places" ? "Places on campus" : leftTab === "institutions" ? "Institutions" : leftTab === "facilities" ? "Facilities" : "Plan a route"}</h2>
               </div>
               <div className="flex rounded-lg bg-ink-100 p-0.5 text-[11px] font-semibold">
                 <button
@@ -153,10 +157,30 @@ function MapContent() {
                 >
                   Institutions
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setLeftTab("facilities")}
+                  className={`rounded-md px-2 py-1 transition-colors ${leftTab === "facilities" ? "bg-white text-ink-900 shadow-xs" : "text-ink-500"}`}
+                >
+                  Facilities
+                </button>
               </div>
             </div>
 
-            {leftTab === "institutions" ? (
+            {leftTab === "facilities" ? (
+              facilities.loading ? (
+                <CardSkeleton rows={5} />
+              ) : facilities.error ? (
+                <ReadError message={facilities.error} retry={facilities.reload} />
+              ) : (
+                <FacilityDirectory
+                  facilities={facilities.data?.facilities ?? []}
+                  attribution={facilities.data?.attribution}
+                  selectedId={focusedFacility?.id ?? null}
+                  onSelect={setFocusedFacility}
+                />
+              )
+            ) : leftTab === "institutions" ? (
               universities.loading ? (
                 <CardSkeleton rows={5} />
               ) : universities.error ? (

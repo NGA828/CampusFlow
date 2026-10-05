@@ -1,6 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { YaoundeDemoMap, type DemoBuilding, type DemoUniversity } from '@/components/maps/yaounde-demo-map';
+import {
+  YaoundeDemoMap,
+  type DemoBuilding,
+  type DemoFacility,
+  type DemoUniversity,
+} from '@/components/maps/yaounde-demo-map';
 
 /**
  * Dataset preview — not part of the authenticated application.
@@ -25,6 +30,7 @@ export default async function YaoundeMapDemoPage() {
   }>('yaounde-universities.json');
 
   const buildings = await readDataset<{ buildings: DemoBuilding[] }>('yaounde-uy1-buildings.json');
+  const facilities = await readDataset<{ facilities: DemoFacility[] }>('yaounde-uy1-facilities.json');
 
   const counts = universities.universities.reduce<Record<string, number>>((acc, u) => {
     acc[u.type] = (acc[u.type] ?? 0) + 1;
@@ -41,8 +47,9 @@ export default async function YaoundeMapDemoPage() {
           Yaoundé university map
         </h1>
         <p className="mt-2 max-w-[70ch] text-[13px] leading-relaxed text-slate-600">
-          {universities.universities.length} institutions and {buildings.buildings.length} Université
-          de Yaoundé I buildings, read straight from the committed OpenStreetMap datasets. Every
+          {universities.universities.length} institutions, {buildings.buildings.length} Université
+          de Yaoundé I buildings and {facilities.facilities.length} campus facilities, read straight
+          from the committed OpenStreetMap datasets. Every
           coordinate, name, phone number and website below came from an Overpass query on{' '}
           {universities.source.harvested_at} — nothing on this map is invented. Fields OpenStreetMap
           does not record are shown as <em>Not recorded</em> rather than filled with a guess.
@@ -56,6 +63,7 @@ export default async function YaoundeMapDemoPage() {
       <YaoundeDemoMap
         universities={universities.universities}
         buildings={buildings.buildings}
+        facilities={facilities.facilities}
         center={universities.city.center}
         attribution={universities.source.attribution}
       />

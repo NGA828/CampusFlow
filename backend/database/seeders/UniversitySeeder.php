@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Building;
+use App\Models\Facility;
 use App\Models\University;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -24,6 +25,7 @@ class UniversitySeeder extends Seeder
 
     public const UNIVERSITIES_FILE = 'yaounde-universities.json';
     public const UY1_BUILDINGS_FILE = 'yaounde-uy1-buildings.json';
+    public const UY1_FACILITIES_FILE = 'yaounde-uy1-facilities.json';
 
     public function run(): void
     {
@@ -61,6 +63,7 @@ class UniversitySeeder extends Seeder
         $this->command?->info(sprintf('Seeded %d Yaoundé institutions from OpenStreetMap.', count($byCode)));
 
         $this->seedUy1Buildings($byCode);
+        $this->seedUy1Facilities($byCode);
     }
 
     /**
@@ -101,6 +104,50 @@ class UniversitySeeder extends Seeder
         }
 
         $this->command?->info(sprintf('Seeded %d real Université de Yaoundé I buildings.', $count));
+    }
+
+    /**
+     * Campus amenities. Unlike buildings these are points of service, so they are attached to the
+     * university rather than to a building: OSM surveys most of them as standalone nodes and does
+     * not say which building, if any, they sit inside.
+     */
+    private function seedUy1Facilities(array $byCode): void
+    {
+        $uy1 = $byCode['UY1'] ?? null;
+
+        if (! $uy1) {
+            throw new RuntimeException('UY1 must exist before its facilities can be attached.');
+        }
+
+        $dataset = $this->readDataset(self::UY1_FACILITIES_FILE);
+        $count = 0;
+
+        foreach ($dataset['facilities'] as $row) {
+            if (! in_array($row['category'], Facility::CATEGORIES, true)) {
+                throw new RuntimeException("Unknown facility category: {$row['category']}");
+            }
+
+            Facility::updateOrCreate(
+                ['osm_type' => 'node', 'osm_id' => $row['osm_id']],
+                [
+                    'university_id' => $uy1->id,
+                    'name'          => $row['name'] ?? null,
+                    'category'      => $row['category'],
+                    'osm_amenity'   => $row['osm_amenity'] ?? null,
+                    'lat'           => $row['lat'],
+                    'lng'           => $row['lng'],
+                    'cuisine'       => $row['cuisine'] ?? null,
+                    'phone'         => $row['phone'] ?? null,
+                    // Deliberately not seeded: see the dataset notes. Guessing when a campus
+                    // pharmacy closes sends someone across campus for nothing.
+                    'opening_hours' => null,
+                    'is_active'     => true,
+                ]
+            );
+            $count++;
+        }
+
+        $this->command?->info(sprintf('Seeded %d real UY1 campus facilities.', $count));
     }
 
     private function describe(array $row): string

@@ -78,6 +78,32 @@ export interface University {
   status: string;
   osm_url: string | null;
   buildings_count?: number;
+  facilities_count?: number;
+}
+
+export type FacilityCategory =
+  | 'food' | 'study' | 'health' | 'money' | 'water'
+  | 'sanitation' | 'parking' | 'worship' | 'culture';
+
+/**
+ * A surveyed point of service on a campus. `name` is null when OpenStreetMap recorded none —
+ * use `display_name`, which the API derives from the category, rather than inventing a label.
+ */
+export interface Facility {
+  id: UUID;
+  university_id: UUID | null;
+  building_id: UUID | null;
+  name: string | null;
+  display_name: string;
+  category: FacilityCategory;
+  osm_amenity: string | null;
+  lat: number;
+  lng: number;
+  cuisine: string | null;
+  phone: string | null;
+  opening_hours: string | null;
+  wheelchair: 'yes' | 'no' | 'limited' | null;
+  osm_url: string | null;
 }
 
 export interface Building {

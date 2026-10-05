@@ -32,7 +32,7 @@ class DatabaseSeeder extends Seeder
     {
         // Truncate non-user tables so the seeder can re-run safely without migrate:fresh.
         // CASCADE handles FK ordering in PostgreSQL.
-        DB::statement('TRUNCATE TABLE announcements, campus_events, timetable_entries, enrollments, courses, terms, office_service_windows, office_tickets, offices, queue_tickets, room_queues, navigation_edges, navigation_nodes, qr_nodes, rooms, floors, buildings, universities, settings CASCADE');
+        DB::statement('TRUNCATE TABLE announcements, campus_events, timetable_entries, enrollments, courses, terms, office_service_windows, office_tickets, offices, queue_tickets, room_queues, navigation_edges, navigation_nodes, qr_nodes, rooms, floors, facilities, buildings, universities, settings CASCADE');
 
         // Real Yaoundé institutions and the real UY1 building set, loaded from the OpenStreetMap
         // datasets in database/data/. Everything below attaches to those rows — the campus is a

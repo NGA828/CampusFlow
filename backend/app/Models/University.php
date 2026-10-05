@@ -41,6 +41,11 @@ class University extends Model
         return $this->hasMany(Building::class);
     }
 
+    public function facilities(): HasMany
+    {
+        return $this->hasMany(Facility::class);
+    }
+
     /** The institution this deployment actually operates queues, offices and timetables for. */
     public static function primary(): ?self
     {
@@ -83,6 +88,7 @@ class University extends Model
             'status'         => $this->status,
             'osm_url'        => $this->osmUrl(),
             'buildings_count' => $this->buildings_count ?? $this->buildings()->count(),
+            'facilities_count' => $this->facilities_count ?? $this->facilities()->count(),
         ];
     }
 }
