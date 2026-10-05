@@ -44,11 +44,116 @@ a measured coordinate.
 
 ## 3. Modelled: everything indoors
 
-Floors, corridors, stairs, the lift, room numbering and the 14 rooms are a *working
-model*. They are internally consistent and good enough to exercise scanning, routing,
-step-free routing and room booking end to end — and they are not a floor plan. No
-photograph showed an interior, and guessing a corridor length is exactly the kind of
-invention that sends somebody down the wrong one.
+Floors, corridors, stairs, the lift, the room numbers and the 39 rooms are a *working
+model*. They are internally consistent, dimensioned and good enough to exercise
+scanning, routing, step-free routing and room booking end to end — and they are not a
+surveyed floor plan. No photograph showed an interior, and guessing a corridor length
+is exactly the kind of invention that sends somebody down the wrong one. Every number
+below is an **estimate**, derived as described here, and the API labels it as modelled.
+
+### 3.1 How the estimates were derived
+
+Each block is generated from one description — corridor length and bearing, then each
+room's frontage, depth and side — by `apps/api/src/data/floorplan.ts`. Nothing indoors
+is hand-placed, so the geometry cannot drift out of agreement with itself.
+
+| Quantity | Value | Where it comes from |
+| --- | --- | --- |
+| Corridor width | **2.4 m** everywhere | Minimum comfortable double-loaded corridor; Cameroonian public-building practice. |
+| ADM envelope | **26.2 m × 23.5 m**, long axis bearing −9.7° | Computed from the traced OSM outline of way 1244927072 — the one measured building. |
+| ADM corridor | 22 m, starting 2 m inside the entrance wall | 26.2 m envelope minus the end walls and the stair core. |
+| ADM room depth | 10.5 m | (23.5 − 2.4 corridor) ÷ 2, minus wall thickness. |
+| PED corridor | 86 m over two floors | Length of the teaching block as fitted to the photographs (92 m) minus the end walls. |
+| PED room depth | 6.8 m | Classroom depth for a 16 m-wide, 45-seat room — the proportion visible in the photographs. |
+| CET corridor | 72 m, single storey | Length of the Centre d'Excellence footprint minus end walls. |
+| CET room depth | 6.3 m | Laboratory depth consistent with the block's 16 m width. |
+| Wall thickness | 0.6 m, drawn as the gap between the room polygons and the footprint | Masonry wall plus render. |
+
+Floor areas follow from frontage × depth and are rounded to the square metre. The
+total modelled area is about 3 100 m² over five floors.
+
+### 3.2 The room-numbering scheme
+
+Room numbers are `BLOCK + FLOOR + NN` — **`P104` is block P, floor 1, room 04**.
+
+- **Block letter**: `P` Bloc Pédagogique, `A` Bloc Administratif, `C` Centre
+  d'Excellence Technologique.
+- **Floor digit**: `0` rez-de-chaussée, `1` premier étage. It is the middle digit, so
+  a student reading a door knows which floor they are on without looking for a sign.
+- **Serial**: **odd numbers on the left of the corridor, even on the right**, counted
+  from the end of the corridor nearest the stairs — the convention used in Cameroonian
+  public buildings. Numbers are not consecutive: gaps are left for rooms that exist
+  but are not yet modelled.
+
+A test (`every room number encodes its block, its floor and its side of the corridor`)
+enforces all three rules, so a future room cannot be added in the wrong block, on the
+wrong floor, or on a corridor side that does not exist.
+
+### 3.3 The schedule of accommodation
+
+#### PED — Rez-de-chaussée (couloir 86 m)
+
+| N° | Salle | Côté | Largeur | Profondeur | Surface | Capacité |
+| --- | --- | --- | --- | --- | --- | --- |
+| P001 | Amphithéâtre A | gauche | 28 m | 6.8 m | 190 m² | 180 |
+| P003 | Salle de TD 1 | gauche | 16 m | 6.8 m | 109 m² | 45 |
+| P005 | Salle de TD 2 | gauche | 16 m | 6.8 m | 109 m² | 45 |
+| P007 | Salle informatique 1 | gauche | 16 m | 6.8 m | 109 m² | 40 |
+| P002 | Sanitaires | droite | 8 m | 6.8 m | 54 m² | — |
+| P004 | Bureau des surveillants | droite | 8 m | 6.8 m | 54 m² | 6 |
+| P006 | Salle de TD 3 | droite | 16 m | 6.8 m | 109 m² | 45 |
+| P008 | Salle de TD 4 | droite | 16 m | 6.8 m | 109 m² | 45 |
+| P010 | Foyer des étudiants | droite | 24 m | 6.8 m | 163 m² | 120 |
+
+#### PED — 1er étage (couloir 86 m)
+
+| N° | Salle | Côté | Largeur | Profondeur | Surface | Capacité |
+| --- | --- | --- | --- | --- | --- | --- |
+| P101 | Salle Réseaux | gauche | 18 m | 6.8 m | 122 m² | 30 |
+| P103 | Salle de Projet | gauche | 14 m | 6.8 m | 95 m² | 25 |
+| P105 | Salle de TD 5 | gauche | 16 m | 6.8 m | 109 m² | 45 |
+| P107 | Laboratoire Matériel | gauche | 16 m | 6.8 m | 109 m² | 30 |
+| P102 | Sanitaires | droite | 8 m | 6.8 m | 54 m² | — |
+| P104 | Salle de TD 6 | droite | 16 m | 6.8 m | 109 m² | 45 |
+| P106 | Salle de TD 7 | droite | 16 m | 6.8 m | 109 m² | 45 |
+| P108 | Salle des enseignants | droite | 16 m | 6.8 m | 109 m² | 20 |
+
+#### ADM — Rez-de-chaussée (couloir 22 m)
+
+| N° | Salle | Côté | Largeur | Profondeur | Surface | Capacité |
+| --- | --- | --- | --- | --- | --- | --- |
+| A001 | Scolarité — guichet | gauche | 8 m | 10.5 m | 84 m² | 6 |
+| A003 | Service des examens | gauche | 6 m | 10.5 m | 63 m² | 4 |
+| A005 | Bureau des Stages | gauche | 6 m | 10.5 m | 63 m² | 4 |
+| A002 | Accueil | droite | 6 m | 10.5 m | 63 m² | 10 |
+| A004 | Salle d’Entretien 1 | droite | 6 m | 10.5 m | 63 m² | 8 |
+| A006 | Sanitaires | droite | 4 m | 10.5 m | 42 m² | — |
+| A008 | Économat | droite | 4 m | 10.5 m | 42 m² | 4 |
+
+#### ADM — 1er étage (couloir 22 m)
+
+| N° | Salle | Côté | Largeur | Profondeur | Surface | Capacité |
+| --- | --- | --- | --- | --- | --- | --- |
+| A101 | Salle du Conseil | gauche | 10 m | 10.5 m | 105 m² | 20 |
+| A103 | Direction | gauche | 6 m | 10.5 m | 63 m² | 6 |
+| A105 | Secrétariat de direction | gauche | 4 m | 10.5 m | 42 m² | 4 |
+| A102 | Salle d’Entretien 2 | droite | 6 m | 10.5 m | 63 m² | 6 |
+| A104 | Comptabilité | droite | 6 m | 10.5 m | 63 m² | 6 |
+| A106 | Archives | droite | 4.5 m | 10.5 m | 47 m² | 2 |
+| A108 | Sanitaires | droite | 4 m | 10.5 m | 42 m² | — |
+
+#### CET — Rez-de-chaussée (couloir 72 m)
+
+| N° | Salle | Côté | Largeur | Profondeur | Surface | Capacité |
+| --- | --- | --- | --- | --- | --- | --- |
+| C001 | Laboratoire Logiciel | gauche | 18 m | 6.3 m | 113 m² | 40 |
+| C003 | Laboratoire Systèmes | gauche | 18 m | 6.3 m | 113 m² | 40 |
+| C005 | Salle d’incubation | gauche | 14 m | 6.3 m | 88 m² | 25 |
+| C007 | Salle serveur | gauche | 8 m | 6.3 m | 50 m² | — |
+| C002 | Bibliothèque | droite | 28 m | 6.3 m | 176 m² | 80 |
+| C004 | Salle de lecture | droite | 16 m | 6.3 m | 101 m² | 30 |
+| C006 | Sanitaires | droite | 6 m | 6.3 m | 38 m² | — |
+| C008 | Reprographie | droite | 8 m | 6.3 m | 50 m² | 4 |
 
 To replace this with the real thing I need, per building: a floor plan (a phone photo
 of the plan on the wall is enough), the floor names in order, one known length for
@@ -62,4 +167,6 @@ scale, the room list with codes, and where the stairs and lifts are.
   more than one door.
 - The footprints of PED and CET are rectangles fitted to the photographs, not traced
   outlines. The ADM footprint is the only traced one.
-- Nothing indoors is surveyed. See section 3.
+- Nothing indoors is surveyed: the dimensions in section 3 are estimates derived from
+  the one measured building and the photographs, not from a plan.
+- The room numbers are a convention I imposed, not the numbers painted on the doors.

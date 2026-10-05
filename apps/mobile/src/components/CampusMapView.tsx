@@ -11,7 +11,7 @@ import { LANDMARK_GLYPH, STYLE_URL, type CampusMapProps } from './map-types';
  * route is drawn through the very nodes the server routed over, so what the student
  * sees on the map and the step list underneath can never disagree.
  */
-export function CampusMapView({ centre, zoom, boundary, buildings, landmarks, gps, indoor, route }: CampusMapProps) {
+export function CampusMapView({ centre, zoom, boundary, buildings, landmarks, gps, indoor, route, plan }: CampusMapProps) {
   const footprints = buildings.filter((building) => building.footprint);
 
   return (
@@ -47,6 +47,56 @@ export function CampusMapView({ centre, zoom, boundary, buildings, landmarks, gp
           <MapLibreGL.LineLayer id="campus-buildings-line" style={{ lineColor: colours.ink, lineWidth: 1.5 }} />
         </MapLibreGL.ShapeSource>
       ) : null}
+
+      {plan && plan.corridors.length ? (
+        <MapLibreGL.ShapeSource
+          id="floor-corridors"
+          shape={{
+            type: 'FeatureCollection',
+            features: plan.corridors.map((corridor) => ({
+              type: 'Feature' as const,
+              properties: {},
+              geometry: { type: 'LineString' as const, coordinates: corridor },
+            })),
+          }}
+        >
+          <MapLibreGL.LineLayer
+            id="floor-corridors-line"
+            style={{ lineColor: '#9aa6c8', lineWidth: 6, lineOpacity: 0.7, lineCap: 'round' }}
+          />
+        </MapLibreGL.ShapeSource>
+      ) : null}
+
+      {plan && plan.rooms.length ? (
+        <MapLibreGL.ShapeSource
+          id="floor-rooms"
+          shape={{
+            type: 'FeatureCollection',
+            features: plan.rooms.map((room) => ({
+              type: 'Feature' as const,
+              properties: { code: room.code, bookable: room.bookable },
+              geometry: { type: 'Polygon' as const, coordinates: [room.polygon] },
+            })),
+          }}
+        >
+          <MapLibreGL.FillLayer
+            id="floor-rooms-fill"
+            style={{
+              fillColor: ['case', ['get', 'bookable'], colours.brand, '#f4f6ff'],
+              fillOpacity: ['case', ['get', 'bookable'], 0.55, 0.9],
+            }}
+          />
+          <MapLibreGL.LineLayer id="floor-rooms-line" style={{ lineColor: colours.ink, lineWidth: 1 }} />
+        </MapLibreGL.ShapeSource>
+      ) : null}
+
+      {(plan?.rooms ?? []).map((room) => (
+        <MapLibreGL.PointAnnotation key={room.id} id={`room-${room.id}`} coordinate={room.centre} title={room.name}>
+          <View style={{ paddingHorizontal: 3, paddingVertical: 1, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.85)' }}>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: colours.ink }}>{room.code}</Text>
+          </View>
+        </MapLibreGL.PointAnnotation>
+      ))}
 
       {landmarks.map((landmark) => (
         <MapLibreGL.PointAnnotation key={landmark.id} id={landmark.id} coordinate={landmark.coordinates} title={landmark.name}>

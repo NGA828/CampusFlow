@@ -39,10 +39,28 @@ export interface CampusModel {
   university: University;
   boundary: CampusBoundary | null;
   landmarks: Landmark[];
-  buildings: { id: string; code: string; name: string; coordinates: [number, number]; footprint: [number, number][] | null }[];
-  rooms: { id: string; code: string; name: string; bookable: boolean; nodeId: string; floorId: string }[];
+  buildings: {
+    id: string;
+    code: string;
+    name: string;
+    coordinates: [number, number];
+    footprint: [number, number][] | null;
+    floors: { id: string; level: number; name: string; corridorLengthMetres: number; corridor: [number, number][] }[];
+  }[];
+  rooms: {
+    id: string;
+    code: string;
+    name: string;
+    bookable: boolean;
+    nodeId: string;
+    floorId: string;
+    widthMetres: number;
+    depthMetres: number;
+    areaSqMetres: number;
+    polygon: [number, number][];
+  }[];
   anchors: { code: string; label: string; nodeId: string }[];
-  nodes: { id: string; label: string; coordinates: [number, number] }[];
+  nodes: { id: string; label: string; floorId: string | null; coordinates: [number, number] }[];
 }
 
 export interface Position {
@@ -69,6 +87,8 @@ export interface IndoorRoute {
   totalDistanceMetres: number;
   estimatedMinutes: number;
   stepFree: boolean;
+  /** Every node passed through, for the line; `steps` is the condensed wording. */
+  geometry: [number, number][];
   steps: RouteStep[];
 }
 

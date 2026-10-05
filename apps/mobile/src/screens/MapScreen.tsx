@@ -5,6 +5,7 @@ import { ApiError, api } from '../api';
 import { CampusMapView } from '../components/CampusMapView';
 import { MapBoundary } from '../components/MapFallback';
 import { colours, styles } from '../theme';
+import type { MapFloorPlan } from '../components/map-types';
 import type { CampusModel, IndoorRoute, Position } from '../types';
 
 /**
@@ -33,12 +34,14 @@ export function MapScreen({ position }: { position: Position | null }) {
   const [gps, setGps] = useState<[number, number] | null>(null);
   const [gpsNote, setGpsNote] = useState<string>('Recherche du signal GPS…');
   const [error, setError] = useState<string | null>(null);
+  const [activeFloorId, setActiveFloorId] = useState<string | null>(null);
 
   useEffect(() => {
     void api<CampusModel>('/universities/iai-cameroun/campus')
       .then((payload) => {
         setCampus(payload);
         setDestination(payload.rooms[0]?.id ?? '');
+        setActiveFloorId(payload.buildings[0]?.floors[0]?.id ?? null);
       })
       .catch(() => setError('Le plan du campus n’a pas pu être chargé.'));
   }, []);
@@ -91,10 +94,33 @@ export function MapScreen({ position }: { position: Position | null }) {
   }
 
   const centre = position?.coordinates ?? campus?.university.coordinates ?? [11.55852, 3.81384];
-  const routeLine = useMemo<[number, number][] | null>(
-    () => (route && route.steps.length > 1 ? route.steps.map((step) => step.coordinates) : null),
-    [route],
-  );
+  const routeLine = useMemo<[number, number][] | null>(() => {
+    const line = route?.geometry?.length ? route.geometry : (route?.steps ?? []).map((step) => step.coordinates);
+    return line.length > 1 ? line : null;
+  }, [route]);
+
+  // The plan of the floor on display: rooms outlined and numbered, corridor drawn.
+  const floorPlan = useMemo<MapFloorPlan | null>(() => {
+    if (!campus || !activeFloorId) return null;
+    const building = campus.buildings.find((item) => item.floors.some((floor) => floor.id === activeFloorId));
+    const floor = building?.floors.find((item) => item.id === activeFloorId);
+    if (!building || !floor) return null;
+    return {
+      floorId: floor.id,
+      label: `${building.code} · ${floor.name}`,
+      corridors: floor.corridor.length > 1 ? [floor.corridor] : [],
+      rooms: campus.rooms
+        .filter((room) => room.floorId === floor.id && room.polygon.length > 2)
+        .map((room) => ({
+          id: room.id,
+          code: room.code,
+          name: room.name,
+          bookable: room.bookable,
+          polygon: room.polygon,
+          centre: campus.nodes.find((node) => node.id === room.nodeId)?.coordinates ?? room.polygon[0],
+        })),
+    };
+  }, [campus, activeFloorId]);
   const toCampus = gps && campus ? metresBetween(gps, campus.university.coordinates) : null;
 
   return (
@@ -121,9 +147,35 @@ export function MapScreen({ position }: { position: Position | null }) {
             gps={gps}
             indoor={position?.coordinates ?? null}
             route={routeLine}
+            plan={floorPlan}
           />
         </MapBoundary>
       </View>
+
+      {campus && campus.buildings.some((building) => building.floors.length) ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+          {campus.buildings.flatMap((building) =>
+            building.floors.map((floor) => (
+              <Pressable
+                key={floor.id}
+                onPress={() => setActiveFloorId(activeFloorId === floor.id ? null : floor.id)}
+                style={[styles.chip, activeFloorId === floor.id ? styles.chipActive : null]}
+              >
+                <Text style={activeFloorId === floor.id ? styles.chipActiveText : styles.chipText}>
+                  {building.code} · {floor.name} · {floor.corridorLengthMetres} m
+                </Text>
+              </Pressable>
+            )),
+          )}
+        </View>
+      ) : null}
+
+      {floorPlan ? (
+        <Text style={styles.muted}>
+          Plan {floorPlan.label} : {floorPlan.rooms.length} salles. Les numéros impairs sont à gauche du couloir, les pairs à
+          droite ; le chiffre du milieu indique l’étage.
+        </Text>
+      ) : null}
 
       {toCampus !== null && campus ? (
         <Text style={styles.notice}>

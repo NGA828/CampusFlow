@@ -1,4 +1,5 @@
 import type { Building, CampusBoundary, Landmark, NavEdge, NavNode, QrAnchor, Room } from '../types.ts';
+import { generateBlock, type BlockSpec } from './floorplan.ts';
 
 /**
  * The IAI Cameroun pilot campus — Centre d'Excellence Technologique Paul Biya,
@@ -75,6 +76,154 @@ export const CAMPUS_BOUNDARY: CampusBoundary = {
   },
 };
 
+/**
+ * The three blocks, described in metres.
+ *
+ * Each block is a corridor with rooms along it; `floorplan.ts` turns these numbers
+ * into room polygons, doors, corridor nodes and the walking graph. Every dimension
+ * here is an estimate read off the photographs — the teaching block's 92 m frontage,
+ * its two storeys, the long low Centre d'Excellence across the esplanade — except
+ * the administration block's envelope, which is the OpenStreetMap outline.
+ *
+ * Room numbers encode the floor: `P104` is block P, floor 1, room 04. Odd numbers
+ * are on the left walking in from the corridor's origin, even numbers on the right.
+ */
+const BLOCKS: BlockSpec[] = [
+  {
+    buildingId: 'iai-b-ped',
+    letter: 'P',
+    slug: 'ped',
+    // Corridor runs south → north up the middle of the 92 × 16 m teaching bar.
+    origin: [17, -43],
+    bearingDeg: 90,
+    floors: [
+      {
+        id: 'iai-b-ped-0',
+        level: 0,
+        name: 'Rez-de-chaussée',
+        corridorLength: 86,
+        stairsAt: 6,
+        liftAt: null,
+        entranceAt: 45,
+        entranceSide: 'ODD',
+        rooms: [
+          { id: 'r-ped-a01', number: '01', name: 'Amphithéâtre A', kind: 'CLASSROOM', capacity: 180, bookable: false, side: 'ODD', start: 2, length: 28, depth: 6.8 },
+          { id: 'r-ped-a02', number: '03', name: 'Salle de TD 1', kind: 'CLASSROOM', capacity: 45, bookable: false, side: 'ODD', start: 32, length: 16, depth: 6.8 },
+          { id: 'r-ped-a03', number: '05', name: 'Salle de TD 2', kind: 'CLASSROOM', capacity: 45, bookable: false, side: 'ODD', start: 50, length: 16, depth: 6.8 },
+          { id: 'r-ped-p007', number: '07', name: 'Salle informatique 1', kind: 'LAB', capacity: 40, bookable: false, side: 'ODD', start: 68, length: 16, depth: 6.8 },
+          { id: 'r-ped-wc0', number: '02', name: 'Sanitaires', kind: 'AMENITY', capacity: 0, bookable: false, side: 'EVEN', start: 2, length: 8, depth: 6.8 },
+          { id: 'r-ped-p004', number: '04', name: 'Bureau des surveillants', kind: 'ADMINISTRATIVE', capacity: 6, bookable: false, side: 'EVEN', start: 12, length: 8, depth: 6.8 },
+          { id: 'r-ped-p006', number: '06', name: 'Salle de TD 3', kind: 'CLASSROOM', capacity: 45, bookable: false, side: 'EVEN', start: 22, length: 16, depth: 6.8 },
+          { id: 'r-ped-p008', number: '08', name: 'Salle de TD 4', kind: 'CLASSROOM', capacity: 45, bookable: false, side: 'EVEN', start: 40, length: 16, depth: 6.8 },
+          { id: 'r-ped-p010', number: '10', name: 'Foyer des étudiants', kind: 'AMENITY', capacity: 120, bookable: false, side: 'EVEN', start: 58, length: 24, depth: 6.8 },
+        ],
+      },
+      {
+        id: 'iai-b-ped-1',
+        level: 1,
+        name: '1er étage',
+        corridorLength: 86,
+        stairsAt: 6,
+        liftAt: null,
+        rooms: [
+          { id: 'r-ped-b11', number: '01', name: 'Salle Réseaux', kind: 'LAB', capacity: 30, bookable: false, side: 'ODD', start: 2, length: 18, depth: 6.8 },
+          { id: 'r-ped-b12', number: '03', name: 'Salle de Projet', kind: 'CLASSROOM', capacity: 25, bookable: true, side: 'ODD', start: 22, length: 14, depth: 6.8 },
+          { id: 'r-ped-p105', number: '05', name: 'Salle de TD 5', kind: 'CLASSROOM', capacity: 45, bookable: false, side: 'ODD', start: 38, length: 16, depth: 6.8 },
+          { id: 'r-ped-p107', number: '07', name: 'Laboratoire Matériel', kind: 'LAB', capacity: 30, bookable: false, side: 'ODD', start: 56, length: 16, depth: 6.8 },
+          { id: 'r-ped-p102', number: '02', name: 'Sanitaires', kind: 'AMENITY', capacity: 0, bookable: false, side: 'EVEN', start: 2, length: 8, depth: 6.8 },
+          { id: 'r-ped-p104', number: '04', name: 'Salle de TD 6', kind: 'CLASSROOM', capacity: 45, bookable: false, side: 'EVEN', start: 12, length: 16, depth: 6.8 },
+          { id: 'r-ped-p106', number: '06', name: 'Salle de TD 7', kind: 'CLASSROOM', capacity: 45, bookable: false, side: 'EVEN', start: 30, length: 16, depth: 6.8 },
+          { id: 'r-ped-p108', number: '08', name: 'Salle des enseignants', kind: 'ADMINISTRATIVE', capacity: 20, bookable: false, side: 'EVEN', start: 48, length: 16, depth: 6.8 },
+        ],
+      },
+    ],
+  },
+  {
+    buildingId: 'iai-b-adm',
+    letter: 'A',
+    slug: 'adm',
+    // Corridor along the long axis of the OSM-mapped 26.2 × 23.5 m block.
+    origin: [-93.2, 61],
+    bearingDeg: -9.7,
+    floors: [
+      {
+        id: 'iai-b-adm-0',
+        level: 0,
+        name: 'Rez-de-chaussée',
+        corridorLength: 22,
+        stairsAt: 8,
+        liftAt: 12,
+        entranceAt: 4,
+        entranceSide: 'EVEN',
+        rooms: [
+          { id: 'r-adm-s01', number: '01', name: 'Scolarité — guichet', kind: 'ADMINISTRATIVE', capacity: 6, bookable: false, side: 'ODD', start: 0, length: 8, depth: 10.5 },
+          { id: 'r-adm-a003', number: '03', name: 'Service des examens', kind: 'ADMINISTRATIVE', capacity: 4, bookable: false, side: 'ODD', start: 9, length: 6, depth: 10.5 },
+          { id: 'r-adm-s02', number: '05', name: 'Bureau des Stages', kind: 'ADMINISTRATIVE', capacity: 4, bookable: true, side: 'ODD', start: 16, length: 6, depth: 10.5 },
+          { id: 'r-adm-a002', number: '02', name: 'Accueil', kind: 'ADMINISTRATIVE', capacity: 10, bookable: false, side: 'EVEN', start: 0, length: 6, depth: 10.5 },
+          { id: 'r-adm-s03', number: '04', name: 'Salle d’Entretien 1', kind: 'ADMINISTRATIVE', capacity: 8, bookable: true, side: 'EVEN', start: 7, length: 6, depth: 10.5 },
+          { id: 'r-adm-a006', number: '06', name: 'Sanitaires', kind: 'AMENITY', capacity: 0, bookable: false, side: 'EVEN', start: 13, length: 4, depth: 10.5 },
+          { id: 'r-adm-a008', number: '08', name: 'Économat', kind: 'ADMINISTRATIVE', capacity: 4, bookable: false, side: 'EVEN', start: 17.5, length: 4, depth: 10.5 },
+        ],
+      },
+      {
+        id: 'iai-b-adm-1',
+        level: 1,
+        name: '1er étage',
+        corridorLength: 22,
+        stairsAt: 8,
+        liftAt: 12,
+        rooms: [
+          { id: 'r-adm-d11', number: '01', name: 'Salle du Conseil', kind: 'ADMINISTRATIVE', capacity: 20, bookable: true, side: 'ODD', start: 0, length: 10, depth: 10.5 },
+          { id: 'r-adm-a103', number: '03', name: 'Direction', kind: 'ADMINISTRATIVE', capacity: 6, bookable: false, side: 'ODD', start: 11, length: 6, depth: 10.5 },
+          { id: 'r-adm-a105', number: '05', name: 'Secrétariat de direction', kind: 'ADMINISTRATIVE', capacity: 4, bookable: false, side: 'ODD', start: 18, length: 4, depth: 10.5 },
+          { id: 'r-adm-d12', number: '02', name: 'Salle d’Entretien 2', kind: 'ADMINISTRATIVE', capacity: 6, bookable: true, side: 'EVEN', start: 0, length: 6, depth: 10.5 },
+          { id: 'r-adm-a104', number: '04', name: 'Comptabilité', kind: 'ADMINISTRATIVE', capacity: 6, bookable: false, side: 'EVEN', start: 7, length: 6, depth: 10.5 },
+          { id: 'r-adm-a106', number: '06', name: 'Archives', kind: 'ADMINISTRATIVE', capacity: 2, bookable: false, side: 'EVEN', start: 13, length: 4.5, depth: 10.5 },
+          { id: 'r-adm-a108', number: '08', name: 'Sanitaires', kind: 'AMENITY', capacity: 0, bookable: false, side: 'EVEN', start: 18, length: 4, depth: 10.5 },
+        ],
+      },
+    ],
+  },
+  {
+    buildingId: 'iai-b-cet',
+    letter: 'C',
+    slug: 'cet',
+    // Corridor runs south → north behind the verandah of the 80 × 16 m low block.
+    origin: [97, -66],
+    bearingDeg: 90,
+    floors: [
+      {
+        id: 'iai-b-cet-0',
+        level: 0,
+        name: 'Rez-de-chaussée',
+        corridorLength: 72,
+        stairsAt: null,
+        liftAt: null,
+        entranceAt: 38,
+        entranceSide: 'ODD',
+        rooms: [
+          { id: 'r-cet-l01', number: '01', name: 'Laboratoire Logiciel', kind: 'LAB', capacity: 40, bookable: false, side: 'ODD', start: 2, length: 18, depth: 6.3 },
+          { id: 'r-cet-l02', number: '03', name: 'Laboratoire Systèmes', kind: 'LAB', capacity: 40, bookable: false, side: 'ODD', start: 22, length: 18, depth: 6.3 },
+          { id: 'r-cet-c05', number: '05', name: 'Salle d’incubation', kind: 'LAB', capacity: 25, bookable: true, side: 'ODD', start: 44, length: 14, depth: 6.3 },
+          { id: 'r-cet-c07', number: '07', name: 'Salle serveur', kind: 'AMENITY', capacity: 0, bookable: false, side: 'ODD', start: 60, length: 8, depth: 6.3 },
+          { id: 'r-cet-bib', number: '02', name: 'Bibliothèque', kind: 'LIBRARY', capacity: 80, bookable: false, side: 'EVEN', start: 2, length: 28, depth: 6.3 },
+          { id: 'r-cet-c04', number: '04', name: 'Salle de lecture', kind: 'LIBRARY', capacity: 30, bookable: false, side: 'EVEN', start: 32, length: 16, depth: 6.3 },
+          { id: 'r-cet-c06', number: '06', name: 'Sanitaires', kind: 'AMENITY', capacity: 0, bookable: false, side: 'EVEN', start: 50, length: 6, depth: 6.3 },
+          { id: 'r-cet-c08', number: '08', name: 'Reprographie', kind: 'AMENITY', capacity: 4, bookable: false, side: 'EVEN', start: 58, length: 8, depth: 6.3 },
+        ],
+      },
+    ],
+  },
+];
+
+const PLANS = BLOCKS.map((block) => ({ block, generated: generateBlock(block, at) }));
+
+function floorsOf(buildingId: string) {
+  return PLANS.find((plan) => plan.block.buildingId === buildingId)?.generated.floors.map((entry) => entry.floor) ?? [];
+}
+
+export const ROOMS: Room[] = PLANS.flatMap((plan) => plan.generated.rooms);
+
 export const BUILDINGS: Building[] = [
   {
     id: 'iai-b-ped',
@@ -86,19 +235,16 @@ export const BUILDINGS: Building[] = [
     coordinates: at(16, 2),
     // U-shaped: a north–south bar with two wings reaching west towards the garden.
     footprint: ring([
-      [-10, 46],
-      [24, 46],
-      [24, -46],
-      [-10, -46],
+      [-10, 46.6],
+      [25.6, 46.6],
+      [25.6, -46.6],
+      [-10, -46.6],
       [-10, -32],
-      [10, -32],
-      [10, 32],
+      [8.4, -32],
+      [8.4, 32],
       [-10, 32],
     ]),
-    floors: [
-      { id: 'iai-b-ped-0', level: 0, name: 'Rez-de-chaussée' },
-      { id: 'iai-b-ped-1', level: 1, name: '1er étage' },
-    ],
+    floors: floorsOf('iai-b-ped'),
   },
   {
     id: 'iai-b-adm',
@@ -116,10 +262,7 @@ export const BUILDINGS: Building[] = [
       [11.5574259, 3.8144306],
       [11.5576587, 3.8143904],
     ],
-    floors: [
-      { id: 'iai-b-adm-0', level: 0, name: 'Rez-de-chaussée' },
-      { id: 'iai-b-adm-1', level: 1, name: '1er étage' },
-    ],
+    floors: floorsOf('iai-b-adm'),
   },
   {
     id: 'iai-b-cet',
@@ -130,40 +273,22 @@ export const BUILDINGS: Building[] = [
       'The long low block with the continuous verandah across the esplanade: computer laboratories, the library and the incubation space.',
     coordinates: at(96, -30),
     footprint: ring([
-      [90, -70],
-      [104, -70],
-      [104, 10],
-      [90, 10],
+      [88.4, -70],
+      [105.6, -70],
+      [105.6, 10],
+      [88.4, 10],
     ]),
-    floors: [{ id: 'iai-b-cet-0', level: 0, name: 'Rez-de-chaussée' }],
+    floors: floorsOf('iai-b-cet'),
   },
 ];
 
-export const ROOMS: Room[] = [
-  // Bâtiment Pédagogique — ground floor
-  { id: 'r-ped-a01', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', code: 'A01', name: 'Amphithéâtre A', kind: 'CLASSROOM', capacity: 180, bookable: false, nodeId: 'n-ped0-a01' },
-  { id: 'r-ped-a02', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', code: 'A02', name: 'Salle de TD 1', kind: 'CLASSROOM', capacity: 45, bookable: false, nodeId: 'n-ped0-a02' },
-  { id: 'r-ped-a03', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', code: 'A03', name: 'Salle de TD 2', kind: 'CLASSROOM', capacity: 45, bookable: false, nodeId: 'n-ped0-a03' },
-  { id: 'r-ped-wc0', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', code: 'WC-P0', name: 'Sanitaires', kind: 'AMENITY', capacity: 0, bookable: false, nodeId: 'n-ped0-wc' },
-  // Bâtiment Pédagogique — first floor
-  { id: 'r-ped-b11', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-1', code: 'B11', name: 'Salle Réseaux', kind: 'LAB', capacity: 30, bookable: false, nodeId: 'n-ped1-b11' },
-  { id: 'r-ped-b12', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-1', code: 'B12', name: 'Salle de Projet', kind: 'CLASSROOM', capacity: 25, bookable: true, nodeId: 'n-ped1-b12' },
 
-  // Bloc Administratif — ground floor
-  { id: 'r-adm-s01', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', code: 'S01', name: 'Scolarité — guichet', kind: 'ADMINISTRATIVE', capacity: 6, bookable: false, nodeId: 'n-adm0-s01' },
-  { id: 'r-adm-s02', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', code: 'S02', name: 'Bureau des Stages', kind: 'ADMINISTRATIVE', capacity: 4, bookable: true, nodeId: 'n-adm0-s02' },
-  { id: 'r-adm-s03', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', code: 'S03', name: 'Salle d’Entretien 1', kind: 'ADMINISTRATIVE', capacity: 8, bookable: true, nodeId: 'n-adm0-s03' },
-  // Bloc Administratif — first floor
-  { id: 'r-adm-d11', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-1', code: 'D11', name: 'Salle du Conseil', kind: 'ADMINISTRATIVE', capacity: 20, bookable: true, nodeId: 'n-adm1-d11' },
-  { id: 'r-adm-d12', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-1', code: 'D12', name: 'Salle d’Entretien 2', kind: 'ADMINISTRATIVE', capacity: 6, bookable: true, nodeId: 'n-adm1-d12' },
-
-  // Centre d'Excellence Technologique
-  { id: 'r-cet-l01', buildingId: 'iai-b-cet', floorId: 'iai-b-cet-0', code: 'L01', name: 'Laboratoire Logiciel', kind: 'LAB', capacity: 40, bookable: false, nodeId: 'n-cet0-l01' },
-  { id: 'r-cet-l02', buildingId: 'iai-b-cet', floorId: 'iai-b-cet-0', code: 'L02', name: 'Laboratoire Systèmes', kind: 'LAB', capacity: 40, bookable: false, nodeId: 'n-cet0-l02' },
-  { id: 'r-cet-bib', buildingId: 'iai-b-cet', floorId: 'iai-b-cet-0', code: 'BIB', name: 'Bibliothèque', kind: 'LIBRARY', capacity: 80, bookable: false, nodeId: 'n-cet0-bib' },
-];
-
-interface NodeSeed {
+/**
+ * Outdoors: the gate, the alley past the flagpoles and the fountain, the court and
+ * the esplanade. Indoor nodes are generated from the floor plans; these are the ones
+ * placed by hand from the photographs.
+ */
+interface OutdoorSeed {
   id: string;
   buildingId: string;
   floorId: string;
@@ -172,136 +297,54 @@ interface NodeSeed {
   y: number;
 }
 
-/**
- * The walking graph, in metres east/north of the campus centroid.
- *
- * Outdoor nodes (`n-out-*`) are attached to the building they stand in front of, so
- * a step on the esplanade still reports a sensible place name. Indoor nodes keep the
- * identifiers they have always had: printed QR anchors and saved bookings point at
- * them, and renaming a node to tidy the file would invalidate a sticker on a wall.
- */
-const NODE_SEEDS: NodeSeed[] = [
-  // ── Outdoors: the gate, the alley, the garden, the esplanade ────────────────
+const OUTDOOR_SEEDS: OutdoorSeed[] = [
   { id: 'n-out-gate', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', label: 'Portail principal', x: -101, y: 25 },
   { id: 'n-out-guard', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', label: 'Poste de garde', x: -97, y: 29 },
-  { id: 'n-out-adm-fork', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', label: 'Allée — embranchement Administration', x: -84, y: 36 },
+  { id: 'n-out-adm-fork', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', label: 'Allée — embranchement Administration', x: -88, y: 40 },
   { id: 'n-out-alley1', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Allée centrale — haut', x: -74, y: 20 },
   { id: 'n-out-flags', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Place des Drapeaux', x: -50, y: 14 },
   { id: 'n-out-fountain', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Fontaine du diplômé', x: -40, y: 6 },
   { id: 'n-out-garden', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Jardin central', x: -22, y: 8 },
   { id: 'n-out-statues', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Terrasse des statues', x: -34, y: -18 },
+  { id: 'n-court-w', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Cour — côté ouest', x: -4, y: 2 },
+  { id: 'n-court-c', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Cour centrale', x: 34, y: -16 },
+  { id: 'n-court-e', buildingId: 'iai-b-cet', floorId: 'iai-b-cet-0', label: 'Cour — côté est', x: 74, y: -28 },
   { id: 'n-out-esplanade', buildingId: 'iai-b-cet', floorId: 'iai-b-cet-0', label: 'Esplanade IAI', x: 56, y: -34 },
   { id: 'n-out-parking', buildingId: 'iai-b-cet', floorId: 'iai-b-cet-0', label: 'Parking', x: 70, y: -56 },
-
-  // ── Bâtiment Pédagogique, rez-de-chaussée ───────────────────────────────────
-  { id: 'n-ped0-entrance', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Entrée Pédagogique', x: 8, y: 2 },
-  { id: 'n-ped0-hall', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Hall PED', x: 15, y: 2 },
-  { id: 'n-ped0-c1', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Couloir PED rez — nord', x: 15, y: 20 },
-  { id: 'n-ped0-c2', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Couloir PED rez — sud', x: 15, y: -20 },
-  { id: 'n-ped0-a01', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Amphithéâtre A', x: 20, y: 38 },
-  { id: 'n-ped0-a02', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Salle de TD 1', x: 20, y: 24 },
-  { id: 'n-ped0-a03', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Salle de TD 2', x: 20, y: -24 },
-  { id: 'n-ped0-wc', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Sanitaires PED', x: 20, y: -38 },
-  { id: 'n-ped0-stairs', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Escalier PED rez', x: 18, y: 8 },
-  // ── Bâtiment Pédagogique, 1er étage ─────────────────────────────────────────
-  { id: 'n-ped1-stairs', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-1', label: 'Escalier PED 1er', x: 18, y: 8 },
-  { id: 'n-ped1-c1', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-1', label: 'Couloir PED 1er', x: 15, y: 14 },
-  { id: 'n-ped1-b11', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-1', label: 'Salle Réseaux', x: 20, y: 28 },
-  { id: 'n-ped1-b12', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-1', label: 'Salle de Projet', x: 20, y: 0 },
-
-  // ── The court between the blocks (kept: an anchor is printed here) ──────────
-  { id: 'n-court-w', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Cour — côté ouest', x: -4, y: 2 },
-  { id: 'n-court-c', buildingId: 'iai-b-ped', floorId: 'iai-b-ped-0', label: 'Cour centrale', x: 32, y: -16 },
-  { id: 'n-court-e', buildingId: 'iai-b-cet', floorId: 'iai-b-cet-0', label: 'Cour — côté est', x: 74, y: -28 },
-
-  // ── Bloc Administratif, rez-de-chaussée ─────────────────────────────────────
-  { id: 'n-adm0-entrance', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', label: 'Entrée Administration', x: -82, y: 46 },
-  { id: 'n-adm0-hall', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', label: 'Hall ADM', x: -82, y: 54 },
-  { id: 'n-adm0-c1', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', label: 'Couloir ADM rez', x: -82, y: 60 },
-  { id: 'n-adm0-s01', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', label: 'Scolarité', x: -90, y: 62 },
-  { id: 'n-adm0-s02', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', label: 'Bureau des Stages', x: -74, y: 62 },
-  { id: 'n-adm0-s03', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', label: 'Salle d’Entretien 1', x: -74, y: 68 },
-  { id: 'n-adm0-stairs', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', label: 'Escalier ADM rez', x: -86, y: 57 },
-  { id: 'n-adm0-lift', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-0', label: 'Ascenseur ADM rez', x: -78, y: 57 },
-  // ── Bloc Administratif, 1er étage ───────────────────────────────────────────
-  { id: 'n-adm1-stairs', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-1', label: 'Escalier ADM 1er', x: -86, y: 57 },
-  { id: 'n-adm1-lift', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-1', label: 'Ascenseur ADM 1er', x: -78, y: 57 },
-  { id: 'n-adm1-c1', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-1', label: 'Couloir ADM 1er', x: -82, y: 60 },
-  { id: 'n-adm1-d11', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-1', label: 'Salle du Conseil', x: -88, y: 66 },
-  { id: 'n-adm1-d12', buildingId: 'iai-b-adm', floorId: 'iai-b-adm-1', label: 'Salle d’Entretien 2', x: -76, y: 66 },
-
-  // ── Centre d'Excellence Technologique ───────────────────────────────────────
-  { id: 'n-cet0-entrance', buildingId: 'iai-b-cet', floorId: 'iai-b-cet-0', label: 'Entrée CET', x: 90, y: -28 },
-  { id: 'n-cet0-hall', buildingId: 'iai-b-cet', floorId: 'iai-b-cet-0', label: 'Hall CET', x: 96, y: -28 },
-  { id: 'n-cet0-l01', buildingId: 'iai-b-cet', floorId: 'iai-b-cet-0', label: 'Laboratoire Logiciel', x: 98, y: -8 },
-  { id: 'n-cet0-l02', buildingId: 'iai-b-cet', floorId: 'iai-b-cet-0', label: 'Laboratoire Systèmes', x: 98, y: -46 },
-  { id: 'n-cet0-bib', buildingId: 'iai-b-cet', floorId: 'iai-b-cet-0', label: 'Bibliothèque', x: 98, y: -62 },
 ];
 
-export const NAV_NODES: NavNode[] = NODE_SEEDS.map((seed) => ({ ...seed, coordinates: at(seed.x, seed.y) }));
+const OUTDOOR_NODES: NavNode[] = OUTDOOR_SEEDS.map((seed) => ({ ...seed, coordinates: at(seed.x, seed.y) }));
 
-const EDGE_SEEDS: [string, string, NavEdge['kind'], boolean][] = [
-  // Outdoors — the gate to everything else
-  ['n-out-gate', 'n-out-guard', 'PATH', true],
-  ['n-out-guard', 'n-out-alley1', 'PATH', true],
-  ['n-out-guard', 'n-out-adm-fork', 'PATH', true],
-  ['n-out-adm-fork', 'n-adm0-entrance', 'PATH', true],
-  ['n-out-alley1', 'n-out-flags', 'PATH', true],
-  ['n-out-flags', 'n-out-fountain', 'PATH', true],
-  ['n-out-fountain', 'n-out-garden', 'PATH', true],
-  ['n-out-fountain', 'n-out-statues', 'PATH', true],
-  ['n-out-garden', 'n-court-w', 'PATH', true],
-  ['n-out-statues', 'n-court-c', 'PATH', true],
-  ['n-court-w', 'n-ped0-entrance', 'PATH', true],
-  ['n-court-c', 'n-out-esplanade', 'PATH', true],
-  ['n-out-esplanade', 'n-out-parking', 'PATH', true],
-  ['n-out-esplanade', 'n-court-e', 'PATH', true],
-  ['n-court-e', 'n-cet0-entrance', 'PATH', true],
-
-  // Bâtiment Pédagogique
-  ['n-ped0-entrance', 'n-ped0-hall', 'DOOR', true],
-  ['n-ped0-hall', 'n-ped0-c1', 'CORRIDOR', true],
-  ['n-ped0-hall', 'n-ped0-c2', 'CORRIDOR', true],
-  ['n-ped0-c1', 'n-ped0-a01', 'DOOR', true],
-  ['n-ped0-c1', 'n-ped0-a02', 'DOOR', true],
-  ['n-ped0-c2', 'n-ped0-a03', 'DOOR', true],
-  ['n-ped0-c2', 'n-ped0-wc', 'DOOR', true],
-  ['n-ped0-hall', 'n-ped0-stairs', 'CORRIDOR', true],
-  ['n-ped0-stairs', 'n-ped1-stairs', 'STAIRS', false],
-  ['n-ped1-stairs', 'n-ped1-c1', 'CORRIDOR', true],
-  ['n-ped1-c1', 'n-ped1-b11', 'DOOR', true],
-  ['n-ped1-c1', 'n-ped1-b12', 'DOOR', true],
-
-  // Bloc Administratif
-  ['n-adm0-entrance', 'n-adm0-hall', 'DOOR', true],
-  ['n-adm0-hall', 'n-adm0-c1', 'CORRIDOR', true],
-  ['n-adm0-c1', 'n-adm0-s01', 'DOOR', true],
-  ['n-adm0-c1', 'n-adm0-s02', 'DOOR', true],
-  ['n-adm0-c1', 'n-adm0-s03', 'DOOR', true],
-  ['n-adm0-hall', 'n-adm0-stairs', 'CORRIDOR', true],
-  ['n-adm0-hall', 'n-adm0-lift', 'CORRIDOR', true],
-  ['n-adm0-stairs', 'n-adm1-stairs', 'STAIRS', false],
-  ['n-adm0-lift', 'n-adm1-lift', 'LIFT', true],
-  ['n-adm1-stairs', 'n-adm1-c1', 'CORRIDOR', true],
-  ['n-adm1-lift', 'n-adm1-c1', 'CORRIDOR', true],
-  ['n-adm1-c1', 'n-adm1-d11', 'DOOR', true],
-  ['n-adm1-c1', 'n-adm1-d12', 'DOOR', true],
-
-  // Centre d'Excellence
-  ['n-cet0-entrance', 'n-cet0-hall', 'DOOR', true],
-  ['n-cet0-hall', 'n-cet0-l01', 'CORRIDOR', true],
-  ['n-cet0-hall', 'n-cet0-l02', 'CORRIDOR', true],
-  ['n-cet0-l02', 'n-cet0-bib', 'DOOR', true],
+const OUTDOOR_EDGES: [string, string][] = [
+  ['n-out-gate', 'n-out-guard'],
+  ['n-out-guard', 'n-out-alley1'],
+  ['n-out-guard', 'n-out-adm-fork'],
+  ['n-out-adm-fork', 'n-adm0-entrance'],
+  ['n-out-alley1', 'n-out-flags'],
+  ['n-out-flags', 'n-out-fountain'],
+  ['n-out-fountain', 'n-out-garden'],
+  ['n-out-fountain', 'n-out-statues'],
+  ['n-out-garden', 'n-court-w'],
+  ['n-out-statues', 'n-court-c'],
+  ['n-court-w', 'n-ped0-entrance'],
+  ['n-court-c', 'n-out-esplanade'],
+  ['n-out-esplanade', 'n-out-parking'],
+  ['n-out-esplanade', 'n-court-e'],
+  ['n-court-e', 'n-cet0-entrance'],
 ];
 
-export const NAV_EDGES: NavEdge[] = EDGE_SEEDS.map(([from, to, kind, accessible]) => ({ from, to, kind, accessible }));
+export const NAV_NODES: NavNode[] = [...OUTDOOR_NODES, ...PLANS.flatMap((plan) => plan.generated.nodes)];
 
-/**
- * What a student navigates by.
- *
- * Each of these is visible in a photograph of the campus, which is why the outdoor
- * instructions can name them instead of counting metres.
- */
+export const NAV_EDGES: NavEdge[] = [
+  ...OUTDOOR_EDGES.map(([from, to]) => ({ from, to, kind: 'PATH' as const, accessible: true })),
+  ...PLANS.flatMap((plan) => plan.generated.edges),
+];
+
+/** The floors of a block, in order, with their corridor geometry. */
+export function floorsOfBuilding(buildingId: string) {
+  return floorsOf(buildingId);
+}
+
 export const LANDMARKS: Landmark[] = [
   {
     id: 'lm-gate',

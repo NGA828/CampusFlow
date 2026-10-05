@@ -30,6 +30,7 @@ export default function StudentMapPage() {
   const [destination, setDestination] = useState('');
   const [stepFree, setStepFree] = useState(false);
   const [route, setRoute] = useState<IndoorRoute | null>(null);
+  const [activeFloorId, setActiveFloorId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -39,6 +40,7 @@ export default function StudentMapPage() {
       .then((payload) => {
         setCampus(payload);
         setDestination(payload.rooms[0]?.id ?? '');
+        setActiveFloorId(payload.buildings[0]?.floors[0]?.id ?? null);
       })
       .catch((caught: unknown) =>
         setError(
@@ -57,6 +59,11 @@ export default function StudentMapPage() {
     );
   }
 
+  const floorRooms = campus && activeFloorId ? campus.rooms.filter((room) => room.floorId === activeFloorId) : [];
+  const activeFloor = activeFloorId
+    ? { rooms: floorRooms, area: Math.round(floorRooms.reduce((sum, room) => sum + room.areaSqMetres, 0)) }
+    : null;
+
   async function scan(code: string) {
     setError(null);
     setNotice(null);
@@ -64,6 +71,9 @@ export default function StudentMapPage() {
       const payload = await api<{ position: Position }>('/positioning/scan', { method: 'POST', body: { code } });
       setPosition(payload.position);
       setNotice(`Position fixed at ${payload.position.label} (${payload.position.floorName}).`);
+      // Show the plan of the floor the student is standing on, not the one they left.
+      const standingOn = campus?.nodes.find((node) => node.id === payload.position.nodeId);
+      if (standingOn?.floorId) setActiveFloorId(standingOn.floorId);
       setRoute(null);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'That anchor could not be read.');
@@ -180,7 +190,47 @@ export default function StudentMapPage() {
             ) : null}
           </div>
 
-          <CampusMap campus={campus} route={route} positionNodeId={position?.nodeId ?? null} />
+          <div className="grid" style={{ gap: 12 }}>
+            <section className="card" style={{ paddingBlock: 12 }}>
+              <p className="eyebrow">Indoor plan · measured floors</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                {campus.buildings.flatMap((building) =>
+                  building.floors.map((floor) => (
+                    <button
+                      key={floor.id}
+                      type="button"
+                      className={`btn btnSmall ${activeFloorId === floor.id ? '' : 'btnGhost'}`}
+                      onClick={() => setActiveFloorId(floor.id)}
+                    >
+                      {building.code} · {floor.name}
+                      <span className="muted" style={{ fontSize: 11, marginLeft: 6 }}>
+                        {floor.corridorLengthMetres} m
+                      </span>
+                    </button>
+                  )),
+                )}
+                <button
+                  type="button"
+                  className={`btn btnSmall ${activeFloorId === null ? '' : 'btnGhost'}`}
+                  onClick={() => setActiveFloorId(null)}
+                >
+                  Hide interiors
+                </button>
+              </div>
+              {activeFloor ? (
+                <p className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>
+                  {activeFloor.rooms.length} rooms · {activeFloor.area} m² mapped · odd numbers on the left of the
+                  corridor, even on the right. The middle digit of a room number is its floor.
+                </p>
+              ) : null}
+            </section>
+            <CampusMap
+              campus={campus}
+              route={route}
+              positionNodeId={position?.nodeId ?? null}
+              activeFloorId={activeFloorId}
+            />
+          </div>
         </div>
       ) : null}
     </main>

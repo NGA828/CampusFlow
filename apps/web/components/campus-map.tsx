@@ -35,10 +35,13 @@ export function CampusMap({
   campus,
   route,
   positionNodeId,
+  activeFloorId,
 }: {
   campus: CampusModel;
   route: IndoorRoute | null;
   positionNodeId: string | null;
+  /** Which floor's plan to draw inside the footprints; null hides the interiors. */
+  activeFloorId?: string | null;
 }) {
   const container = useRef<HTMLDivElement | null>(null);
   const map = useRef<MapLibreMap | null>(null);
@@ -89,6 +92,46 @@ export function CampusMap({
         paint: { 'line-color': '#0b1020', 'line-width': 1.5 },
       });
 
+      // The indoor plan: rooms, then the corridor they open onto, then the numbers.
+      instance.addLayer({
+        id: `${CAMPUS_SOURCE}-room-fill`,
+        type: 'fill',
+        source: CAMPUS_SOURCE,
+        filter: ['==', ['get', 'role'], 'room'],
+        paint: {
+          'fill-color': ['case', ['get', 'bookable'], '#2a4bd8', '#f4f6ff'],
+          'fill-opacity': ['case', ['get', 'bookable'], 0.55, 0.9],
+        },
+      });
+      instance.addLayer({
+        id: `${CAMPUS_SOURCE}-room-line`,
+        type: 'line',
+        source: CAMPUS_SOURCE,
+        filter: ['==', ['get', 'role'], 'room'],
+        paint: { 'line-color': '#0b1020', 'line-width': 1 },
+      });
+      instance.addLayer({
+        id: `${CAMPUS_SOURCE}-corridor-line`,
+        type: 'line',
+        source: CAMPUS_SOURCE,
+        filter: ['==', ['get', 'role'], 'corridor'],
+        layout: { 'line-cap': 'round' },
+        paint: { 'line-color': '#9aa6c8', 'line-width': 6, 'line-opacity': 0.7 },
+      });
+      instance.addLayer({
+        id: `${CAMPUS_SOURCE}-room-label`,
+        type: 'symbol',
+        source: CAMPUS_SOURCE,
+        filter: ['==', ['get', 'role'], 'room-label'],
+        layout: {
+          'text-field': ['get', 'code'],
+          'text-font': ['Noto Sans Regular'],
+          'text-size': 11,
+          'text-allow-overlap': false,
+        },
+        paint: { 'text-color': '#0b1020', 'text-halo-color': '#ffffff', 'text-halo-width': 1.2 },
+      });
+
       instance.addSource(ROUTE_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       instance.addLayer({
         id: `${ROUTE_SOURCE}-line`,
@@ -128,11 +171,38 @@ export function CampusMap({
           geometry: { type: 'Polygon', coordinates: [building.footprint] },
         });
       }
+      if (activeFloorId) {
+        for (const building of campus.buildings) {
+          const floor = building.floors.find((item) => item.id === activeFloorId);
+          if (!floor || floor.corridor.length < 2) continue;
+          features.push({
+            type: 'Feature',
+            properties: { role: 'corridor' },
+            geometry: { type: 'LineString', coordinates: floor.corridor },
+          });
+        }
+        for (const room of campus.rooms) {
+          if (room.floorId !== activeFloorId || room.polygon.length < 3) continue;
+          features.push({
+            type: 'Feature',
+            properties: { role: 'room', code: room.code, bookable: room.bookable },
+            geometry: { type: 'Polygon', coordinates: [room.polygon] },
+          });
+          const node = campus.nodes.find((item) => item.id === room.nodeId);
+          if (node) {
+            features.push({
+              type: 'Feature',
+              properties: { role: 'room-label', code: room.code },
+              geometry: { type: 'Point', coordinates: node.coordinates },
+            });
+          }
+        }
+      }
       source.setData({ type: 'FeatureCollection', features });
     };
     if (ready.current) draw();
     else instance.once('load', draw);
-  }, [campus]);
+  }, [campus, activeFloorId]);
 
   // Buildings, landmarks and the current position.
   useEffect(() => {
@@ -188,11 +258,11 @@ export function CampusMap({
     const draw = () => {
       const source = instance.getSource(ROUTE_SOURCE) as maplibregl.GeoJSONSource | undefined;
       if (!source) return;
-      if (!route || route.steps.length < 2) {
+      const coordinates = route?.geometry?.length ? route.geometry : (route?.steps ?? []).map((step) => step.coordinates);
+      if (!route || coordinates.length < 2) {
         source.setData({ type: 'FeatureCollection', features: [] });
         return;
       }
-      const coordinates = route.steps.map((step) => step.coordinates);
       source.setData({
         type: 'FeatureCollection',
         features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } }],

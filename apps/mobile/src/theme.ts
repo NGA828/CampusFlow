@@ -56,6 +56,11 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     overflow: 'hidden',
   },
+  // Floor switcher pills under the map.
+  chip: { borderRadius: 999, borderWidth: 1, borderColor: '#cfd6ec', backgroundColor: colours.white, paddingHorizontal: 10, paddingVertical: 6 },
+  chipActive: { backgroundColor: colours.brand, borderColor: colours.brand },
+  chipText: { fontSize: 12, fontWeight: '700', color: colours.ink },
+  chipActiveText: { fontSize: 12, fontWeight: '700', color: colours.white },
   map: { height: 300, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: colours.line },
 });
 

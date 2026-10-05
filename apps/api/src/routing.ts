@@ -31,7 +31,43 @@ export interface RouteResult {
   stepFree: boolean;
   totalDistanceMetres: number;
   estimatedMinutes: number;
+  /**
+   * Every node the path passes through, for drawing. Kept separate from `steps`
+   * because the two answer different questions: the line on the map must follow the
+   * corridor round its corners, while the instructions must not say "continue" nine
+   * times for one corridor.
+   */
+  geometry: [number, number][];
   steps: RouteStep[];
+}
+
+/**
+ * Collapse a run of corridor (or path) hops into one instruction.
+ *
+ * A student walking 60 m down a straight corridor needs to be told that once, with
+ * the distance, not told at every door they pass. Doors, stairs and lifts are never
+ * merged: those are the moments something actually changes.
+ */
+function condense(steps: RouteStep[]): RouteStep[] {
+  const merged: RouteStep[] = [];
+  for (const step of steps) {
+    const previous = merged[merged.length - 1];
+    const mergeable = step.edgeKind === 'CORRIDOR' || step.edgeKind === 'PATH';
+    if (previous && mergeable && previous.edgeKind === step.edgeKind) {
+      const distance = Math.round(previous.distanceMetres + step.distanceMetres);
+      merged[merged.length - 1] = {
+        ...step,
+        distanceMetres: distance,
+        instruction:
+          step.edgeKind === 'PATH'
+            ? `Dehors, continuez sur ${distance} m jusqu’à ${step.label}`
+            : `Suivez le couloir sur ${distance} m jusqu’à ${step.label}`,
+      };
+      continue;
+    }
+    merged.push(step);
+  }
+  return merged;
 }
 
 function distance(a: NavNode, b: NavNode): number {
@@ -135,6 +171,7 @@ export function findRoute(fromNodeId: string, toNodeId: string, stepFree = false
     totalDistanceMetres: Math.round(total),
     // 1.25 m/s is an unhurried indoor walking pace, rounded up to whole minutes.
     estimatedMinutes: Math.max(1, Math.ceil(total / 1.25 / 60)),
-    steps,
+    geometry: path.map((entry) => entry.node.coordinates),
+    steps: condense(steps),
   };
 }

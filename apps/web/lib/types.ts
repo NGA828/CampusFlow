@@ -94,6 +94,8 @@ export interface IndoorRoute {
   stepFree: boolean;
   totalDistanceMetres: number;
   estimatedMinutes: number;
+  /** Every node on the path, for drawing the line; `steps` is the condensed wording. */
+  geometry: [number, number][];
   steps: RouteStep[];
 }
 
@@ -115,12 +117,38 @@ export interface Landmark {
   source: 'OSM' | 'PHOTO_SURVEY';
 }
 
+export interface Floor {
+  id: string;
+  level: number;
+  name: string;
+  /** Length of the spine corridor in metres, and its centre line. */
+  corridorLengthMetres: number;
+  corridor: [number, number][];
+}
+
+/** A room as it appears on the indoor plan: numbered, measured and outlined. */
+export interface MappedRoom {
+  id: string;
+  buildingId: string;
+  floorId: string;
+  code: string;
+  name: string;
+  kind: RoomSummary['kind'];
+  capacity: number;
+  bookable: boolean;
+  nodeId: string;
+  widthMetres: number;
+  depthMetres: number;
+  areaSqMetres: number;
+  polygon: [number, number][];
+}
+
 export interface CampusModel {
   university: University;
   boundary: CampusBoundary | null;
   landmarks: Landmark[];
-  buildings: { id: string; code: string; name: string; description: string; coordinates: [number, number]; footprint: [number, number][] | null; floors: { id: string; level: number; name: string }[] }[];
-  rooms: { id: string; buildingId: string; floorId: string; code: string; name: string; kind: RoomSummary['kind']; capacity: number; bookable: boolean; nodeId: string }[];
+  buildings: { id: string; code: string; name: string; description: string; coordinates: [number, number]; footprint: [number, number][] | null; floors: Floor[] }[];
+  rooms: MappedRoom[];
   anchors: { code: string; buildingId: string; floorId: string; nodeId: string; label: string }[];
   nodes: { id: string; buildingId: string; floorId: string; label: string; coordinates: [number, number] }[];
   edges: { from: string; to: string; kind: string; accessible: boolean }[];

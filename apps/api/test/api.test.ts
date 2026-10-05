@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { router } from '../src/routes.ts';
-import { BUILDINGS, LANDMARKS, NAV_NODES, insideCampus } from '../src/data/campus.ts';
+import { BUILDINGS, LANDMARKS, NAV_NODES, ROOMS, floorsOfBuilding, insideCampus } from '../src/data/campus.ts';
 import { DEMO_PASSWORD, disablePersistence, seed } from '../src/store.ts';
 
 /**
@@ -253,4 +253,95 @@ test('a visitor can be routed from the main gate to a room indoors', async () =>
   assert.ok(kinds.includes('PATH'), 'the route must start outdoors');
   assert.ok(kinds.includes('DOOR'), 'the route must enter the building');
   assert.ok(kinds.includes('STAIRS') || kinds.includes('LIFT'), 'the council room is upstairs');
+});
+
+/** Point-in-polygon, so a room can be checked against the shell that contains it. */
+function inside(ring: [number, number][], point: [number, number]): boolean {
+  let hit = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]!;
+    const [xj, yj] = ring[j]!;
+    if (yi > point[1] !== yj > point[1] && point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi) hit = !hit;
+  }
+  return hit;
+}
+
+test('every room number encodes its block, its floor and its side of the corridor', () => {
+  for (const room of ROOMS) {
+    assert.match(room.code, /^[PAC]\d{3}$/, `${room.id} does not follow BLOCK + FLOOR + NN`);
+
+    const building = BUILDINGS.find((item) => item.id === room.buildingId)!;
+    assert.equal(room.code[0], building.code[0], `${room.code} does not start with the ${building.code} block letter`);
+
+    const floor = floorsOfBuilding(building.id).find((item) => item.id === room.floorId)!;
+    assert.equal(
+      Number(room.code[1]),
+      floor.level,
+      `${room.code} claims a floor digit that is not ${floor.level}`,
+    );
+
+    // Odd on the left of the corridor, even on the right: the two sides must both exist.
+    const serial = Number(room.code.slice(2));
+    assert.ok(serial > 0, `${room.code} has no serial number`);
+  }
+
+  for (const building of BUILDINGS) {
+    for (const floor of floorsOfBuilding(building.id)) {
+      const codes = ROOMS.filter((room) => room.floorId === floor.id).map((room) => Number(room.code.slice(2)));
+      assert.ok(codes.some((serial) => serial % 2 === 1), `${building.code} ${floor.name} has no left-hand rooms`);
+      assert.ok(codes.some((serial) => serial % 2 === 0), `${building.code} ${floor.name} has no right-hand rooms`);
+    }
+  }
+});
+
+test('every room is measured and fits inside its building', () => {
+  for (const room of ROOMS) {
+    assert.ok(room.widthMetres >= 4, `${room.code} is implausibly narrow`);
+    assert.ok(room.depthMetres >= 4, `${room.code} is implausibly shallow`);
+    assert.equal(room.areaSqMetres, Math.round(room.widthMetres * room.depthMetres));
+    assert.equal(room.polygon.length, 5, `${room.code} is not a closed quadrilateral`);
+
+    const building = BUILDINGS.find((item) => item.id === room.buildingId)!;
+    for (const corner of room.polygon) {
+      assert.ok(inside(building.footprint!, corner), `${room.code} has a corner outside ${building.code}`);
+    }
+  }
+});
+
+test('each floor has a corridor long enough for the rooms that open onto it', () => {
+  for (const building of BUILDINGS) {
+    for (const floor of floorsOfBuilding(building.id)) {
+      const rooms = ROOMS.filter((room) => room.floorId === floor.id);
+      assert.ok(floor.corridor.length >= 2, `${building.code} ${floor.name} has no corridor line`);
+      assert.ok(floor.corridorLengthMetres > 10, `${building.code} ${floor.name} corridor is too short to be real`);
+
+      for (const side of [1, 0]) {
+        const frontage = rooms
+          .filter((room) => Number(room.code.slice(2)) % 2 === side)
+          .reduce((sum, room) => sum + room.widthMetres, 0);
+        assert.ok(
+          frontage <= floor.corridorLengthMetres,
+          `${building.code} ${floor.name} has ${frontage} m of rooms on a ${floor.corridorLengthMetres} m corridor`,
+        );
+      }
+    }
+  }
+});
+
+test('a long corridor is one instruction, not one per door', async () => {
+  const { payload } = await call<{
+    route: { geometry: [number, number][]; steps: { edgeKind: string | null; instruction: string }[] };
+  }>({
+    method: 'POST',
+    path: '/api/v1/navigation/route',
+    token: studentToken,
+    body: { from: 'n-ped0-entrance', to: 'r-ped-b12' },
+  });
+
+  const corridorSteps = payload.route.steps.filter((step) => step.edgeKind === 'CORRIDOR');
+  assert.ok(corridorSteps.length <= 3, `the walk was broken into ${corridorSteps.length} corridor instructions`);
+  assert.ok(corridorSteps.every((step) => step.instruction.startsWith('Suivez le couloir')));
+
+  // The drawn line still follows every node, so it turns where the corridor turns.
+  assert.ok(payload.route.geometry.length > payload.route.steps.length);
 });

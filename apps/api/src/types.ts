@@ -107,6 +107,10 @@ export interface Floor {
   id: string;
   level: number;
   name: string;
+  /** Usable corridor length in metres — an estimate, like every indoor dimension. */
+  corridorLengthMetres: number;
+  /** The corridor centre line, so a client can draw the floor and not just its rooms. */
+  corridor: [number, number][];
 }
 
 export type RoomKind = 'CLASSROOM' | 'LAB' | 'ADMINISTRATIVE' | 'AMENITY' | 'LIBRARY';
@@ -123,6 +127,13 @@ export interface Room {
   bookable: boolean;
   /** Indoor graph node this room opens onto. */
   nodeId: string;
+  /** Estimated frontage on the corridor, in metres. */
+  widthMetres: number;
+  /** Estimated depth back from the corridor, in metres. */
+  depthMetres: number;
+  areaSqMetres: number;
+  /** The room outline, [longitude, latitude], first point repeated last. */
+  polygon: [number, number][];
 }
 
 /** A printed QR anchor fixed to a wall; scanning one establishes an indoor position. */

@@ -11,7 +11,7 @@ import { LANDMARK_GLYPH, STYLE_URL, type CampusMapProps } from './map-types';
  * native build. Markers and the route line are reconciled on every prop change
  * rather than rebuilt with the map, which keeps panning stable while routing.
  */
-export function CampusMapView({ centre, zoom, boundary, buildings, landmarks, gps, indoor, route }: CampusMapProps) {
+export function CampusMapView({ centre, zoom, boundary, buildings, landmarks, gps, indoor, route, plan }: CampusMapProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markers = useRef<maplibregl.Marker[]>([]);
@@ -74,6 +74,33 @@ export function CampusMapView({ centre, zoom, boundary, buildings, landmarks, gp
         paint: { 'line-color': colours.ink, 'line-width': 1.5 },
       });
 
+      // The indoor plan, drawn over the footprints: rooms, then their corridor.
+      instance.addLayer({
+        id: 'campus-room-fill',
+        type: 'fill',
+        source: 'campus',
+        filter: ['==', ['get', 'role'], 'room'],
+        paint: {
+          'fill-color': ['case', ['get', 'bookable'], colours.brand, '#f4f6ff'],
+          'fill-opacity': ['case', ['get', 'bookable'], 0.55, 0.9],
+        },
+      });
+      instance.addLayer({
+        id: 'campus-room-line',
+        type: 'line',
+        source: 'campus',
+        filter: ['==', ['get', 'role'], 'room'],
+        paint: { 'line-color': colours.ink, 'line-width': 1 },
+      });
+      instance.addLayer({
+        id: 'campus-corridor-line',
+        type: 'line',
+        source: 'campus',
+        filter: ['==', ['get', 'role'], 'corridor'],
+        layout: { 'line-cap': 'round' },
+        paint: { 'line-color': '#9aa6c8', 'line-width': 6, 'line-opacity': 0.7 },
+      });
+
       instance.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       instance.addLayer({
         id: 'route-line',
@@ -119,11 +146,25 @@ export function CampusMapView({ centre, zoom, boundary, buildings, landmarks, gp
           geometry: { type: 'Polygon' as const, coordinates: [building.footprint] },
         });
       }
+      for (const corridor of plan?.corridors ?? []) {
+        features.push({
+          type: 'Feature' as const,
+          properties: { role: 'corridor' },
+          geometry: { type: 'LineString' as const, coordinates: corridor },
+        });
+      }
+      for (const room of plan?.rooms ?? []) {
+        features.push({
+          type: 'Feature' as const,
+          properties: { role: 'room', code: room.code, bookable: room.bookable },
+          geometry: { type: 'Polygon' as const, coordinates: [room.polygon] },
+        });
+      }
       source.setData({ type: 'FeatureCollection', features });
     };
     if (ready.current) draw();
     else instance.once('load', draw);
-  }, [boundary, buildings]);
+  }, [boundary, buildings, plan]);
 
   useEffect(() => {
     const instance = map.current;
@@ -159,9 +200,18 @@ export function CampusMapView({ centre, zoom, boundary, buildings, landmarks, gp
       return element;
     };
 
+    for (const room of plan?.rooms ?? []) {
+      const number = document.createElement('div');
+      number.textContent = room.code;
+      number.title = room.name;
+      number.style.cssText =
+        'font:700 10px/1 system-ui;color:#0b1020;background:rgba(255,255,255,.85);padding:2px 4px;border-radius:5px';
+      add(room.centre, number);
+    }
+
     if (gps) add(gps, dot(colours.brand, 16));
     if (indoor) add(indoor, dot(colours.gold, 18));
-  }, [buildings, landmarks, gps?.[0], gps?.[1], indoor?.[0], indoor?.[1]]);
+  }, [buildings, landmarks, plan, gps?.[0], gps?.[1], indoor?.[0], indoor?.[1]]);
 
   useEffect(() => {
     const instance = map.current;
