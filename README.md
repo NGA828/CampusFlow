@@ -10,7 +10,8 @@ command.
 ```
 apps/api     REST API — Node standard library only, no framework, no runtime deps
 apps/web     Next.js 16 web app (visitor, student, staff, administrator) + MapLibre
-tools/dev.mjs  starts both with a single Ctrl+C
+apps/mobile  Expo student app — QR positioning, GPS, MapLibre native, notifications
+tools/dev.mjs  starts the API and the web app with a single Ctrl+C
 ```
 
 ## Run it
@@ -78,11 +79,33 @@ five floors, 14 rooms, 8 printed QR anchors and a 36-node walking graph that the
 routes over with Dijkstra, with a fixed penalty per level change and a step-free mode
 that removes stairs entirely.
 
+## Storage
+
+Records live in memory and are mirrored to `.data/campusflow.json` after every
+successful write (temporary file + rename, so a crash mid-write cannot truncate the
+file). The API restores that file on boot and only falls back to the seed when it is
+missing. Sessions are deliberately **not** persisted: restarting the API signs
+everyone out, but their accounts, bookings, notifications and announcements survive.
+
+Set `CAMPUSFLOW_DATA_FILE` to move the file; delete it to go back to the seed.
+`GET /api/v1/health` reports the path in use.
+
+## The mobile app
+
+`apps/mobile` is the student experience on a phone: four tabs (Aujourd'hui, Scanner,
+Carte, Salles), QR anchors scanned with the camera and resolved by the API, GPS
+outdoors, MapLibre native rendering of the same campus model the web app draws, room
+requests, and local notifications for time-sensitive guidance.
+
+It is kept out of the npm workspaces on purpose — it needs a native toolchain, which
+this repository's CI does not have, and installing it would slow every `npm install`
+down. See `apps/mobile/README.md` for how to build the development client.
+
 ## Known limits
 
-- Storage is in memory. Restarting the API resets accounts, bookings and
-  notifications to the seed — `/api/v1/health` says so in its own payload.
+- The JSON data file is a single-writer store for one API process — fine for a
+  demo and a pilot campus, not a substitute for a database.
 - The IAI indoor model is a working model of the Nkol Anga'a campus, not a survey.
-- The Expo mobile client (QR camera scanning, GPS, push notifications) is not in this
-  rebuild yet; the API endpoints it needs (`/positioning/scan`, `/navigation/route`,
-  `/notifications`) already exist and are tested.
+- The mobile app is shipped as source: it requires a custom Expo development build
+  (MapLibre native and `expo-camera` do not run in Expo Go) and cannot be compiled
+  in this sandbox.

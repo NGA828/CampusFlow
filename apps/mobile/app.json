@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "CampusFlow",
+    "slug": "campusflow",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "scheme": "campusflow",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "cm.campusflow.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "CampusFlow uses the camera to read the QR anchors printed in campus corridors, which fixes your indoor position.",
+        "NSLocationWhenInUseUsageDescription": "CampusFlow uses your location to guide you to the campus outdoors."
+      }
+    },
+    "android": {
+      "package": "cm.campusflow.app",
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-camera",
+        { "cameraPermission": "CampusFlow reads the QR anchors on campus walls to place you indoors." }
+      ],
+      [
+        "expo-location",
+        { "locationWhenInUsePermission": "CampusFlow guides you to your institution outdoors." }
+      ],
+      "@maplibre/maplibre-react-native"
+    ],
+    "extra": {
+      "apiUrl": "http://10.0.2.2:4000/api/v1"
+    }
+  }
+}

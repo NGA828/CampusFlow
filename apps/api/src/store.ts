@@ -1,14 +1,18 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import type { Announcement, Booking, CampusEvent, Notification, PublicUser, Session, User } from './types.ts';
 
 /**
  * Runtime state.
  *
- * The preview keeps everything in memory: restarting the API resets accounts,
- * bookings and notifications to the seed below. That is a deliberate limitation of
- * this environment (no database server is available here), and it is stated in the
- * API's own `/health` payload rather than hidden, so nobody mistakes the preview for
- * durable storage.
+ * Records live in memory and are mirrored to a JSON file after every mutation, so an
+ * account created or a room booked survives a restart of the API. No database server
+ * can be installed in this environment; a single file written atomically is the
+ * honest substitute, and `/health` reports which file is in use.
+ *
+ * Sessions are deliberately *not* persisted: a restart should end everyone's session
+ * rather than resurrect tokens from disk.
  */
 
 export const users = new Map<string, User>();
@@ -17,6 +21,71 @@ export const bookings = new Map<string, Booking>();
 export const notifications = new Map<string, Notification>();
 export const events = new Map<string, CampusEvent>();
 export const announcements = new Map<string, Announcement>();
+
+/* ------------------------------------------------------------- persistence */
+
+export const DATA_FILE = resolve(process.env.CAMPUSFLOW_DATA_FILE ?? resolve(process.cwd(), '../../.data/campusflow.json'));
+
+interface Snapshot {
+  version: 1;
+  users: User[];
+  bookings: Booking[];
+  notifications: Notification[];
+  events: CampusEvent[];
+  announcements: Announcement[];
+}
+
+let persistenceEnabled = true;
+
+/** Write the whole snapshot through a temporary file, so a crash cannot truncate it. */
+export function persist(): void {
+  if (!persistenceEnabled) return;
+  const snapshot: Snapshot = {
+    version: 1,
+    users: [...users.values()],
+    bookings: [...bookings.values()],
+    notifications: [...notifications.values()],
+    events: [...events.values()],
+    announcements: [...announcements.values()],
+  };
+  try {
+    mkdirSync(dirname(DATA_FILE), { recursive: true });
+    const temporary = `${DATA_FILE}.tmp`;
+    writeFileSync(temporary, JSON.stringify(snapshot, null, 2), 'utf8');
+    renameSync(temporary, DATA_FILE);
+  } catch (error) {
+    // Losing durability must never take the API down — but it must be visible.
+    console.error('[api] could not write the data file; continuing in memory only', error);
+    persistenceEnabled = false;
+  }
+}
+
+function restore(): boolean {
+  if (!existsSync(DATA_FILE)) return false;
+  try {
+    const snapshot = JSON.parse(readFileSync(DATA_FILE, 'utf8')) as Snapshot;
+    if (snapshot.version !== 1 || !Array.isArray(snapshot.users) || snapshot.users.length === 0) return false;
+    users.clear();
+    bookings.clear();
+    notifications.clear();
+    events.clear();
+    announcements.clear();
+    for (const user of snapshot.users) users.set(user.id, user);
+    for (const booking of snapshot.bookings ?? []) bookings.set(booking.id, booking);
+    for (const notification of snapshot.notifications ?? []) notifications.set(notification.id, notification);
+    for (const event of snapshot.events ?? []) events.set(event.id, event);
+    for (const announcement of snapshot.announcements ?? []) announcements.set(announcement.id, announcement);
+    return true;
+  } catch (error) {
+    console.error('[api] the data file could not be read; starting from the seed instead', error);
+    return false;
+  }
+}
+
+/** Tests run against a throwaway store; nothing they create touches the data file. */
+export function disablePersistence(): void {
+  persistenceEnabled = false;
+}
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString('hex');
@@ -212,4 +281,15 @@ export function seed(): { student: User; staff: User; admin: User } {
   notify(student.id, 'ANNOUNCEMENT', 'Dépôt des rapports de stage', 'Nouvelle annonce urgente de la direction.');
 
   return { student, staff, admin };
+}
+
+/**
+ * Boot the store: reuse the data file when it holds a usable snapshot, otherwise seed
+ * the walkthrough campus and write the first one.
+ */
+export function initialise(): { restored: boolean } {
+  if (restore()) return { restored: true };
+  seed();
+  persist();
+  return { restored: false };
 }

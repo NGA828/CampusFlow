@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { HttpError, readBody, resolveUser, send } from './http.ts';
 import { router } from './routes.ts';
-import { seed } from './store.ts';
+import { DATA_FILE, initialise, persist, userByEmail } from './store.ts';
 
 /**
  * CampusFlow API.
@@ -15,7 +15,7 @@ import { seed } from './store.ts';
 const port = Number(process.env.PORT ?? 4000);
 const host = process.env.HOST ?? '0.0.0.0';
 
-const { student, staff, admin } = seed();
+const { restored } = initialise();
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
@@ -40,6 +40,8 @@ const server = createServer(async (req, res) => {
   try {
     const body = req.method === 'POST' ? await readBody(req) : null;
     const payload = await match.handler({ req, res, url, params: match.params, body, user: resolveUser(req) });
+    // Every successful write goes to disk before the client is told it succeeded.
+    if (req.method === 'POST') persist();
     send(res, res.statusCode === 200 ? 200 : res.statusCode, payload);
   } catch (error) {
     if (error instanceof HttpError) {
@@ -53,5 +55,7 @@ const server = createServer(async (req, res) => {
 
 server.listen(port, host, () => {
   console.log(`[api] CampusFlow API on http://${host}:${port}/api/v1`);
-  console.log(`[api] walkthrough accounts — student ${student.email} · staff ${staff.email} · admin ${admin.email}`);
+  console.log(`[api] data file ${DATA_FILE} (${restored ? 'restored' : 'seeded'})`);
+  const student = userByEmail('etudiant@iaicameroun.cm');
+  if (student) console.log(`[api] walkthrough student ${student.email} · staff scolarite@iaicameroun.cm · admin direction@iaicameroun.cm`);
 });

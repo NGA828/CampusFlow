@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { router } from '../src/routes.ts';
-import { DEMO_PASSWORD, seed } from '../src/store.ts';
+import { DEMO_PASSWORD, disablePersistence, seed } from '../src/store.ts';
 
 /**
  * The route table is exercised directly: the handlers receive the same context the
@@ -37,6 +37,8 @@ let studentToken = '';
 let staffToken = '';
 
 before(async () => {
+  // These tests must never touch the real data file.
+  disablePersistence();
   seed();
   const student = await call<{ token: string }>({
     method: 'POST',

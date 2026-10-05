@@ -1,0 +1,28 @@
+{
+  "name": "@campusflow/mobile",
+  "version": "2.0.0",
+  "private": true,
+  "main": "index.ts",
+  "description": "CampusFlow student app — QR positioning, GPS, indoor routing and bookings",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@maplibre/maplibre-react-native": "^10.2.0",
+    "expo": "~54.0.0",
+    "expo-camera": "~17.0.0",
+    "expo-location": "~19.0.0",
+    "expo-notifications": "~0.32.0",
+    "expo-secure-store": "~15.0.0",
+    "expo-status-bar": "~3.0.0",
+    "react": "19.1.0",
+    "react-native": "0.81.4"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "typescript": "~5.9.2"
+  }
+}

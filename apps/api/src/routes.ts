@@ -4,6 +4,7 @@ import { UNIVERSITIES, findUniversity } from './data/universities.ts';
 import { HttpError, Router, bool, isoDate, optionalStr, requireRole, requireUser, str } from './http.ts';
 import { findRoute } from './routing.ts';
 import {
+  DATA_FILE,
   DEMO_PASSWORD,
   announcements,
   bookings,
@@ -28,7 +29,7 @@ export const router = new Router();
 
 router.get('/api/v1/health', () => ({
   status: 'ok',
-  storage: 'in-memory (preview) — data resets when the API restarts',
+  storage: `json-file: ${DATA_FILE} (written after every mutation; sessions are not persisted)`,
   universities: UNIVERSITIES.length,
   indoorCampuses: UNIVERSITIES.filter((university) => university.indoorMappingPriority === 1).map((u) => u.slug),
   time: new Date().toISOString(),
