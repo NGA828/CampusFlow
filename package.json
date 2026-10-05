@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "dev": "node tools/dev.mjs",
+    "preview": "npm run build && node tools/dev.mjs --prod",
     "dev:api": "npm run dev --workspace @campusflow/api",
     "dev:web": "npm run dev --workspace @campusflow/web",
     "build": "npm run build --workspace @campusflow/web",
