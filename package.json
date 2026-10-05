@@ -1,34 +1,25 @@
 {
   "name": "campusflow",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "CampusFlow \u2014 Intelligent Campus Management, Navigation and Student Services Platform",
+  "description": "CampusFlow — campus discovery, indoor/outdoor navigation and student services for Yaoundé universities",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
   "scripts": {
-    "dev": "node scripts/dev.mjs",
-    "setup": "composer install --working-dir=backend && npm --prefix frontend install && npm --prefix mobile install && php backend/artisan migrate --seed",
-    "db:migrate": "php backend/artisan migrate",
-    "db:seed": "php backend/artisan db:seed",
-    "db:reset": "php backend/artisan migrate:fresh --seed",
-    "test": "cd backend && php artisan test",
-    "typecheck": "npm --prefix frontend run typecheck && npm --prefix mobile run typecheck",
-    "lint": "npm --prefix frontend run lint",
-    "check:php": "node scripts/check-php-syntax.mjs",
-    "check:api": "node scripts/check-api-contract.mjs",
-    "check:test": "cd backend && php artisan test",
-    "check:static": "npm run check:php && npm run check:api && npm run typecheck && npm run test:scripts",
-    "check": "npm run check:static && node -e \"console.log('\\n[gate] Static checks passed. These do NOT run the PHPUnit suite: a change can be syntactically valid and still be broken at runtime. Run npm run check:full before calling any work done.')\"",
-    "check:full": "npm run check:static && npm run check:test",
-    "check:separation": "node scripts/check-api-contract.mjs",
-    "osm:network": "node scripts/import-osm-network.mjs",
-    "test:scripts": "node --test scripts/*.test.mjs"
+    "dev": "node tools/dev.mjs",
+    "dev:api": "npm run dev --workspace @campusflow/api",
+    "dev:web": "npm run dev --workspace @campusflow/web",
+    "build": "npm run build --workspace @campusflow/web",
+    "typecheck": "npm run typecheck --workspace @campusflow/api && npm run typecheck --workspace @campusflow/web",
+    "test": "npm run test --workspace @campusflow/api",
+    "check": "npm run typecheck && npm run test"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.6"
   },
   "devDependencies": {
-    "newman": "^6.2.2",
-    "newman-reporter-htmlextra": "^1.23.1",
-    "php-parser": "^3.7.0",
-    "puppeteer": "^25.11.0"
+    "typescript": "^5.9.3"
   }
 }

@@ -1,2 +1,0 @@
-# Optional documentation build only; not application dependencies.
-reportlab==5.0.1

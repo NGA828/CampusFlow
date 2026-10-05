@@ -1,46 +1,14 @@
-# Dependencies
 node_modules/
-.pnp
-.pnp.js
-
-# Build output
 .next/
+.next-dev/
+.next-build/
 out/
 dist/
 build/
-.turbo/
-*.tsbuildinfo
-
-# Environment — real configuration stays local; `.env.example` files are tracked.
-.env
-.env.*
-!.env.example
-
-# Local database / uploaded artifacts (the API recreates these from migrations + seed)
-server/storage/
-
-# Logs
-*.log
-npm-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Test / coverage output
 coverage/
-.nyc_output/
-.pytest_cache/
-__pycache__/
-
-# Editors and OS
+*.log
+.env
+.env.local
 .DS_Store
-Thumbs.db
-.idea/
-.vscode/
-*.swp
-
-# Browser regression artifacts
-playwright-report/
-test-results/
-
-# Local audit scratch files
-.cache/
+next-env.d.ts
+*.tsbuildinfo
