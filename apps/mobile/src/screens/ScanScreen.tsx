@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { ApiError, api } from '../api';
+import { QrCamera } from '../components/QrCamera';
 import { colours, styles } from '../theme';
 import type { CampusModel, Position } from '../types';
 
@@ -11,37 +11,53 @@ import type { CampusModel, Position } from '../types';
  * The camera reads an anchor printed in a corridor and the *server* resolves it: the
  * phone never decides where it is. An unrecognised code is refused rather than
  * guessed, because a wrong indoor fix sends somebody down the wrong corridor.
+ *
+ * Three ways in, in order of convenience: the camera, typing the code printed under
+ * the QR, or picking the anchor from the list. All three hit the same endpoint.
  */
-export function ScanScreen({ onPosition, position }: { onPosition: (position: Position) => void; position: Position | null }) {
-  const [permission, requestPermission] = useCameraPermissions();
+export function ScanScreen({
+  onPosition,
+  position,
+}: {
+  onPosition: (position: Position) => void;
+  position: Position | null;
+}) {
   const [campus, setCampus] = useState<CampusModel | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [typed, setTyped] = useState('');
   const [scanning, setScanning] = useState(true);
   const lastCode = useRef<string | null>(null);
 
   useEffect(() => {
     void api<CampusModel>('/universities/iai-cameroun/campus')
       .then(setCampus)
-      .catch(() => setError('The campus model could not be loaded.'));
+      .catch(() => setError('Le plan du campus n’a pas pu être chargé.'));
   }, []);
 
-  async function resolve(code: string) {
-    if (code === lastCode.current) return;
-    lastCode.current = code;
-    setScanning(false);
-    try {
-      const payload = await api<{ position: Position }>('/positioning/scan', { method: 'POST', body: { code } });
-      onPosition(payload.position);
-      setError(null);
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'That anchor could not be read.');
-    } finally {
-      setTimeout(() => {
-        lastCode.current = null;
-        setScanning(true);
-      }, 1500);
-    }
-  }
+  const resolve = useCallback(
+    async (code: string) => {
+      const normalised = code.trim().toUpperCase();
+      if (!normalised || normalised === lastCode.current) return;
+      lastCode.current = normalised;
+      setScanning(false);
+      try {
+        const payload = await api<{ position: Position }>('/positioning/scan', {
+          method: 'POST',
+          body: { code: normalised },
+        });
+        onPosition(payload.position);
+        setError(null);
+      } catch (caught) {
+        setError(caught instanceof ApiError ? caught.message : 'Cette ancre n’a pas pu être lue.');
+      } finally {
+        setTimeout(() => {
+          lastCode.current = null;
+          setScanning(true);
+        }, 1500);
+      }
+    },
+    [onPosition],
+  );
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -61,25 +77,27 @@ export function ScanScreen({ onPosition, position }: { onPosition: (position: Po
       ) : null}
 
       <View style={styles.map}>
-        {!permission ? (
-          <Text style={[styles.muted, { padding: 16 }]}>Préparation de la caméra…</Text>
-        ) : !permission.granted ? (
-          <View style={{ padding: 16, gap: 10 }}>
-            <Text style={styles.muted}>
-              CampusFlow a besoin de la caméra pour lire les ancres QR. Sans autorisation, choisissez une ancre dans la liste
-              ci-dessous.
-            </Text>
-            <Pressable accessibilityRole="button" style={styles.button} onPress={() => void requestPermission()}>
-              <Text style={styles.buttonText}>Autoriser la caméra</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <CameraView
-            style={{ flex: 1 }}
-            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-            onBarcodeScanned={scanning ? (result) => void resolve(result.data.trim().toUpperCase()) : undefined}
+        <QrCamera active={scanning} onCode={(code) => void resolve(code)} />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Saisir le code</Text>
+        <Text style={styles.muted}>Le code imprimé sous le QR, par exemple IAI-ADM-ENT.</Text>
+        <View style={[styles.row, { alignItems: 'center' }]}>
+          <TextInput
+            style={[styles.input, { flex: 1 }]}
+            value={typed}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            placeholder="IAI-…"
+            placeholderTextColor={colours.ink500}
+            onChangeText={setTyped}
+            onSubmitEditing={() => void resolve(typed)}
           />
-        )}
+          <Pressable accessibilityRole="button" style={styles.button} onPress={() => void resolve(typed)}>
+            <Text style={styles.buttonText}>Valider</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.card}>

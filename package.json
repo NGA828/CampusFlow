@@ -14,7 +14,10 @@
     "build": "npm run build --workspace @campusflow/web",
     "typecheck": "npm run typecheck --workspace @campusflow/api && npm run typecheck --workspace @campusflow/web",
     "test": "npm run test --workspace @campusflow/api",
-    "check": "npm run typecheck && npm run test"
+    "check": "npm run typecheck && npm run test",
+    "mobile:install": "npm install --prefix apps/mobile",
+    "mobile:web": "npm run build:web --prefix apps/mobile && npm run serve:web --prefix apps/mobile",
+    "mobile:smoke": "npm run smoke:web --prefix apps/mobile"
   },
   "engines": {
     "node": ">=22.6"

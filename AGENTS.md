@@ -8,7 +8,7 @@ CampusFlow is a small npm-workspace monorepo. Read this before changing anything
 | --- | --- |
 | `apps/api` | REST API, Node standard library only. Run with `node --experimental-strip-types`. |
 | `apps/web` | Next.js 16 app router, React 19, MapLibre GL. |
-| `apps/mobile` | Expo student app. **Not** an npm workspace, not installed, not type-checked in CI. |
+| `apps/mobile` | Expo student app (Android, iOS, web). **Not** an npm workspace — install it separately. |
 | `tools/dev.mjs` | Starts the API (4000) and the web app (3000) together. |
 | `docs/` | Content provenance for the directory and the content feed. |
 
@@ -28,6 +28,19 @@ CampusFlow is a small npm-workspace monorepo. Read this before changing anything
    `disablePersistence()` before anything else; new test files must too.
 5. **IAI Cameroun is the indoor pilot.** Other campuses answer 404 on
    `/universities/:slug/campus` by design; the message says so.
+
+## The mobile app
+
+Platform differences live in paired files (`x.ts` native / `x.web.ts` web) that the
+bundler picks between — do not add `Platform.OS` branches above that layer. Anything
+the platform cannot do (no camera, no WebGL, no keychain) must degrade to a visible
+fallback, never a crash: `npm run smoke:web` asserts exactly that.
+
+After changing mobile code:
+
+```bash
+cd apps/mobile && npm run typecheck && npm run build:web && npm run smoke:web
+```
 
 ## Before you finish
 

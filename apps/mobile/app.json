@@ -17,22 +17,48 @@
     },
     "android": {
       "package": "cm.campusflow.app",
-      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0b1020"
+      }
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#0b1020",
+          "imageWidth": 180
+        }
+      ],
       "expo-secure-store",
       [
         "expo-camera",
-        { "cameraPermission": "CampusFlow reads the QR anchors on campus walls to place you indoors." }
+        {
+          "cameraPermission": "CampusFlow reads the QR anchors on campus walls to place you indoors."
+        }
       ],
       [
         "expo-location",
-        { "locationWhenInUsePermission": "CampusFlow guides you to your institution outdoors." }
+        {
+          "locationWhenInUsePermission": "CampusFlow guides you to your institution outdoors."
+        }
       ],
       "@maplibre/maplibre-react-native"
     ],
     "extra": {
       "apiUrl": "http://10.0.2.2:4000/api/v1"
-    }
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "output": "single"
+    },
+    "icon": "./assets/icon.png"
   }
 }

@@ -1,19 +1,34 @@
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+import { readToken, writeToken } from './token-store';
 
 /**
  * Mobile HTTP client.
  *
- * The phone talks to the API directly (there is no Next.js rewrite in front of it),
+ * The phone talks to the API directly — there is no Next.js rewrite in front of it —
  * so the base URL is configuration, never a literal scattered through screens:
  *   EXPO_PUBLIC_API_URL=http://192.168.1.20:4000/api/v1
- * The default targets the Android emulator's host alias.
  *
- * The session token lives in SecureStore — the platform keychain — because a token on
- * a phone outlives the process and must not sit in plain AsyncStorage.
+ * Without that variable the app guesses sensibly instead of failing:
+ *   • web, hosted preview (`8081-<sandbox>.e2b.app`) → the API on the same sandbox
+ *   • web, local            → the API on the same hostname, port 4000
+ *   • native                → the Android emulator's alias for the host machine
  */
-export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:4000/api/v1';
+function resolveApiUrl(): string {
+  const configured = process.env.EXPO_PUBLIC_API_URL;
+  if (configured) return configured;
 
-const TOKEN_KEY = 'campusflow.token';
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+    // Hosted sandbox previews expose every port as `<port>-<sandbox-id>.<domain>`.
+    const preview = hostname.match(/^(\d+)-(.+)$/);
+    if (preview) return `${protocol}//4000-${preview[2]}/api/v1`;
+    return `${protocol}//${hostname}:4000/api/v1`;
+  }
+
+  return 'http://10.0.2.2:4000/api/v1';
+}
+
+export const API_URL = resolveApiUrl();
 
 export class ApiError extends Error {
   status: number;
@@ -28,25 +43,19 @@ let cachedToken: string | null = null;
 
 export async function loadToken(): Promise<string | null> {
   if (cachedToken) return cachedToken;
-  try {
-    cachedToken = await SecureStore.getItemAsync(TOKEN_KEY);
-  } catch {
-    cachedToken = null;
-  }
+  cachedToken = await readToken();
   return cachedToken;
 }
 
 export async function saveToken(token: string | null): Promise<void> {
   cachedToken = token;
-  try {
-    if (token) await SecureStore.setItemAsync(TOKEN_KEY, token);
-    else await SecureStore.deleteItemAsync(TOKEN_KEY);
-  } catch {
-    /* keychain unavailable on this device — the cached token keeps this launch signed in */
-  }
+  await writeToken(token);
 }
 
-export async function api<T>(path: string, options: { method?: 'GET' | 'POST'; body?: unknown; auth?: boolean } = {}): Promise<T> {
+export async function api<T>(
+  path: string,
+  options: { method?: 'GET' | 'POST'; body?: unknown; auth?: boolean } = {},
+): Promise<T> {
   const headers: Record<string, string> = { accept: 'application/json' };
   if (options.body !== undefined) headers['content-type'] = 'application/json';
   if (options.auth !== false) {
@@ -68,7 +77,10 @@ export async function api<T>(path: string, options: { method?: 'GET' | 'POST'; b
   const text = await response.text();
   const payload = text ? (JSON.parse(text) as Record<string, unknown>) : {};
   if (!response.ok) {
-    throw new ApiError(response.status, typeof payload.error === 'string' ? payload.error : 'The request could not be completed.');
+    throw new ApiError(
+      response.status,
+      typeof payload.error === 'string' ? payload.error : 'The request could not be completed.',
+    );
   }
   return payload as T;
 }

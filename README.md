@@ -94,18 +94,33 @@ Set `CAMPUSFLOW_DATA_FILE` to move the file; delete it to go back to the seed.
 
 `apps/mobile` is the student experience on a phone: four tabs (Aujourd'hui, Scanner,
 Carte, Salles), QR anchors scanned with the camera and resolved by the API, GPS
-outdoors, MapLibre native rendering of the same campus model the web app draws, room
-requests, and local notifications for time-sensitive guidance.
+outdoors, MapLibre rendering of the same campus model the web app draws, room
+requests, and notifications for time-sensitive guidance.
 
-It is kept out of the npm workspaces on purpose — it needs a native toolchain, which
-this repository's CI does not have, and installing it would slow every `npm install`
-down. See `apps/mobile/README.md` for how to build the development client.
+It runs in a browser too, which is how it can be reviewed without Android Studio:
+
+```bash
+npm run mobile:install     # once — it is not part of the root workspaces
+npm run mobile:web         # builds and serves the student app on :8081
+npm run mobile:smoke       # drives it end to end against the running API
+```
+
+The browser build is the same code, not a mock: the bundler swaps four files per
+platform (keychain/localStorage, MapLibre Native/GL JS, expo-camera/getUserMedia,
+expo-notifications/Notification). For a real device, `apps/mobile/README.md` has the
+development-client instructions — MapLibre Native and expo-camera cannot run in Expo
+Go.
+
+`apps/mobile` is kept out of the npm workspaces on purpose: it needs a native
+toolchain, and installing it would slow every root `npm install` down.
 
 ## Known limits
 
 - The JSON data file is a single-writer store for one API process — fine for a
   demo and a pilot campus, not a substitute for a database.
 - The IAI indoor model is a working model of the Nkol Anga'a campus, not a survey.
-- The mobile app is shipped as source: it requires a custom Expo development build
-  (MapLibre native and `expo-camera` do not run in Expo Go) and cannot be compiled
-  in this sandbox.
+- The mobile app's **native** binary is not built here — no Android/iOS toolchain in
+  this sandbox. Its web target is built, served and smoke-tested on every change; the
+  native target shares all of that code but is verified only by type-checking.
+- Mobile notifications are local, not push: real push needs an Expo project id and a
+  server holding device tokens.

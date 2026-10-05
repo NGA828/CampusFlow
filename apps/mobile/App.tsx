@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, SafeAreaView, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import * as Notifications from 'expo-notifications';
 import { SessionProvider, useSession } from './src/session';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { ScanScreen } from './src/screens/ScanScreen';
 import { MapScreen } from './src/screens/MapScreen';
 import { BookingsScreen } from './src/screens/BookingsScreen';
+import { useLiveNotifications } from './src/useLiveNotifications';
+import { notify } from './src/notify';
 import { colours, styles } from './src/theme';
 import type { Position } from './src/types';
 
@@ -18,16 +19,6 @@ import type { Position } from './src/types';
  * experience is a small, flat set of screens, and the indoor position is shared
  * between Scan and Map, so one owner for that state keeps the behaviour obvious.
  */
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: true,
-  }),
-});
-
 const TABS = [
   { id: 'today', label: 'Aujourd’hui' },
   { id: 'scan', label: 'Scanner' },
@@ -41,12 +32,11 @@ function Shell() {
   const { user, loading } = useSession();
   const [tab, setTab] = useState<TabId>('today');
   const [position, setPosition] = useState<Position | null>(null);
+  const [feedVersion, setFeedVersion] = useState(0);
 
-  // Time-sensitive guidance is delivered as a local notification; a push token would be
-  // registered here too once a project id is configured for this build.
-  useEffect(() => {
-    void Notifications.requestPermissionsAsync();
-  }, []);
+  // Decisions on room requests and new announcements arrive as device notifications
+  // while the app is open; the counter nudges the Today screen to reload with them.
+  useLiveNotifications(Boolean(user), () => setFeedVersion((version) => version + 1));
 
   if (loading) {
     return (
@@ -61,16 +51,13 @@ function Shell() {
   return (
     <View style={styles.screen}>
       <View style={{ flex: 1 }}>
-        {tab === 'today' ? <TodayScreen /> : null}
+        {tab === 'today' ? <TodayScreen key={feedVersion} /> : null}
         {tab === 'scan' ? (
           <ScanScreen
             position={position}
             onPosition={(fixed) => {
               setPosition(fixed);
-              void Notifications.scheduleNotificationAsync({
-                content: { title: 'Position fixée', body: `${fixed.label} — ${fixed.floorName}` },
-                trigger: null,
-              });
+              void notify('Position fixée', `${fixed.label} — ${fixed.floorName}`);
             }}
           />
         ) : null}

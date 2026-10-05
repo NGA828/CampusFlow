@@ -1,0 +1,129 @@
+import { useEffect, useRef, useState } from 'react';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { Text, View } from 'react-native';
+import { colours, styles } from '../theme';
+import { STYLE_URL, type CampusMapProps } from './map-types';
+
+/**
+ * Web campus map — the same MapLibre style and the same data as the native map,
+ * rendered with MapLibre GL JS so the app can be reviewed in a browser without a
+ * native build. Markers and the route line are reconciled on every prop change
+ * rather than rebuilt with the map, which keeps panning stable while routing.
+ */
+export function CampusMapView({ centre, zoom, buildings, gps, indoor, route }: CampusMapProps) {
+  const container = useRef<HTMLDivElement | null>(null);
+  const map = useRef<maplibregl.Map | null>(null);
+  const markers = useRef<maplibregl.Marker[]>([]);
+  const ready = useRef(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!container.current || map.current) return;
+
+    // WebGL is not available everywhere — a locked-down browser or a software
+    // renderer throws here, and that must degrade to a message, not a blank app.
+    let instance: maplibregl.Map;
+    try {
+      instance = new maplibregl.Map({
+        container: container.current,
+        style: STYLE_URL,
+        center: centre,
+        zoom,
+        attributionControl: { compact: true },
+      });
+    } catch {
+      setFailed(true);
+      return;
+    }
+    instance.on('error', (event) => {
+      if (String(event?.error?.message ?? '').includes('WebGL')) setFailed(true);
+    });
+    instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    instance.on('load', () => {
+      ready.current = true;
+      instance.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      instance.addLayer({
+        id: 'route-line',
+        type: 'line',
+        source: 'route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': colours.brand, 'line-width': 5 },
+      });
+    });
+    map.current = instance;
+    return () => {
+      instance.remove();
+      map.current = null;
+      ready.current = false;
+    };
+    // The map is created once; every later change is applied by the effects below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    map.current?.easeTo({ center: centre, zoom, duration: 700 });
+  }, [centre[0], centre[1], zoom]);
+
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance) return;
+
+    for (const marker of markers.current) marker.remove();
+    markers.current = [];
+
+    const add = (coordinates: [number, number], element: HTMLElement) => {
+      markers.current.push(new maplibregl.Marker({ element }).setLngLat(coordinates).addTo(instance));
+    };
+
+    for (const building of buildings) {
+      const label = document.createElement('div');
+      label.textContent = building.code;
+      label.title = building.name;
+      label.style.cssText = `background:${colours.ink};color:white;font:800 11px/1 system-ui;padding:4px 7px;border-radius:8px`;
+      add(building.coordinates, label);
+    }
+
+    const dot = (colour: string, size: number) => {
+      const element = document.createElement('div');
+      element.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:${colour};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)`;
+      return element;
+    };
+
+    if (gps) add(gps, dot(colours.brand, 16));
+    if (indoor) add(indoor, dot(colours.gold, 18));
+  }, [buildings, gps?.[0], gps?.[1], indoor?.[0], indoor?.[1]]);
+
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance || !ready.current) return;
+    const source = instance.getSource('route') as maplibregl.GeoJSONSource | undefined;
+    if (!source) return;
+    source.setData(
+      route && route.length > 1
+        ? { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: route } }
+        : { type: 'FeatureCollection', features: [] },
+    );
+    if (route && route.length > 1) {
+      const bounds = route.reduce(
+        (box, point) => box.extend(point),
+        new maplibregl.LngLatBounds(route[0], route[0]),
+      );
+      instance.fitBounds(bounds, { padding: 60, maxZoom: 19, duration: 700 });
+    }
+  }, [route]);
+
+  if (failed) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <Text style={styles.cardTitle}>Carte indisponible</Text>
+        <Text style={[styles.muted, { textAlign: 'center' }]}>
+          Ce navigateur ne peut pas afficher la carte (WebGL indisponible). Les itinéraires et les instructions
+          ci-dessous restent utilisables.
+        </Text>
+      </View>
+    );
+  }
+
+  return <div ref={container} style={{ position: 'absolute', inset: 0 }} />;
+}
