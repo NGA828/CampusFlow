@@ -48,8 +48,42 @@ export interface SessionInfo {
 
 /* --------------------------------------------------------------------- campus */
 
+/**
+ * An institution on the Yaoundé map. Fields are null when OpenStreetMap records no value for that
+ * institution — render them as unknown, never substitute a placeholder.
+ */
+export interface University {
+  id: UUID;
+  code: string;
+  name: string;
+  name_en: string | null;
+  short_name: string | null;
+  type: 'public' | 'private' | 'confessional';
+  operator: string | null;
+  description: string | null;
+  lat: number | null;
+  lng: number | null;
+  /** [lng, lat] ring of the campus grounds; null when OSM has no polygon. */
+  boundary: [number, number][] | null;
+  website: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  wikipedia: string | null;
+  logo_url: string | null;
+  established: string | null;
+  /** OSM wheelchair tag; null means unsurveyed, which is not the same as inaccessible. */
+  wheelchair: 'yes' | 'no' | 'limited' | null;
+  is_primary: boolean;
+  status: string;
+  osm_url: string | null;
+  buildings_count?: number;
+}
+
 export interface Building {
   id: UUID;
+  university_id: UUID | null;
+  university: { id: UUID; code: string; name: string } | null;
   code: string;
   name: string;
   description: string | null;

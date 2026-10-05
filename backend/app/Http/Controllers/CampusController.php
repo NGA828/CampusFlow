@@ -7,12 +7,15 @@ use App\Http\Controllers\Concerns\RespondsJson;
 use App\Models\Building;
 use App\Models\Floor;
 use App\Models\Room;
+use App\Models\University;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 /**
  * Campus spatial endpoints:
+ *  GET /universities
+ *  GET /universities/{id}
  *  GET /buildings
  *  GET /buildings/{id}
  *  GET /buildings/{id}/floors
@@ -27,11 +30,55 @@ class CampusController extends Controller
     use BuildsRoomAvailability;
     use RespondsJson;
 
+    // ── Universities ────────────────────────────────────────────────────────
+
+    /**
+     * Every institution on the Yaoundé map.
+     *
+     * Values come from the OpenStreetMap-derived dataset. A null field means OSM records nothing
+     * for that institution, and the clients must show it as unknown rather than inventing a value.
+     */
+    public function universities(): JsonResponse
+    {
+        $universities = University::withCount('buildings')
+            ->where('status', '!=', 'closed')
+            ->orderByDesc('is_primary')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($u) => $u->toApiArray());
+
+        return $this->ok([
+            'universities' => $universities,
+            'attribution'  => '© OpenStreetMap contributors (ODbL)',
+        ]);
+    }
+
+    public function university(string $id): JsonResponse
+    {
+        $university = University::withCount('buildings')
+            ->where('id', $id)
+            ->orWhere('code', strtoupper($id))
+            ->firstOrFail();
+
+        $buildings = $university->buildings()
+            ->withCount('floors')
+            ->where('status', '!=', 'closed')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($b) => $b->toApiArray());
+
+        return $this->ok([
+            'university'  => $university->toApiArray(),
+            'buildings'   => $buildings,
+            'attribution' => '© OpenStreetMap contributors (ODbL)',
+        ]);
+    }
+
     // ── Buildings ───────────────────────────────────────────────────────────
 
     public function buildings(): JsonResponse
     {
-        $buildings = Building::withCount('floors')
+        $buildings = Building::with('university')->withCount('floors')
             ->where('status', '!=', 'closed')
             ->orderBy('name')
             ->get()

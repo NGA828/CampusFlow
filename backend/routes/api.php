@@ -103,6 +103,10 @@ Route::middleware(['auth:sanctum', 'role:student,staff,admin'])->prefix('me')->g
 // Buildings, floors, rooms, boards and route preview for anyone with a CampusFlow account.
 // Visitors get /public/* instead, which is a narrower projection of the same tables.
 Route::middleware(['auth:sanctum', 'role:student,staff,admin'])->prefix('campus')->group(function () {
+    // The Yaoundé institution map. `universities` is the top of the spatial tree: buildings belong
+    // to an institution, so the map can show every campus in the city, not just the one operated here.
+    Route::get('/universities', [CampusController::class, 'universities']);
+    Route::get('/universities/{id}', [CampusController::class, 'university']);
     Route::get('/buildings', [CampusController::class, 'buildings']);
     Route::get('/buildings/{id}', [CampusController::class, 'building']);
     Route::get('/buildings/{buildingId}/floors', [CampusController::class, 'floors']);

@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "university_code": "UY1",
+  "source": {
+    "provider": "OpenStreetMap",
+    "licence": "ODbL 1.0",
+    "attribution": "© OpenStreetMap contributors — data made available under the Open Database License (ODbL).",
+    "licence_url": "https://www.openstreetmap.org/copyright",
+    "harvested_at": "2026-10-05",
+    "osm_base_timestamp": "2026-10-05T06:37:50Z",
+    "query": "way[building][name](3.8525,11.4950,3.8610,11.5043) — the Université de Yaoundé I campus bounding box",
+    "notes": [
+      "Names, coordinates, storey counts and heights are read from OSM. `levels` and `height_m` are null where the upstream feature is untagged — they are NOT estimated.",
+      "Two named buildings inside the bounding box are deliberately excluded because they are not university facilities: Hôtel les Ancêtres (tourism=hotel, way 192854381) and Hôtel de Police (amenity=police, way 806841844).",
+      "`category` is derived from the OSM building/amenity tags by the seeder's own mapping; it is an interpretation of real tags, not new data."
+    ]
+  },
+  "buildings": [
+    { "code": "UY1-A1001", "name": "Amphi 1001", "lat": 3.8598696, "lng": 11.5007718, "osm_id": 188083941, "osm_building": "university", "levels": null, "height_m": null, "category": "lecture" },
+    { "code": "UY1-A1002", "name": "Amphi 1002", "lat": 3.8601531, "lng": 11.5003829, "osm_id": 806882622, "osm_building": "university", "levels": null, "height_m": null, "category": "lecture" },
+    { "code": "UY1-A1003", "name": "Amphi 1003", "lat": 3.8556385, "lng": 11.5011961, "osm_id": 806813380, "osm_building": "public", "levels": null, "height_m": null, "category": "lecture" },
+    { "code": "UY1-A300", "name": "Amphi 300", "lat": 3.8578211, "lng": 11.5014102, "osm_id": 192839406, "osm_building": "school", "levels": null, "height_m": null, "category": "lecture" },
+    { "code": "UY1-A700", "name": "Amphi 700", "lat": 3.8582489, "lng": 11.5022189, "osm_id": 192848115, "osm_building": "school", "levels": null, "height_m": null, "category": "lecture" },
+    { "code": "UY1-A501", "name": "Amphi 501", "lat": 3.8574734, "lng": 11.4993618, "osm_id": 192852932, "osm_building": "university", "levels": null, "height_m": null, "category": "lecture" },
+    { "code": "UY1-A502", "name": "Amphi 502", "lat": 3.8575846, "lng": 11.4990890, "osm_id": 192839636, "osm_building": "university", "levels": null, "height_m": null, "category": "lecture" },
+    { "code": "UY1-A250350", "name": "Amphi 250 & 350", "lat": 3.8582718, "lng": 11.5001002, "osm_id": 207523606, "osm_building": "university", "levels": null, "height_m": null, "category": "lecture" },
+    { "code": "UY1-A1", "name": "Amphi 1", "lat": 3.8577383, "lng": 11.5008986, "osm_id": 806823970, "osm_building": "university", "levels": null, "height_m": null, "category": "lecture" },
+    { "code": "UY1-A2", "name": "Amphi 2", "lat": 3.8576617, "lng": 11.5007661, "osm_id": 806824611, "osm_building": "university", "levels": null, "height_m": null, "category": "lecture" },
+    { "code": "UY1-A3", "name": "Amphi 3", "lat": 3.8575994, "lng": 11.5004769, "osm_id": 806821326, "osm_building": "university", "levels": null, "height_m": null, "category": "lecture" },
+
+    { "code": "UY1-FALSS", "name": "Faculty of Arts, Letters and Social Sciences", "lat": 3.8570830, "lng": 11.5011149, "osm_id": 192850935, "osm_building": "yes", "levels": null, "height_m": null, "category": "faculty" },
+    { "code": "UY1-ESSTIC", "name": "ESSTIC", "lat": 3.8589563, "lng": 11.5018801, "osm_id": 219197135, "osm_building": "public", "levels": null, "height_m": null, "category": "faculty", "elevation_m": 771 },
+    { "code": "UY1-ASMAC", "name": "A.S.M.A.C.", "lat": 3.8586660, "lng": 11.5019659, "osm_id": 192842499, "osm_building": "public", "levels": null, "height_m": null, "category": "faculty" },
+    { "code": "UY1-CERDIC", "name": "Centre d'Études et de Recherche en Droit International et Communautaire", "lat": 3.8582362, "lng": 11.5015878, "osm_id": 192845325, "osm_building": "public", "levels": null, "height_m": null, "category": "research" },
+    { "code": "UY1-NOLANGA", "name": "Centre d'études NOLANGA", "lat": 3.8547954, "lng": 11.5010919, "osm_id": 192851385, "osm_building": "yes", "levels": null, "height_m": null, "category": "research" },
+    { "code": "UY1-CALCUL", "name": "Centre de Calcul", "lat": 3.8582116, "lng": 11.4995389, "osm_id": 192847151, "osm_building": "public", "levels": null, "height_m": null, "category": "research" },
+    { "code": "UY1-PEDAGO", "name": "Bâtiment Pédagogique", "lat": 3.8570625, "lng": 11.5007638, "osm_id": 806885745, "osm_building": "yes", "levels": null, "height_m": null, "category": "faculty" },
+
+    { "code": "UY1-BATA", "name": "Bâtiment A", "lat": 3.8554937, "lng": 11.4999108, "osm_id": 192851159, "osm_building": "public", "levels": 3, "height_m": 15, "category": "administration" },
+    { "code": "UY1-BATD", "name": "Bâtiment D", "lat": 3.8592403, "lng": 11.5013989, "osm_id": 806880270, "osm_building": "yes", "levels": null, "height_m": null, "category": "administration" },
+    { "code": "UY1-BATE", "name": "Bâtiment E", "lat": 3.8592339, "lng": 11.5016732, "osm_id": 806880269, "osm_building": "yes", "levels": null, "height_m": null, "category": "administration" },
+    { "code": "UY1-BATE-S", "name": "Bâtiment E (sinistré)", "lat": 3.8556651, "lng": 11.4990002, "osm_id": 192850487, "osm_building": "yes", "levels": 2, "height_m": 10, "category": "administration", "status": "closed", "status_reason": "OSM records this building as 'sinistre' (fire/disaster damaged)." },
+    { "code": "UY1-BATF", "name": "Bâtiment F", "lat": 3.8548909, "lng": 11.4990550, "osm_id": 192851131, "osm_building": "yes", "levels": 4, "height_m": 25, "category": "administration" },
+    { "code": "UY1-BATH", "name": "Bâtiment H — Division des Logements", "lat": 3.8546390, "lng": 11.4994816, "osm_id": 192851165, "osm_building": "yes", "levels": null, "height_m": null, "category": "administration" },
+    { "code": "UY1-SCOL", "name": "Scolarité", "lat": 3.8578329, "lng": 11.5005983, "osm_id": 806822624, "osm_building": "public", "levels": null, "height_m": null, "category": "administration" },
+    { "code": "UY1-INFO", "name": "Poste de renseignements", "lat": 3.8564230, "lng": 11.5035639, "osm_id": 192854628, "osm_building": "yes", "levels": null, "height_m": null, "category": "administration" },
+
+    { "code": "UY1-CITE-I", "name": "Mini Cités — Bâtiment I", "lat": 3.8577901, "lng": 11.4961823, "osm_id": 192850843, "osm_building": "public", "levels": null, "height_m": null, "category": "residence" },
+    { "code": "UY1-CITE-L", "name": "Mini Cités — Bâtiment L", "lat": 3.8579139, "lng": 11.4964711, "osm_id": 192851557, "osm_building": "public", "levels": null, "height_m": null, "category": "residence" },
+    { "code": "UY1-CITE", "name": "Mini Cité", "lat": 3.8553251, "lng": 11.4994428, "osm_id": 192851232, "osm_building": "public", "levels": null, "height_m": null, "category": "residence" },
+    { "code": "UY1-CITE-UY1", "name": "Mini Cité UY1", "lat": 3.8540681, "lng": 11.4988306, "osm_id": 192851304, "osm_building": "public", "levels": null, "height_m": null, "category": "residence" },
+
+    { "code": "UY1-CMS", "name": "Centre Médico-Social", "lat": 3.8581095, "lng": 11.5042976, "osm_id": 192841434, "osm_building": "yes", "levels": null, "height_m": null, "category": "health", "amenity": "doctors" },
+    { "code": "UY1-PHARM", "name": "Pharmacie de l'Université", "lat": 3.8595544, "lng": 11.5044198, "osm_id": 192843865, "osm_building": "yes", "levels": null, "height_m": null, "category": "health", "amenity": "pharmacy" },
+    { "code": "UY1-EAUX", "name": "Service des eaux", "lat": 3.8564545, "lng": 11.5034149, "osm_id": 221012906, "osm_building": "yes", "levels": null, "height_m": null, "category": "utility" }
+  ]
+}

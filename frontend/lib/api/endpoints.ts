@@ -71,6 +71,7 @@ import type {
   TimetableEntry,
   TimetableWeek,
   User,
+  University,
 } from './types';
 
 export interface ListQuery {
@@ -285,6 +286,13 @@ export const publicApi = {
  * Data, not a screen: each role renders it differently and nothing in this group writes.
  */
 export const campusApi = {
+  /** Every institution on the Yaoundé map, primary campus first. */
+  universities: () =>
+    api.get<{ universities: University[]; attribution: string }>('/campus/universities', { timeoutMs: 12_000 }),
+  university: (idOrCode: string) =>
+    api.get<{ university: University; buildings: Building[]; attribution: string }>(
+      `/campus/universities/${idOrCode}`,
+    ),
   buildings: () => api.get<{ buildings: Building[] }>('/campus/buildings', { timeoutMs: 12_000 }),
   building: async (idOrCode: string) => normalizeBuildingPayload(await api.get<unknown>(`/campus/buildings/${idOrCode}`)),
   floors: async (buildingId: string) => normalizeFloorList(await api.get<unknown>(`/campus/buildings/${buildingId}/floors`)),
