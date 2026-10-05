@@ -51,7 +51,8 @@ const D = window.document;
 
 // Browser capabilities jsdom does not implement. Each one stands in for a device
 // that genuinely lacks it, so the app must cope with all of them.
-window.fetch = (input, init) => fetch(String(input), init);
+// The app calls its own origin (`/api/v1/...`); node's fetch needs that resolved.
+window.fetch = (input, init) => fetch(new URL(String(input), APP).toString(), init);
 window.URL.createObjectURL = () => 'blob:stub';
 window.URL.revokeObjectURL = () => {};
 window.HTMLCanvasElement.prototype.getContext = () => null;

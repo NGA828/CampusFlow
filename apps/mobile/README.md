@@ -24,16 +24,22 @@ browser build exists: it is the same screens, the same API calls, reviewable any
 
 ### Where the API is
 
-No hardcoded host. `EXPO_PUBLIC_API_URL` wins if set; otherwise the app works it out:
+No hardcoded host. `EXPO_PUBLIC_API_URL` wins if set; otherwise:
 
 | Target | Default |
 | --- | --- |
-| Web, hosted preview (`8081-<sandbox>.e2b.app`) | the API on the same sandbox, port 4000 |
-| Web, local | `http://<same host>:4000/api/v1` |
+| Web (any host, local or hosted) | `/api/v1` on the **same origin**, proxied to the API by `tools/serve-web.mjs` |
 | Android emulator | `http://10.0.2.2:4000/api/v1` (the emulator's alias for your machine) |
 
-A physical phone is not on the emulator's network, so set `EXPO_PUBLIC_API_URL` to
-your machine's LAN address there.
+The web build deliberately never names a host. It used to guess one — `<host>:4000`,
+with a special case for `<port>-<sandbox>` preview domains — and that fails for every
+hostname the guess did not anticipate: the browser is not the machine running the API
+and port 4000 is usually not reachable from it. Calling its own origin and letting the
+static server do the hop works everywhere, with no CORS and no configuration. Point
+the proxy elsewhere with `API_ORIGIN=http://host:4000 npm run serve:web`.
+
+A physical phone talks to the API directly, so set `EXPO_PUBLIC_API_URL` to your
+machine's LAN address there.
 
 ## Screens
 

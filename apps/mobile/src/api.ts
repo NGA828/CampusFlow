@@ -4,27 +4,24 @@ import { readToken, writeToken } from './token-store';
 /**
  * Mobile HTTP client.
  *
- * The phone talks to the API directly — there is no Next.js rewrite in front of it —
- * so the base URL is configuration, never a literal scattered through screens:
+ * A real phone talks to the API directly, so the base URL is configuration rather
+ * than a literal scattered through screens:
  *   EXPO_PUBLIC_API_URL=http://192.168.1.20:4000/api/v1
  *
- * Without that variable the app guesses sensibly instead of failing:
- *   • web, hosted preview (`8081-<sandbox>.e2b.app`) → the API on the same sandbox
- *   • web, local            → the API on the same hostname, port 4000
- *   • native                → the Android emulator's alias for the host machine
+ * Without that variable:
+ *   • web → **same origin**, `/api/v1`, proxied to the API by `tools/serve-web.mjs`.
+ *     This used to guess a host and port (`<host>:4000`, or `4000-<sandbox>` for one
+ *     particular preview domain) and it broke the moment the app was opened through
+ *     any other hostname: the browser is not the machine running the API, that port
+ *     is usually not routable from it, and the guess fails as an unreachable-network
+ *     error. The browser must only ever call the origin it was served from.
+ *   • native → the Android emulator's alias for the host machine, which is a real
+ *     direct connection and cannot be relative.
  */
 function resolveApiUrl(): string {
   const configured = process.env.EXPO_PUBLIC_API_URL;
   if (configured) return configured;
-
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    const { protocol, hostname } = window.location;
-    // Hosted sandbox previews expose every port as `<port>-<sandbox-id>.<domain>`.
-    const preview = hostname.match(/^(\d+)-(.+)$/);
-    if (preview) return `${protocol}//4000-${preview[2]}/api/v1`;
-    return `${protocol}//${hostname}:4000/api/v1`;
-  }
-
+  if (Platform.OS === 'web') return '/api/v1';
   return 'http://10.0.2.2:4000/api/v1';
 }
 
