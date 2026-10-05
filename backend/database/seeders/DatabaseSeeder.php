@@ -32,7 +32,12 @@ class DatabaseSeeder extends Seeder
     {
         // Truncate non-user tables so the seeder can re-run safely without migrate:fresh.
         // CASCADE handles FK ordering in PostgreSQL.
-        DB::statement('TRUNCATE TABLE announcements, campus_events, timetable_entries, enrollments, courses, terms, office_service_windows, office_tickets, offices, queue_tickets, room_queues, navigation_edges, navigation_nodes, qr_nodes, rooms, floors, buildings, settings CASCADE');
+        DB::statement('TRUNCATE TABLE announcements, campus_events, timetable_entries, enrollments, courses, terms, office_service_windows, office_tickets, offices, queue_tickets, room_queues, navigation_edges, navigation_nodes, qr_nodes, rooms, floors, facilities, buildings, universities, settings CASCADE');
+
+        // Real Yaoundé institutions and the real UY1 building set, loaded from the OpenStreetMap
+        // datasets in database/data/. Everything below attaches to those rows — the campus is a
+        // real place, so the demo must not invent buildings on top of it.
+        $this->call(UniversitySeeder::class);
 
         // 1. Core Users
         $admin = User::updateOrCreate(
@@ -87,14 +92,23 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 2. Spatial Infrastructure — 7 Campus Buildings
-        $stb = Building::create(['code' => 'STB', 'name' => 'Science & Technology Building', 'short_name' => 'SciTech', 'lat' => 37.774929, 'lng' => -122.419416, 'description' => 'Main engineering labs, CS department, and lecture halls.', 'status' => 'active']);
-        $sub = Building::create(['code' => 'SUB', 'name' => 'Student Union Building', 'short_name' => 'StudentUnion', 'lat' => 37.775200, 'lng' => -122.418800, 'description' => 'Administrative offices, registrar, financial aid, and food court.', 'status' => 'active']);
-        $lib = Building::create(['code' => 'LIB', 'name' => 'University Library & Learning Commons', 'short_name' => 'Library', 'lat' => 37.775600, 'lng' => -122.419100, 'description' => 'Study halls, digital archives, and technology help desk.', 'status' => 'active']);
-        $eng = Building::create(['code' => 'ENG', 'name' => 'Engineering & Applied Sciences Complex', 'short_name' => 'Engineering', 'lat' => 37.774400, 'lng' => -122.420100, 'description' => '3D printing workshops, robotics lab, and circuits studios.', 'status' => 'active']);
-        $bus = Building::create(['code' => 'BUS', 'name' => 'School of Business & Management', 'short_name' => 'Business', 'lat' => 37.776100, 'lng' => -122.418300, 'description' => 'Executive lecture halls, trading floor lab, and startup incubator.', 'status' => 'active']);
-        $sac = Building::create(['code' => 'SAC', 'name' => 'Student Athletics & Recreation Center', 'short_name' => 'Athletics', 'lat' => 37.774100, 'lng' => -122.418100, 'description' => 'Main gym, fitness center, and athletic offices.', 'status' => 'active']);
-        $adm = Building::create(['code' => 'ADM', 'name' => 'University Administration & Admissions', 'short_name' => 'AdminBlock', 'lat' => 37.776400, 'lng' => -122.419700, 'description' => 'Admissions welcome center, bursar desk, and administration.', 'status' => 'active']);
+        // 2. Spatial Infrastructure — real Université de Yaoundé I buildings.
+        //
+        // UniversitySeeder already created these rows from the OpenStreetMap dataset, so they are
+        // looked up by code rather than created here. The variable names are the operational roles
+        // this demo needs (labs, student records, study centre…) mapped onto the building that
+        // genuinely serves that purpose on the UY1 campus. `firstOrFail` is deliberate: if the
+        // dataset ever stops providing one of these, seeding must fail loudly instead of silently
+        // producing a campus with holes in it.
+        $byCode = static fn (string $code) => Building::where('code', $code)->firstOrFail();
+
+        $stb = $byCode('UY1-CALCUL');    // Centre de Calcul — computing centre, lab queues
+        $sub = $byCode('UY1-SCOL');      // Scolarité — student records counter
+        $lib = $byCode('UY1-NOLANGA');   // Centre d'études NOLANGA — study centre
+        $eng = $byCode('UY1-PEDAGO');    // Bâtiment Pédagogique — teaching building
+        $bus = $byCode('UY1-FALSS');     // Faculty of Arts, Letters and Social Sciences
+        $sac = $byCode('UY1-CMS');       // Centre Médico-Social — campus health service
+        $adm = $byCode('UY1-BATA');      // Bâtiment A — administration
 
         // 3. Floors
         $stbF1 = Floor::create(['building_id' => $stb->id, 'code' => 'F1', 'name' => 'First Floor — CS & Robotics Labs', 'level' => 1, 'status' => 'active', 'plan_width_m' => 40.0, 'plan_height_m' => 30.0]);
@@ -143,16 +157,16 @@ class DatabaseSeeder extends Seeder
 
         // 7. Navigation Graph — Outdoor Central Campus Quad & Building Entrances
         $hubPlaza = NavigationNode::create([
-            'label' => 'Campus Central Quad & Clocktower Plaza', 'type' => 'waypoint', 'lat' => 37.775000, 'lng' => -122.419000, 'plan_x' => 50.0, 'plan_y' => 50.0, 'is_accessible' => true, 'is_active' => true
+            'label' => 'Esplanade centrale du campus (UY1)', 'type' => 'waypoint', 'lat' => 3.8566837, 'lng' => 11.4996487, 'plan_x' => 50.0, 'plan_y' => 50.0, 'is_accessible' => true, 'is_active' => true
         ]);
 
-        $nStbOut = NavigationNode::create(['building_id' => $stb->id, 'floor_id' => $stbF1->id, 'label' => 'STB Main Entrance Plaza', 'type' => 'exit', 'lat' => 37.774929, 'lng' => -122.419416, 'plan_x' => 10.0, 'plan_y' => 5.0, 'is_accessible' => true, 'qr_node_id' => $qrStbMain->id]);
-        $nSubOut = NavigationNode::create(['building_id' => $sub->id, 'floor_id' => $subF1->id, 'label' => 'SUB Main Entrance Plaza', 'type' => 'exit', 'lat' => 37.775200, 'lng' => -122.418800, 'plan_x' => 8.0, 'plan_y' => 4.0, 'is_accessible' => true, 'qr_node_id' => $qrSubMain->id]);
-        $nLibOut = NavigationNode::create(['building_id' => $lib->id, 'floor_id' => $libF1->id, 'label' => 'Library Main Entrance Ramp', 'type' => 'exit', 'lat' => 37.775600, 'lng' => -122.419100, 'plan_x' => 12.0, 'plan_y' => 6.0, 'is_accessible' => true, 'qr_node_id' => $qrLibMain->id]);
-        $nEngOut = NavigationNode::create(['building_id' => $eng->id, 'floor_id' => $engF1->id, 'label' => 'Engineering Complex Courtyard', 'type' => 'exit', 'lat' => 37.774400, 'lng' => -122.420100, 'plan_x' => 15.0, 'plan_y' => 8.0, 'is_accessible' => true, 'qr_node_id' => $qrEngMain->id]);
-        $nBusOut = NavigationNode::create(['building_id' => $bus->id, 'floor_id' => $busF1->id, 'label' => 'Business School Atrium Entrance', 'type' => 'exit', 'lat' => 37.776100, 'lng' => -122.418300, 'plan_x' => 10.0, 'plan_y' => 5.0, 'is_accessible' => true, 'qr_node_id' => $qrBusMain->id]);
-        $nSacOut = NavigationNode::create(['building_id' => $sac->id, 'floor_id' => $sacF1->id, 'label' => 'Athletics Center Front Concourse', 'type' => 'exit', 'lat' => 37.774100, 'lng' => -122.418100, 'plan_x' => 14.0, 'plan_y' => 7.0, 'is_accessible' => true, 'qr_node_id' => $qrSacMain->id]);
-        $nAdmOut = NavigationNode::create(['building_id' => $adm->id, 'floor_id' => $admF1->id, 'label' => 'Admin Building Portico', 'type' => 'exit', 'lat' => 37.776400, 'lng' => -122.419700, 'plan_x' => 9.0, 'plan_y' => 4.5, 'is_accessible' => true, 'qr_node_id' => $qrAdmMain->id]);
+        $nStbOut = NavigationNode::create(['building_id' => $stb->id, 'floor_id' => $stbF1->id, 'label' => 'Centre de Calcul — entrée principale', 'type' => 'exit', 'lat' => $stb->lat, 'lng' => $stb->lng, 'plan_x' => 10.0, 'plan_y' => 5.0, 'is_accessible' => true, 'qr_node_id' => $qrStbMain->id]);
+        $nSubOut = NavigationNode::create(['building_id' => $sub->id, 'floor_id' => $subF1->id, 'label' => 'Scolarité — entrée principale', 'type' => 'exit', 'lat' => $sub->lat, 'lng' => $sub->lng, 'plan_x' => 8.0, 'plan_y' => 4.0, 'is_accessible' => true, 'qr_node_id' => $qrSubMain->id]);
+        $nLibOut = NavigationNode::create(['building_id' => $lib->id, 'floor_id' => $libF1->id, 'label' => 'Centre d\'études NOLANGA — entrée', 'type' => 'exit', 'lat' => $lib->lat, 'lng' => $lib->lng, 'plan_x' => 12.0, 'plan_y' => 6.0, 'is_accessible' => true, 'qr_node_id' => $qrLibMain->id]);
+        $nEngOut = NavigationNode::create(['building_id' => $eng->id, 'floor_id' => $engF1->id, 'label' => 'Bâtiment Pédagogique — entrée', 'type' => 'exit', 'lat' => $eng->lat, 'lng' => $eng->lng, 'plan_x' => 15.0, 'plan_y' => 8.0, 'is_accessible' => true, 'qr_node_id' => $qrEngMain->id]);
+        $nBusOut = NavigationNode::create(['building_id' => $bus->id, 'floor_id' => $busF1->id, 'label' => 'FALSS — entrée principale', 'type' => 'exit', 'lat' => $bus->lat, 'lng' => $bus->lng, 'plan_x' => 10.0, 'plan_y' => 5.0, 'is_accessible' => true, 'qr_node_id' => $qrBusMain->id]);
+        $nSacOut = NavigationNode::create(['building_id' => $sac->id, 'floor_id' => $sacF1->id, 'label' => 'Centre Médico-Social — accueil', 'type' => 'exit', 'lat' => $sac->lat, 'lng' => $sac->lng, 'plan_x' => 14.0, 'plan_y' => 7.0, 'is_accessible' => true, 'qr_node_id' => $qrSacMain->id]);
+        $nAdmOut = NavigationNode::create(['building_id' => $adm->id, 'floor_id' => $admF1->id, 'label' => 'Bâtiment A — entrée administration', 'type' => 'exit', 'lat' => $adm->lat, 'lng' => $adm->lng, 'plan_x' => 9.0, 'plan_y' => 4.5, 'is_accessible' => true, 'qr_node_id' => $qrAdmMain->id]);
 
         $nStbLab101 = NavigationNode::create(['building_id' => $stb->id, 'floor_id' => $stbF1->id, 'room_id' => $lab101->id, 'label' => 'Doorway to AI Lab 101', 'type' => 'room_entry', 'plan_x' => 11.0, 'plan_y' => 11.0, 'is_accessible' => true, 'qr_node_id' => $qrStbLab->id]);
         $nSub101    = NavigationNode::create(['building_id' => $sub->id, 'floor_id' => $subF1->id, 'room_id' => $sub101->id, 'label' => 'Registrar Counter Entry', 'type' => 'room_entry', 'plan_x' => 11.0, 'plan_y' => 10.0, 'is_accessible' => true]);

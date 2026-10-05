@@ -48,8 +48,68 @@ export interface SessionInfo {
 
 /* --------------------------------------------------------------------- campus */
 
+/**
+ * An institution on the Yaoundé map. Fields are null when OpenStreetMap records no value for that
+ * institution — render them as unknown, never substitute a placeholder.
+ */
+export interface University {
+  id: UUID;
+  code: string;
+  name: string;
+  name_en: string | null;
+  short_name: string | null;
+  type: 'public' | 'private' | 'confessional';
+  operator: string | null;
+  description: string | null;
+  lat: number | null;
+  lng: number | null;
+  /** [lng, lat] ring of the campus grounds; null when OSM has no polygon. */
+  boundary: [number, number][] | null;
+  website: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  wikipedia: string | null;
+  logo_url: string | null;
+  established: string | null;
+  /** OSM wheelchair tag; null means unsurveyed, which is not the same as inaccessible. */
+  wheelchair: 'yes' | 'no' | 'limited' | null;
+  is_primary: boolean;
+  status: string;
+  osm_url: string | null;
+  buildings_count?: number;
+  facilities_count?: number;
+}
+
+export type FacilityCategory =
+  | 'food' | 'study' | 'health' | 'money' | 'water'
+  | 'sanitation' | 'parking' | 'worship' | 'culture';
+
+/**
+ * A surveyed point of service on a campus. `name` is null when OpenStreetMap recorded none —
+ * use `display_name`, which the API derives from the category, rather than inventing a label.
+ */
+export interface Facility {
+  id: UUID;
+  university_id: UUID | null;
+  building_id: UUID | null;
+  name: string | null;
+  display_name: string;
+  category: FacilityCategory;
+  osm_amenity: string | null;
+  lat: number;
+  lng: number;
+  cuisine: string | null;
+  phone: string | null;
+  opening_hours: string | null;
+  wheelchair: 'yes' | 'no' | 'limited' | null;
+  osm_url: string | null;
+}
+
 export interface Building {
   id: UUID;
+  university_id: UUID | null;
+  university: { id: UUID; code: string; name: string } | null;
   code: string;
   name: string;
   description: string | null;

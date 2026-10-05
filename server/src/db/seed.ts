@@ -194,6 +194,16 @@ const USERS: SeedUser[] = [
   { key: 'daniel', name: 'Daniel Costache', email: 'daniel.costache@campusflow.dev', role: 'student', registrationNo: '2026-0106', department: 'Business' },
 ];
 
+/**
+ * Accounts that exist only so the web login page's demo buttons work against this backend.
+ * They mirror the role and department of a real seeded user and use the password that page sends.
+ */
+const WEB_DEMO_ALIASES = [
+  { email: 'student@campusflow.edu', mirrors: 'student@campusflow.dev', name: 'Alex Rivera', registrationNo: 'WEB-0101' },
+  { email: 'staff@campusflow.edu', mirrors: 'staff@campusflow.dev', name: 'Dr. Jane Smith', registrationNo: 'WEB-1001' },
+  { email: 'admin@campusflow.edu', mirrors: 'admin@campusflow.dev', name: 'System Administrator', registrationNo: null as string | null },
+];
+
 const ENROLLMENTS: Record<string, string[]> = {
   sofia: ['CS201', 'CS310', 'CS340', 'MATH204', 'ENG150'],
   jonas: ['CS201', 'CS310', 'PHYS101', 'MATH204'],
@@ -403,6 +413,25 @@ export async function seedDatabase(db: Db, options: SeedOptions = {}): Promise<S
       [user.name, user.email, passwordHash, user.role, user.registrationNo ?? null, user.department ?? null],
     );
     userIds.set(user.key, row.id);
+  }
+
+  // The web login page ships hardcoded "Explore with a demo account" buttons that use
+  // `*@campusflow.edu` / `password123` — the Laravel seeder's fixtures. Against this backend those
+  // buttons fail, which reads as "sign-in is broken" rather than "two backends disagree about
+  // their fixtures". Seeding the same three accounts here makes the buttons work without changing
+  // what the `.dev` accounts are.
+  const webDemoHash = await hashPassword('password123');
+  for (const alias of WEB_DEMO_ALIASES) {
+    const source = USERS.find((u) => u.email === alias.mirrors);
+    if (!source) continue;
+    await insert<{ id: string }>(
+      db,
+      `INSERT INTO users (name, email, password_hash, role_code, registration_no, department, status, email_verified_at, last_login_at)
+       VALUES ($1,$2,$3,$4,$5,$6,'active', now(), now() - interval '1 day')
+       ON CONFLICT (id) DO NOTHING
+       RETURNING id`,
+      [alias.name, alias.email, webDemoHash, source.role, alias.registrationNo, source.department ?? null],
+    );
   }
 
   /* --------------------------------------------------------------- buildings */
