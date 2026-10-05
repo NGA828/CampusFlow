@@ -1,47 +1,53 @@
-# CampusFlow — Hard Rules (abridged)
+# Working in this repository
 
-Full specification: PROMPT.md (the complete master development prompt).
-Read it before starting any work on this repository.
+CampusFlow is a small npm-workspace monorepo. Read this before changing anything.
 
-Hard gates — never skip for convenience:
+## Layout
 
-1. Inspect the repository before modifying anything (PROMPT.md §4, §94).
-2. Backend (Laravel) is authoritative for auth, authorization, queue
-   positions, capacity, tickets, and routes. The LLM/AI assistant never
-   touches the database directly (§7, §31, §33).
-3. Design research is a blocking gate before final UI implementation of
-   every major screen: search → inspect ≥3 references → score 1–10 →
-   compare → select → document → then implement (§45–§59). No generic
-   Tailwind/shadcn template as the final design (§3, §44, §77).
-4. Document research in docs/design-research.md and docs/design-decisions/
-   with real sources — never fabricate URLs or claims (§49).
-5. Score every implemented screen; average ≥ 8/10 or improve (§57).
-6. Concurrency-critical queue logic: transactions, row locking, unique
-   constraints — never frontend-only (§21).
-7. No fake functionality, placeholder APIs, dead buttons, or success
-   without backend confirmation (§3, §38, §41).
-8. Centralized API clients via NEXT_PUBLIC_API_URL / EXPO_PUBLIC_API_URL —
-   no scattered hardcoded URLs (§36).
-9. Tests before "done" (§64–§69, §93).
-9b. Role × platform separation is enforced by scripts, not by review:
-   `npm run check:separation` fails when either client calls a route that
-   does not exist, when a mobile-only capability is wired into the web
-   client (or the reverse), when a feature test asserts against a dead path,
-   or when a route has no screen in front of it. `npm run check:php` parses
-   every backend file, and `npm run typecheck` covers both clients.
-   `npm run check:test` runs the actual PHPUnit suite.
-   `npm run check` is the fast static gate (parse, contract, typecheck) and
-   deliberately skips the suite so it stays usable; `npm run check:full`
-   runs everything. **Rule 9 applies to `check:full`.** A green `check` alone
-   is not a finished change — `check:php` cannot see a file that is
-   syntactically valid and behaviourally broken, and one of those has
-   already shipped through this gate. CI (.github/workflows/check.yml) runs
-   `check:full` on every push and pull request, so this is enforced rather
-   than merely documented.
-   See docs/role-platform-matrix.md and docs/platform-role-audit.md.
-9c. The PHP runtime IS available (PHP 8.5 at
-   "C:\Program Files\php-8.5.2\php.exe"; the WinGet PHP 8.2 on PATH is the
-   wrong one). Run the suite instead of trusting `check:php`: parsing proves
-   a file is syntactically valid, never that it behaves. A change that only
-   failed at runtime has shipped through this gate before.
-10. Incremental, backend-first development per §75.
+| Path | What it is |
+| --- | --- |
+| `apps/api` | REST API, Node standard library only. Run with `node --experimental-strip-types`. |
+| `apps/web` | Next.js 16 app router, React 19, MapLibre GL. |
+| `apps/mobile` | Expo student app (Android, iOS, web). **Not** an npm workspace — install it separately. |
+| `tools/dev.mjs` | Starts the API (4000) and the web app (3000) together. |
+| `docs/` | Content provenance for the directory and the content feed. |
+
+## Rules that are not negotiable
+
+1. **The API has no runtime dependencies.** No express, no bcrypt, no tsx, no test
+   framework — `node:http`, `node:crypto` and `node --test` do the job. Keep it that
+   way: it is why `npm install` is 58 packages and why nothing here can break on a
+   flaky registry.
+2. **The browser never calls port 4000.** `apps/web/next.config.ts` rewrites
+   `/api/v1/*` to `API_ORIGIN`. Front-end code uses relative URLs only — the hosted
+   preview runs on a different host from the sandbox.
+3. **Directory entries cite their sources.** Every institution in
+   `apps/api/src/data/universities.ts` carries `sources[]` and an honest
+   `locationPrecision` (`CITY_LOCATION` vs `CAMPUS_POINT`). Do not invent coordinates.
+4. **Tests must not touch the data file.** `apps/api/test/api.test.ts` calls
+   `disablePersistence()` before anything else; new test files must too.
+5. **IAI Cameroun is the indoor pilot.** Other campuses answer 404 on
+   `/universities/:slug/campus` by design; the message says so.
+
+## The mobile app
+
+Platform differences live in paired files (`x.ts` native / `x.web.ts` web) that the
+bundler picks between — do not add `Platform.OS` branches above that layer. Anything
+the platform cannot do (no camera, no WebGL, no keychain) must degrade to a visible
+fallback, never a crash: `npm run smoke:web` asserts exactly that.
+
+After changing mobile code:
+
+```bash
+cd apps/mobile && npm run typecheck && npm run build:web && npm run smoke:web
+```
+
+## Before you finish
+
+```bash
+npm run check   # typecheck both workspaces + the API test suite
+```
+
+Both must pass. If you changed routing, bookings or authorisation, add a case to
+`apps/api/test/api.test.ts` — the suite drives `router.match()` handlers directly, so
+a new case is a few lines and needs no server.

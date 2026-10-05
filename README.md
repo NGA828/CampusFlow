@@ -1,121 +1,126 @@
-# CampusFlow — Navigate. Learn. Connect.
+# CampusFlow
 
-An intelligent campus management, navigation and student-services platform: a **Next.js web app**,
-an **Expo mobile app** and a **Laravel REST API** sharing one set of contracts, backed by
-PostgreSQL/PostGIS.
+Campus discovery, indoor and outdoor navigation, and student services for the
+universities and grandes écoles of **Yaoundé, Cameroon**.
+
+This is a clean rebuild. The previous Laravel + Next.js + Expo codebase was removed
+and replaced with a small, dependency-light monorepo that actually runs in one
+command.
 
 ```
-frontend/   Next.js 16 (App Router, React 19, Tailwind v4) — student, staff and admin consoles
-mobile/     Expo SDK 57 (expo-router) — scanner, queues, timetable, live navigation
-backend/    Laravel API — auth/RBAC, campus, positioning, navigation, queues, offices,
-            engagement, notifications and administration
-scripts/    dev launcher
-docs/       Architecture, API and design-research documentation
+apps/api     REST API — Node standard library only, no framework, no runtime deps
+apps/web     Next.js 16 web app (visitor, student, staff, administrator) + MapLibre
+apps/mobile  Expo student app — QR positioning, GPS, MapLibre native, notifications
+tools/dev.mjs  starts the API and the web app with a single Ctrl+C
 ```
 
-## Quick start
+## Run it
 
 ```bash
-npm run setup        # installs Laravel, frontend and mobile, migrates + seeds the database
-npm run dev          # API :8001, web :3000, plus the queue worker and ticket-expiry scheduler
+npm install
+npm run dev          # web on :3000, API on :4000
 ```
 
-Open <http://localhost:3000>. Seeded accounts (password `password123`):
-
-| Role | Email |
-| --- | --- |
-| Student | `student@campusflow.edu` |
-| Staff | `staff@campusflow.edu` |
-| Admin | `admin@campusflow.edu` |
-
-Database helpers: `npm run db:migrate`, `npm run db:seed`, `npm run db:reset`. Checks:
-`npm run typecheck`, `npm test` (Laravel API), and the Laravel feature tests provide the
-end-to-end API coverage.
-
-### Mobile app
+The browser only ever talks to the web port: `apps/web/next.config.ts` rewrites
+`/api/v1/*` to the API process, so the hosted preview never makes a cross-origin
+request and never depends on a third-party cookie.
 
 ```bash
-cd mobile && npm install
-EXPO_PUBLIC_API_URL=http://<your-lan-ip>:8001/api/v1 npm run start   # scan the QR with Expo Go
+npm run typecheck    # both workspaces
+npm test             # API route tests (authorisation, bookings, routing)
+npm run check        # typecheck + tests
 ```
 
-A phone cannot reach `127.0.0.1`, so point `EXPO_PUBLIC_API_URL` at your machine's LAN address.
-See [`mobile/README.md`](mobile/README.md) for the screen list and push-notification notes.
+## Signing in
 
-## What it does
+Opening `/login` signs you in as the walkthrough **student** immediately — that is
+the demo entry point. It is a real sign-in: the API issues a bearer token and checks
+the role on every later request.
 
-- **Personal timetable** derived from enrolments → courses → the master timetable.
-- **Campus map & indoor positioning** — buildings, floors, rooms, floor plans and signed QR
-  anchors validated by the API.
-- **Navigation** — A* over a stored walking graph, turn-by-turn indoor/outdoor steps, accessible
-  (step-free) preference, mobile live tracking, off-route warning with a grace period and automatic
-  recalculation. The web map also draws route lines from a chosen anchor or a one-time browser GPS
-  fix; web location is used only for that preview and is not saved or tracked.
-- **Room admission queues** — geofence-checked joins, one active ticket per student enforced by
-  transactions, row locks and unique constraints; position, ETA, check-in window and no-show policy.
-- **Administrative office ticketing** — ticket numbers per office, position, expected service
-  window, proximity check-in and the full service lifecycle.
-- **Engagement** — events, announcements and durable in-app notifications. Expo push tokens are
-  stored and push jobs are sent through Expo when a physical device is registered. Laravel Reverb
-  live websocket delivery is not wired yet; clients should refresh for updates.
-- **AI Campus Assistant** — a natural-language gateway to a controlled set of backend tools; it
-  never issues SQL and never bypasses the caller's own authorization.
-- **Staff and admin consoles** — queue/office operations, timetable publishing, content, users and
-  roles, campus and spatial editing, service configuration and analytics computed from live data.
+| Role | Email | Password |
+| --- | --- | --- |
+| Student | `etudiant@iaicameroun.cm` | `CampusFlow2026` |
+| Staff (scolarité) | `scolarite@iaicameroun.cm` | `CampusFlow2026` |
+| Administrator | `direction@iaicameroun.cm` | `CampusFlow2026` |
 
-## Documentation
+`/login?manual=1` skips the automatic sign-in and shows the form — that is how you
+reach the staff and administrator accounts.
 
-- **[Setup, user & test guide (PDF)](docs/guides/guide.pdf)** — new-machine installation,
-  role-by-role web/mobile usage, a handover-call walkthrough, 95 acceptance-test scenarios,
-  troubleshooting and known limitations. [Editable source and rebuild instructions](docs/guides/README.md).
+## What each role gets
 
-- [`docs/design-research.md`](docs/design-research.md) — the blocking design-research gate: the
-  references that were inspected, the weighted rubric, the per-screen decisions and the review
-  scores.
+**Visitor** — the public directory of 20 Yaoundé institutions on a MapLibre map,
+with search and type filters, plus published events and announcements, and student
+registration.
 
-- [`docs/responsive.md`](docs/responsive.md) — responsive web/native patterns, framework and image
-  recommendations, automated layout checks, and the remaining physical-device QA checklist.
+**Student** — a dashboard of appointments, notifications, events and notices; the
+IAI campus map with QR-anchor positioning and step-by-step indoor routes (including
+a step-free option); room browsing and administrative room requests.
 
-Additional documents (architecture, API, database, navigation, queue system, administrative
-office, AI assistant, testing, deployment) are listed in `AGENTS.md`/`PROMPT.md`; they are written
-from the same source of truth as the code in `backend/` and `frontend/`.
+**Staff** — the room requests queue with approve/decline and a note to the student,
+and announcement publishing that notifies every student of the institution.
 
-### Enable the AI model
+**Administrator** — account issuing (student, staff, administrator), the account
+list and directory statistics.
 
-The Laravel assistant uses OpenAI `gpt-4o-mini` as an intent planner when an API key is configured.
-The model can only choose from tools already authorized for the signed-in role and platform; Laravel
-still reads the campus data and executes the tool. Without a key, the built-in deterministic planner
-remains available for local testing.
+## The directory
 
-Add these values to `backend/.env` (never commit the key):
+20 institutions, each with the sources it came from: public universities (UY1, UY2
+Soa), grandes écoles (ENSPY/Polytechnique, ENS, ENSTP, ESSTIC, IRIC, FMSB), the
+military academy (EMIA), inter-state and international institutions (IAI Cameroun,
+UCAC) and nine private institutions (Siantou, ICT University, PKFokam, IUG, ISTA,
+Ndi Samba and others).
 
-```dotenv
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_TIMEOUT_SECONDS=20
-# Optional when PHP cannot locate a trusted CA bundle on Windows:
-OPENAI_CA_BUNDLE=C:\path\to\cacert.pem
+Coordinates say what they are worth: `CITY_LOCATION` means the point locates the
+institution in the city, `CAMPUS_POINT` means it came from a mapped campus feature.
+No entry claims a surveyed boundary.
+
+**IAI Cameroun is the indoor pilot** (`indoorMappingPriority: 1`): three buildings,
+five floors, 14 rooms, 8 printed QR anchors and a 36-node walking graph that the API
+routes over with Dijkstra, with a fixed penalty per level change and a step-free mode
+that removes stairs entirely.
+
+## Storage
+
+Records live in memory and are mirrored to `.data/campusflow.json` after every
+successful write (temporary file + rename, so a crash mid-write cannot truncate the
+file). The API restores that file on boot and only falls back to the seed when it is
+missing. Sessions are deliberately **not** persisted: restarting the API signs
+everyone out, but their accounts, bookings, notifications and announcements survive.
+
+Set `CAMPUSFLOW_DATA_FILE` to move the file; delete it to go back to the seed.
+`GET /api/v1/health` reports the path in use.
+
+## The mobile app
+
+`apps/mobile` is the student experience on a phone: four tabs (Aujourd'hui, Scanner,
+Carte, Salles), QR anchors scanned with the camera and resolved by the API, GPS
+outdoors, MapLibre rendering of the same campus model the web app draws, room
+requests, and notifications for time-sensitive guidance.
+
+It runs in a browser too, which is how it can be reviewed without Android Studio:
+
+```bash
+npm run mobile:install     # once — it is not part of the root workspaces
+npm run mobile:web         # builds and serves the student app on :8081
+npm run mobile:smoke       # drives it end to end against the running API
 ```
 
-Then clear cached Laravel configuration and restart the API:
+The browser build is the same code, not a mock: the bundler swaps four files per
+platform (keychain/localStorage, MapLibre Native/GL JS, expo-camera/getUserMedia,
+expo-notifications/Notification). For a real device, `apps/mobile/README.md` has the
+development-client instructions — MapLibre Native and expo-camera cannot run in Expo
+Go.
 
-```powershell
-php backend\artisan config:clear
-php backend\artisan serve --host=0.0.0.0 --port=8001
-```
+`apps/mobile` is kept out of the npm workspaces on purpose: it needs a native
+toolchain, and installing it would slow every root `npm install` down.
 
-The assistant capabilities response reports `planner: openai` when the model is active. If the key is
-empty, it reports `planner: deterministic`.
+## Known limits
 
-If the key was issued by OpenRouter (keys commonly use the `sk-or-v1` prefix), use its
-OpenAI-compatible endpoint instead of `api.openai.com`:
-
-```dotenv
-OPENAI_BASE_URL=https://openrouter.ai/api/v1
-OPENAI_MODEL=openai/gpt-4o-mini
-```
-
-For a native OpenAI key, keep the default OpenAI base URL. Never set TLS verification to `false`.
-If PHP still reports cURL error 60, set `curl.cainfo` and `openssl.cafile` in the active `php.ini`
-to the same trusted CA bundle, then restart the Laravel server.
+- The JSON data file is a single-writer store for one API process — fine for a
+  demo and a pilot campus, not a substitute for a database.
+- The IAI indoor model is a working model of the Nkol Anga'a campus, not a survey.
+- The mobile app's **native** binary is not built here — no Android/iOS toolchain in
+  this sandbox. Its web target is built, served and smoke-tested on every change; the
+  native target shares all of that code but is verified only by type-checking.
+- Mobile notifications are local, not push: real push needs an Expo project id and a
+  server holding device tokens.

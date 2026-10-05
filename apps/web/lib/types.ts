@@ -1,0 +1,155 @@
+/** Mirrors `apps/api/src/types.ts`. Kept small and explicit rather than generated. */
+
+export type Role = 'STUDENT' | 'STAFF' | 'ADMIN';
+
+export interface University {
+  slug: string;
+  name: string;
+  shortName: string;
+  type: 'PUBLIC' | 'PRIVATE' | 'INTERNATIONAL' | 'MILITARY';
+  city: string;
+  neighbourhood: string | null;
+  coordinates: [number, number];
+  accuracy: 'CITY_LOCATION' | 'CAMPUS_POINT';
+  description: string;
+  sources: { claim: string; url: string }[];
+  indoorMappingPriority: number | null;
+}
+
+export interface SessionUser {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  universitySlug: string;
+  matricule: string | null;
+}
+
+export interface RoomSummary {
+  id: string;
+  code: string;
+  name: string;
+  kind: 'CLASSROOM' | 'LAB' | 'ADMINISTRATIVE' | 'AMENITY' | 'LIBRARY';
+  capacity: number;
+  bookable: boolean;
+  nodeId: string;
+  buildingName: string;
+  buildingCode: string;
+  floorName: string;
+}
+
+export interface Booking {
+  id: string;
+  roomId: string;
+  purpose: string;
+  startsAt: string;
+  endsAt: string;
+  status: 'PENDING' | 'APPROVED' | 'DECLINED' | 'CANCELLED';
+  decisionNote: string | null;
+  room: { id: string; code: string; name: string; buildingName: string; floorName: string; nodeId: string } | null;
+  student: { id: string; name: string; matricule: string | null } | null;
+}
+
+export interface CampusEvent {
+  id: string;
+  universitySlug: string;
+  title: string;
+  body: string;
+  venue: string;
+  startsAt: string;
+  endsAt: string;
+}
+
+export interface Announcement {
+  id: string;
+  universitySlug: string;
+  title: string;
+  body: string;
+  priority: 'NORMAL' | 'HIGH' | 'URGENT';
+  publishedAt: string;
+}
+
+export interface NotificationItem {
+  id: string;
+  title: string;
+  body: string;
+  kind: 'BOOKING' | 'ANNOUNCEMENT' | 'EVENT' | 'NAVIGATION';
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface RouteStep {
+  nodeId: string;
+  label: string;
+  floorName: string;
+  coordinates: [number, number];
+  instruction: string;
+  distanceMetres: number;
+  edgeKind: 'CORRIDOR' | 'DOOR' | 'STAIRS' | 'LIFT' | null;
+}
+
+export interface IndoorRoute {
+  from: string;
+  to: string;
+  stepFree: boolean;
+  totalDistanceMetres: number;
+  estimatedMinutes: number;
+  /** Every node on the path, for drawing the line; `steps` is the condensed wording. */
+  geometry: [number, number][];
+  steps: RouteStep[];
+}
+
+export interface CampusBoundary {
+  universitySlug: string;
+  ring: [number, number][];
+  areaHectares: number;
+  source: 'OSM' | 'PHOTO_SURVEY';
+  sourceRef: { claim: string; url: string };
+}
+
+export interface Landmark {
+  id: string;
+  kind: 'GATE' | 'PLAZA' | 'FOUNTAIN' | 'MONUMENT' | 'PARKING' | 'GARDEN' | 'VIEWPOINT' | 'SPORT';
+  name: string;
+  description: string;
+  coordinates: [number, number];
+  nodeId: string | null;
+  source: 'OSM' | 'PHOTO_SURVEY';
+}
+
+export interface Floor {
+  id: string;
+  level: number;
+  name: string;
+  /** Length of the spine corridor in metres, and its centre line. */
+  corridorLengthMetres: number;
+  corridor: [number, number][];
+}
+
+/** A room as it appears on the indoor plan: numbered, measured and outlined. */
+export interface MappedRoom {
+  id: string;
+  buildingId: string;
+  floorId: string;
+  code: string;
+  name: string;
+  kind: RoomSummary['kind'];
+  capacity: number;
+  bookable: boolean;
+  nodeId: string;
+  widthMetres: number;
+  depthMetres: number;
+  areaSqMetres: number;
+  polygon: [number, number][];
+}
+
+export interface CampusModel {
+  university: University;
+  boundary: CampusBoundary | null;
+  landmarks: Landmark[];
+  buildings: { id: string; code: string; name: string; description: string; coordinates: [number, number]; footprint: [number, number][] | null; floors: Floor[] }[];
+  rooms: MappedRoom[];
+  anchors: { code: string; buildingId: string; floorId: string; nodeId: string; label: string }[];
+  nodes: { id: string; buildingId: string; floorId: string; label: string; coordinates: [number, number] }[];
+  edges: { from: string; to: string; kind: string; accessible: boolean }[];
+}
