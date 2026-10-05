@@ -67,6 +67,7 @@ export interface RequestOptions {
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined | null>;
   signal?: AbortSignal;
+  timeoutMs?: number;
   /** Supplied for mutations where a retry must not create a second record. */
   idempotencyKey?: string;
   auth?: boolean;
@@ -101,31 +102,56 @@ export function newIdempotencyKey(prefix = 'cf'): string {
   return `${prefix}-${Date.now().toString(36)}-${random}`;
 }
 
+async function fetchResponseText(
+  url: string,
+  init: RequestInit,
+  signal: AbortSignal | undefined,
+  timeoutMs: number,
+): Promise<{ response: Response; text: string }> {
+  const controller = new AbortController();
+  let timedOut = false;
+  const abortFromCaller = () => controller.abort(signal?.reason);
+  if (signal?.aborted) abortFromCaller();
+  else signal?.addEventListener('abort', abortFromCaller, { once: true });
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    return { response, text: response.status === 204 ? '' : await response.text() };
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    if (timedOut) {
+      throw new ApiError(0, 'The CampusFlow API did not respond in time. Please try again.', 'REQUEST_TIMEOUT');
+    }
+    if ((error as Error)?.name === 'AbortError') throw error;
+    throw new ApiError(0, 'The CampusFlow API is unreachable. Check that the API server is running.', 'NETWORK_ERROR');
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', abortFromCaller);
+  }
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, query, signal, idempotencyKey, auth = true } = options;
+  const timeoutMs = options.timeoutMs ?? 30_000;
   const headers: Record<string, string> = { accept: 'application/json', 'X-CampusFlow-Client': CLIENT_PLATFORM };
   if (body !== undefined) headers['content-type'] = 'application/json';
   const token = auth ? getToken() : null;
   if (token) headers.authorization = `Bearer ${token}`;
   if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
 
-  let response: Response;
-  try {
-    response = await fetch(buildUrl(path, query), {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal,
-      credentials: 'same-origin',
-    });
-  } catch (error) {
-    if ((error as Error).name === 'AbortError') throw error;
-    throw new ApiError(0, 'The CampusFlow API is unreachable. Check that the API server is running.', 'NETWORK_ERROR');
-  }
+  const { response, text } = await fetchResponseText(buildUrl(path, query), {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    credentials: 'same-origin',
+  }, signal, timeoutMs);
 
   if (response.status === 204) return undefined as T;
 
-  const text = await response.text();
   let payload: unknown = null;
   if (text) {
     try {

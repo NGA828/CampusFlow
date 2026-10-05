@@ -196,6 +196,22 @@ test("position failure is not represented as no saved position", async ({
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Retry saved position" }).click();
 });
+test("a stalled campus map request ends in a retryable error instead of loading forever", async ({
+  page,
+}) => {
+  await operationsSession(page);
+  await page.route("**/api/v1/campus/buildings", () => new Promise(() => {}));
+  await page.goto("/student/campus/map");
+  await expect(
+    page.getByText("Loading published campus map", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("The CampusFlow API did not respond in time.", {
+      exact: false,
+    }),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("button", { name: /try again/i })).toBeVisible();
+});
 test("zero latitude and longitude remain valid saved coordinates", async ({
   page,
 }) => {

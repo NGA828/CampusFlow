@@ -97,7 +97,12 @@ function MapContent() {
       {buildings.error ? (
         <ReadError message={buildings.error} retry={buildings.reload} />
       ) : buildings.loading ? (
-        <CardSkeleton rows={7} />
+        <div>
+          <p className={s.notice} role="status" aria-live="polite">
+            Loading published campus map…
+          </p>
+          <CardSkeleton rows={7} />
+        </div>
       ) : !rows.length ? (
         <section className={`${s.panel} ${s.empty}`}>
           <h2>No campus buildings published</h2>

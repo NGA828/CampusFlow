@@ -285,7 +285,7 @@ export const publicApi = {
  * Data, not a screen: each role renders it differently and nothing in this group writes.
  */
 export const campusApi = {
-  buildings: () => api.get<{ buildings: Building[] }>('/campus/buildings'),
+  buildings: () => api.get<{ buildings: Building[] }>('/campus/buildings', { timeoutMs: 12_000 }),
   building: async (idOrCode: string) => normalizeBuildingPayload(await api.get<unknown>(`/campus/buildings/${idOrCode}`)),
   floors: async (buildingId: string) => normalizeFloorList(await api.get<unknown>(`/campus/buildings/${buildingId}/floors`)),
   floor: (floorId: string) => api.get<{ floor: Floor; building: Building; rooms: Room[] }>(`/campus/floors/${floorId}`),
