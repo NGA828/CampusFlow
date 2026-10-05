@@ -128,8 +128,10 @@ class UniversityTest extends TestCase
 
     public function test_student_can_read_one_university_by_code(): void
     {
+        $code = University::where('code', 'UY1')->firstOrFail()->code;
+
         $response = $this->actingAs($this->student(), 'sanctum')
-            ->getJson('/api/v1/campus/universities/UY1');
+            ->getJson('/api/v1/campus/universities/' . $code);
 
         $response->assertStatus(200)
             ->assertJsonPath('success', true)
@@ -145,8 +147,10 @@ class UniversityTest extends TestCase
 
     public function test_unknown_university_is_a_404(): void
     {
+        $missing = 'NO-SUCH-INSTITUTION';
+
         $this->actingAs($this->student(), 'sanctum')
-            ->getJson('/api/v1/campus/universities/NOPE')
+            ->getJson('/api/v1/campus/universities/' . $missing)
             ->assertStatus(404);
     }
 
