@@ -31,6 +31,29 @@ class CampusConfigurationTest extends TestCase
         $this->patchJson('/api/v1/admin/buildings/' . $id, ['campus_name' => 'Not a column'])->assertUnprocessable();
     }
 
+    public function test_building_footprints_and_verified_heights_are_validated_and_returned(): void
+    {
+        $footprint = [[11.5, 3.8], [11.5001, 3.8], [11.5001, 3.8001], [11.5, 3.8]];
+        $created = $this->postJson('/api/v1/admin/buildings', [
+            'code' => 'MAP-3D',
+            'name' => 'Mapped building',
+            'lat' => 3.80005,
+            'lng' => 11.50005,
+            'footprint' => $footprint,
+            'height_m' => 14.6,
+        ])->assertCreated();
+
+        $id = $created->json('data.id');
+        $created->assertJsonPath('data.height_m', 14.6);
+        $this->assertSame($footprint, Building::findOrFail($id)->footprint);
+        $this->assertEquals(14.6, Building::findOrFail($id)->height_m);
+
+        $this->patchJson('/api/v1/admin/buildings/' . $id, [
+            'footprint' => [[181, 3.8], [11.5001, 3.8], [11.5, 3.8]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('footprint.0.0');
+        $this->patchJson('/api/v1/admin/buildings/' . $id, ['height_m' => 0])->assertUnprocessable();
+    }
+
     public function test_floor_code_and_metre_dimensions_are_stored_and_parent_is_immutable(): void
     {
         $b = Building::firstOrFail();

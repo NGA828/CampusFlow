@@ -650,13 +650,18 @@ export default function AdminCampusPage() {
                             <option value="true">Yes</option>
                             <option value="false">No</option>
                           </Select>
-                        ) : f.type === "textarea" ? (
+                        ) : f.type === "textarea" || f.type === "json" ? (
                           <Textarea
                             id={"campus-" + f.key}
                             aria-describedby={
                               f.hint ? "campus-hint-" + f.key : undefined
                             }
                             rows={3}
+                            placeholder={
+                              f.type === "json"
+                                ? "[[longitude,latitude],[longitude,latitude],[longitude,latitude]]"
+                                : undefined
+                            }
                             value={draft.values[f.key]}
                             onChange={(e) =>
                               setDraft({

@@ -253,7 +253,7 @@ function MapContent() {
                   }
                 />
                 <p className={s.mapNote}>
-                  Schematic map from campus data. Select a building on the map or in the list.
+                  3D campus map with mapped buildings. Select a building on the map or in the list.
                 </p>
                 <div className={`${s.bar} mt-5`}>
                   <p className={s.muted}>

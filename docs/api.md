@@ -164,8 +164,12 @@ Existing `/api/v1/admin/{buildings,floors,rooms}` GET/POST and corresponding
   dimensions (`plan_width_m`, `plan_height_m`) and room `area_m2` are nullable or0.01…999999.99;
   room anchors `plan_x/y` are nullable within±999999.9999. Numeric inputs may carry computed
   spatial precision; database decimal rounding applies. Capacity is0…2147483647.
-- Supported metadata remains writable: building description/address/footprint/image/public
-  policy; floor plan URL/SVG; room features/type/status/image/admission/access/public policy.
+- Supported metadata remains writable: building description/address/footprint/`height_m`/
+  image/public policy; floor plan URL/SVG; room features/type/status/image/admission/access/public
+  policy. Building footprint is a ring of `[longitude, latitude]` coordinate pairs (3–1000
+  vertices); `height_m` is nullable and must be a verified positive measurement no greater than
+  1000 metres. The campus map only draws a CampusFlow-owned 3D extrusion when that height and a
+  valid footprint are present; it does not infer a footprint or height from the floor count.
   The campus editor sends dirty fields only and leaves advanced spatial/policy metadata intact.
   `campus_name`, floor `plan_width/plan_height`, room `room_type/plan_w/plan_h` are rejected;
   these are not stored aliases. Admission configuration does not create a room queue.

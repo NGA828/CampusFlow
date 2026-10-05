@@ -33,9 +33,10 @@ This document records that process honestly:
 | 10 | `timetable`, `university timetable` | University Timetable (Bartek Pierzchała), Schedule-App for University (Any Rudometkina), Calendar & Timetable iOS, Orary |
 | 11 | Web (non-Dribbble) | Volpis — *How to develop an indoor navigation app* (render floor plans as SVG/GeoJSON, overlay computed route, no SDK/tile dependency) |
 
-Reachability note: Dribbble pages and the Volpis blog were reachable; Maplibre tile hosts,
-`fonts.googleapis.com` and `tile.openstreetmap.org` are blocked in this environment, which
-reinforces the offline-SVG floor-plan approach selected below.
+Reachability note: Dribbble pages and the Volpis blog were reachable. On 2026-10-05 the
+OpenFreeMap Liberty style document was reachable, but its vector-tile, glyph and sprite assets
+still require network access and may be blocked independently. The OSM public raster tile host
+is governed by its own usage policy; the app does not bulk-download it.
 
 ---
 
@@ -110,17 +111,38 @@ for browse entries, on the shot tags/titles visible in the listing.
 ### 4.3 Campus map (`/map`)
 
 - **Candidates:** R2 (7.4), R1 (7.9), R19 (8.3).
-- **Comparison:** R1/R2 assume a tile basemap — impossible here (tile hosts blocked). R19's
-  approach (floor plans as SVG/GeoJSON + computed overlays) is both reachable offline and
-  higher-scoring on wayfinding.
-- **Selected:** R19 architecture + R1's route-screen composition.
-- **As built:** `components/maps/campus-map.tsx` renders building footprints from the API polygon
-  data; `components/maps/floor-plan.tsx` renders rooms, graph nodes/edges, QR anchors and the
-  computed route as SVG. Outdoor routing uses real lat/lng; indoor routing uses floor-plan metres.
+- **Comparison:** R1/R2's map-first hierarchy remains useful, while R19's surveyed floor-plan
+  overlays preserve floor-aware indoor routing. The previous SVG-only outdoor view did not
+  provide real-world street context or true pitched building extrusions.
+- **Selected:** MapLibre GL JS on web and MapLibre Native on mobile for real OSM basemap context
+  and `fill-extrusion`; retain R1's route-screen composition and R19's indoor SVG floor plans.
+- **As built:** `components/maps/campus-map.tsx` renders the OpenFreeMap Liberty style, whose
+  OpenMapTiles source includes a 3D building layer. CampusFlow overlays only published building
+  coordinates, verified footprint rings/heights, and Laravel-computed route geometry.
+  `components/maps/floor-plan.tsx` continues to render surveyed floor plans and graph paths.
 - **Refresh:** the map now adds orientation and scale context, status legend, label visibility,
   reset/zoom controls, a selected-destination card, stronger route contrast, and a direct
   transition into the selected building's floor plans. The refresh decision record is in
   [`design-decisions/campus-map-refresh.md`](design-decisions/campus-map-refresh.md).
+
+#### Renderer and data research (2026-10-05)
+
+- MapLibre's [3D buildings example](https://maplibre.org/maplibre-gl-js/docs/examples/display-buildings-in-3d/)
+  demonstrates real polygon extrusion; its [style specification](https://maplibre.org/maplibre-style-spec/layers/#fill-extrusion)
+  defines `fill-extrusion` and lists JS/native support. The
+  [React Native SDK](https://maplibre.org/maplibre-react-native/) supplies the mobile map renderer.
+- The actual [OpenFreeMap Liberty style](https://tiles.openfreemap.org/styles/liberty) was fetched
+  and inspected. Its `building-3d` layer extrudes OpenMapTiles building features using the
+  `render_height` and `render_min_height` attributes.
+- [OpenStreetMap licensing](https://www.openstreetmap.org/copyright) requires attribution and
+  ODbL credit. The [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/)
+  requires visible attribution, caching and non-bulk usage for its public raster tile service.
+- The [Leaflet API reference](https://leafletjs.com/reference.html) documents its map/layer
+  rendering model but no built-in 3D extrusion layer. A strict Leaflet solution would require a
+  separate WebGL overlay and a WebView bridge on native mobile, which duplicates rendering work.
+- Decision: retain MapLibre for genuine 3D on web and native mobile. External basemap failure now
+  falls back to a local style that still shows saved CampusFlow geometry and routes; it cannot
+  create missing road/building data or replace a proper production tile service.
 
 ### 4.4 Navigation + live tracking (`/navigate`)
 
@@ -282,7 +304,7 @@ first viewport, state coverage, contrast, 360 px reflow, token reuse).
 | --- | --- | --- |
 | Dashboard | 8.4 | Next-class hero + ticket strip; trimmed from week view |
 | Timetable | 8.6 | Week grid ≥ 768 px, stacked timeline below |
-| Campus map | 8.6 | SVG plans + selected destination context, status legend, orientation, scale, route contrast |
+| Campus map | 8.6 | 3D basemap buildings + verified campus overlays, selected-place context, location control, route contrast |
 | Navigation / live | 8.5 | Step list + banner; off-route state explained with countdown |
 | Rooms + detail | 8.7 | Dual-encoded availability, slot timeline |
 | QR scan | 8.3 | Error taxonomy surfaced with plain language |

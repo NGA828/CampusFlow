@@ -31,7 +31,8 @@ class CampusController extends Controller
 
     public function buildings(): JsonResponse
     {
-        $buildings = Building::where('status', '!=', 'closed')
+        $buildings = Building::withCount('floors')
+            ->where('status', '!=', 'closed')
             ->orderBy('name')
             ->get()
             ->map(fn ($b) => $b->toApiArray());

@@ -58,11 +58,12 @@ export interface Building {
   lat: number;
   lng: number;
   footprint: [number, number][] | null;
+  height_m: number | null;
   has_elevator: boolean;
   is_public: boolean;
   status: 'operational' | 'limited' | 'closed' | 'maintenance';
   opening_hours: Record<string, string> | null;
-  floor_count?: number;
+  floors_count?: number;
   room_count?: number;
   floors?: Floor[];
 }

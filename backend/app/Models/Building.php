@@ -14,7 +14,7 @@ class Building extends Model
 
     protected $fillable = [
         'code', 'name', 'short_name', 'description', 'address', 'lat', 'lng',
-        'footprint', 'image_url', 'status', 'is_public', 'floors_count',
+        'footprint', 'height_m', 'image_url', 'status', 'is_public', 'floors_count',
     ];
 
     protected function casts(): array
@@ -23,6 +23,7 @@ class Building extends Model
             'lat'          => 'float',
             'lng'          => 'float',
             'footprint'    => 'array',
+            'height_m'     => 'float',
             'floors_count' => 'integer',
             'is_public'    => 'boolean',
         ];
@@ -51,6 +52,7 @@ class Building extends Model
             'lat'          => $this->lat,
             'lng'          => $this->lng,
             'footprint'    => $this->footprint,
+            'height_m'     => $this->height_m,
             'image_url'    => $this->image_url,
             'status'       => $this->status,
             'floors_count' => $this->floors_count,

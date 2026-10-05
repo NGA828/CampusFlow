@@ -37,7 +37,7 @@ export default function MapScreen() {
           {query ? <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setQuery('')} style={styles.clear}><Ionicons name="close-circle" size={22} color={colors.ink400} /></Pressable> : null}
         </View>
 
-        {!searching && buildings.data ? <CampusMap3D buildings={buildings.data.buildings} onSelect={setQuery} /> : null}
+        {!searching && buildings.data ? <CampusMap3D buildings={buildings.data.buildings} position={position.data?.position} onSelect={setQuery} /> : null}
         <Notice icon="locate-outline" title={position.data?.position ? 'Your location is anchored' : 'Find your indoor position'} tone="mint">
           {position.data?.position ? `${position.data.position.source} · updated ${relativeTime(position.data.position.updated_at)}` : 'Scan a QR anchor for a trusted starting point inside a building.'}
         </Notice>
@@ -60,7 +60,7 @@ export default function MapScreen() {
           {buildings.data?.buildings.length === 0 ? <EmptyState title="The campus directory is quiet" description="Buildings will appear here when they are published by your campus." /> : null}
           {buildings.data?.buildings.map((building) => <Card key={building.id}>
             <View style={styles.buildingHeading}><IconTile name="business-outline" tone="mint" /><View style={{ flex: 1 }}><Small style={{ color: colors.brand700, fontWeight: '700' }}>BUILDING {building.code}</Small><H3 style={{ marginTop: 4 }}>{building.name}</H3></View></View>
-            <View style={styles.meta}><Badge tone={building.status === 'operational' ? 'mint' : building.status === 'closed' ? 'coral' : 'signal'}>{building.status}</Badge><Small>{building.floor_count ?? '—'} floors · {building.room_count ?? '—'} rooms{building.has_elevator ? ' · lift' : ''}</Small></View>
+            <View style={styles.meta}><Badge tone={building.status === 'operational' ? 'mint' : building.status === 'closed' ? 'coral' : 'signal'}>{building.status}</Badge><Small>{building.floors_count ?? '—'} floors · {building.room_count ?? '—'} rooms{building.has_elevator ? ' · lift' : ''}</Small></View>
             <Button label={`Explore ${building.code} rooms`} variant="secondary" onPress={() => setQuery(building.code)} style={{ marginTop: 16 }} />
           </Card>)}
         </>}

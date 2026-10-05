@@ -37,10 +37,20 @@ class CampusConfiguration
             $rules += [
                 'lat' => 'nullable|numeric|between:-90,90',
                 'lng' => 'nullable|numeric|between:-180,180',
+                'height_m' => 'nullable|numeric|gt:0|max:1000',
                 'image_url' => 'nullable|string|max:500', 'is_public' => 'sometimes|boolean',
             ];
             if ($kind === 'building') {
-                $rules += ['short_name' => 'nullable|string|max:40', 'description' => 'nullable|string', 'address' => 'nullable|string|max:200', 'footprint' => 'nullable|array', 'campus_name' => 'prohibited'];
+                $rules += [
+                    'short_name' => 'nullable|string|max:40',
+                    'description' => 'nullable|string',
+                    'address' => 'nullable|string|max:200',
+                    'footprint' => 'nullable|array|min:3|max:1000',
+                    'footprint.*' => 'required|array|size:2',
+                    'footprint.*.0' => 'required|numeric|between:-180,180',
+                    'footprint.*.1' => 'required|numeric|between:-90,90',
+                    'campus_name' => 'prohibited',
+                ];
             } else {
                 $rules += [
                     'floor_id' => $existing ? 'prohibited' : ['required', 'uuid', Rule::exists('floors', 'id')->whereNull('deleted_at')],

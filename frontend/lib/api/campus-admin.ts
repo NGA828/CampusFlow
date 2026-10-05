@@ -12,7 +12,7 @@ export interface CampusField {
   key: string;
   label: string;
   group: string;
-  type?: "number" | "select" | "boolean" | "textarea";
+  type?: "number" | "select" | "boolean" | "textarea" | "json";
   required?: boolean;
   maxLength?: number;
   min?: number;
@@ -98,7 +98,24 @@ export const campusFields: Record<CampusKind, CampusField[]> = {
       type: "textarea",
       group: "Identity",
     },
+    {
+      key: "footprint",
+      label: "Footprint ring coordinates (JSON)",
+      type: "json",
+      group: "Coordinates",
+      hint: "Use surveyed or verified [longitude, latitude] pairs, for example [[11.5,3.8],[11.5001,3.8],[11.5001,3.8001]]. A guessed outline is not used.",
+    },
     ...coordinates,
+    {
+      key: "height_m",
+      label: "Verified building height (m)",
+      group: "Coordinates",
+      type: "number",
+      min: 0.01,
+      max: 1000,
+      step: "0.01",
+      hint: "Optional measured height. Leave blank if it has not been verified; map tiles supply their own mapped building heights.",
+    },
     visibility,
   ],
   floors: [
@@ -233,9 +250,20 @@ export function campusRow(kind: CampusKind, value: unknown): CampusRow {
           502,
           "The campus record is missing its policy values.",
         );
+    } else if (field.type === "json") {
+      if (v != null && !Array.isArray(v))
+        throw new ApiError(
+          502,
+          "The campus record contains invalid footprint metadata.",
+        );
     } else if (v != null && typeof v !== "string")
       throw new ApiError(502, "The campus record is incomplete.");
-    values[field.key] = v == null ? "" : String(v);
+    values[field.key] =
+      v == null
+        ? ""
+        : field.type === "json"
+          ? JSON.stringify(v)
+          : String(v);
   }
   if (kind === "floors") identity(r.building_id);
   if (kind === "rooms") identity(r.floor_id);
@@ -281,14 +309,26 @@ export function campusBody(
     if (existing && values[f.key] === existing.values[f.key]) continue;
     const v = values[f.key]?.trim() ?? "";
     if (f.required && !v) throw new Error(`${f.label} is required.`);
-    body[f.key] =
-      f.type === "boolean"
-        ? v === "true"
-        : f.type === "number"
-          ? v === ""
-            ? null
-            : Number(v)
-          : v || null;
+    if (f.type === "json") {
+      if (!v) {
+        body[f.key] = null;
+      } else {
+        try {
+          body[f.key] = JSON.parse(v);
+        } catch {
+          throw new Error("Footprint coordinates must be valid JSON.");
+        }
+      }
+    } else {
+      body[f.key] =
+        f.type === "boolean"
+          ? v === "true"
+          : f.type === "number"
+            ? v === ""
+              ? null
+              : Number(v)
+            : v || null;
+    }
     if (
       f.type === "number" &&
       v &&

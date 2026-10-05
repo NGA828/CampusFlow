@@ -47,6 +47,12 @@ for (const width of [320, 768, 1440])
       await expect(
         page.getByRole("heading", { name: screen.ready, exact: true }),
       ).toBeVisible();
+      if (screen.slug === "map") {
+        await expect(
+          page.getByRole("status").filter({ hasText: "Loading campus map" }),
+        ).toHaveCount(0, { timeout: 15_000 });
+        await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+      }
       if (screen.slug === "staff-queue") {
         await page.getByRole("button", { name: /A-022/ }).click();
         await expect(
@@ -212,6 +218,29 @@ test("a stalled campus map request ends in a retryable error instead of loading 
   ).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("button", { name: /try again/i })).toBeVisible();
 });
+test("the campus map falls back to stored geometry when the external basemap is unreachable", async ({
+  page,
+}) => {
+  await operationsSession(page);
+  await page.route("https://tiles.openfreemap.org/**", (route) =>
+    route.abort(),
+  );
+  await page.goto("/student/campus/map");
+  await expect(
+    page.getByRole("application", { name: /Interactive 3D campus map/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Offline map view · showing saved CampusFlow geometry only."),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+  await expect(page.getByTestId("offline-campus-geometry").locator("polygon")).toHaveCount(2);
+  mkdirSync(screens, { recursive: true });
+  await page.screenshot({
+    path: `${screens}/map-offline-1440.png`,
+    fullPage: true,
+    animations: "disabled",
+  });
+});
 test("zero latitude and longitude remain valid saved coordinates", async ({
   page,
 }) => {
@@ -235,7 +264,9 @@ test("zero latitude and longitude remain valid saved coordinates", async ({
   );
   await page.goto("/student/campus/map");
   await expect(
-    page.locator('svg g[aria-label="Saved position"]'),
+    page.locator(
+      '.campus-map-marker--user[aria-label="Saved position"]',
+    ),
   ).toBeVisible();
 });
 test("queue directory searches closed lines and confirmed closing keeps the line accessible", async ({
