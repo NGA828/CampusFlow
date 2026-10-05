@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Card, Small, SectionTitle } from '@/components/ui';
+import { RouteMap3D } from '@/components/route-map-3d';
 import { colors, spacing } from '@/lib/theme';
 import type { MobileRouteLeg, MobileRouteNode } from '@/lib/api';
 import type { Position } from '@/lib/types';
@@ -234,6 +235,7 @@ export function RouteTrace({ legs, originPosition, position, originNode }: { leg
   return (
     <Card style={styles.card}>
       <SectionTitle title="Route map" />
+      <RouteMap3D legs={legs} />
       <Small style={styles.caption}>Solid blue segments use saved edge bends; amber dashed segments are straight fallbacks between route nodes. Saved geometry still needs checking against real walkways and closures. The blue dot is your current position when it can be matched to this section.</Small>
       {gpsSnapLeg ? <Small style={styles.indoorNote}>Dashed line: your GPS fix to the nearest mapped route node. This is a snap connector, not a verified walkway.</Small> : null}
       {gpsOrigin && gpsSnapDistance !== null && gpsSnapDistance > 350 ? <Small style={styles.indoorNote}>Your GPS fix is {Math.round(gpsSnapDistance)} m from the route’s starting node; no snap connector is drawn at that distance.</Small> : null}

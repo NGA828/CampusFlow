@@ -1,3 +1,4 @@
+@import 'maplibre-gl/dist/maplibre-gl.css';
 @import 'tailwindcss';
 
 /*
@@ -168,13 +169,16 @@
   }
 }
 
-/* MapLibre canvas: keep it inside the rounded frame and free of default chrome. */
-.maplibregl-canvas {
-  outline: none !important;
+/* MapLibre navigation chrome and high-visibility live-position markers. */
+.maplibregl-canvas { outline: none !important; }
+.maplibregl-ctrl-attrib { font-size: 9px; opacity: .8; }
+.campus-map-marker {
+  width: 18px; height: 18px; border: 3px solid #fff; border-radius: 999px;
+  background: #e9a52f; box-shadow: 0 0 0 5px rgb(233 165 47 / .25), 0 3px 10px rgb(15 23 42 / .35);
 }
-.maplibregl-ctrl-attrib {
-  display: none !important;
-}
+.campus-map-marker--user { background: #4f46e5; box-shadow: 0 0 0 7px rgb(79 70 229 / .24), 0 3px 10px rgb(15 23 42 / .35); }
+.campus-map-marker--destination { background: #dc3e50; box-shadow: 0 0 0 5px rgb(220 62 80 / .22), 0 3px 10px rgb(15 23 42 / .35); }
+.campus-map-marker--office { background: #158a76; }
 
 /* Shared reflow rules: constrain children, not the document's overflow. */
 @layer base {
