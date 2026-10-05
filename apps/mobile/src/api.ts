@@ -52,6 +52,23 @@ export async function saveToken(token: string | null): Promise<void> {
   await writeToken(token);
 }
 
+/**
+ * What to do when the server rejects the stored token mid-session — the API was
+ * restarted, or twelve hours passed. Without this each screen reports it as its own
+ * loading failure and the student is left pulling to refresh against a dead token.
+ */
+type UnauthorizedHandler = () => void;
+let onUnauthorized: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  onUnauthorized = handler;
+}
+
+/** True when a failure is just "you are no longer signed in". */
+export function isSignedOut(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+}
+
 export async function api<T>(
   path: string,
   options: { method?: 'GET' | 'POST'; body?: unknown; auth?: boolean } = {},
@@ -76,6 +93,10 @@ export async function api<T>(
 
   const text = await response.text();
   const payload = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  if (response.status === 401 && headers.authorization) {
+    await saveToken(null);
+    onUnauthorized?.();
+  }
   if (!response.ok) {
     throw new ApiError(
       response.status,

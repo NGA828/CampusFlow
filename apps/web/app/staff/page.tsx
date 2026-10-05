@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, isSignedOut } from '@/lib/api';
 import { useRequireRole } from '@/lib/session';
 import type { Booking } from '@/lib/types';
 
@@ -17,7 +17,8 @@ export default function StaffRequestsPage() {
     try {
       const payload = await api<{ items: Booking[] }>('/bookings');
       setBookings(payload.items);
-    } catch {
+    } catch (caught) {
+      if (isSignedOut(caught)) return;
       setError('Requests could not be loaded.');
     }
   }, []);

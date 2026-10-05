@@ -21,6 +21,21 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * What to do when the server says the token is no longer good.
+ *
+ * Every screen fetches its own data, so without this each one invents its own wording
+ * for an expired session — a student gets "your campus data could not be loaded" and
+ * is left pressing refresh against a token that will never work again. The session
+ * provider registers a handler here and signs them out properly instead.
+ */
+type UnauthorizedHandler = () => void;
+let onUnauthorized: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  onUnauthorized = handler;
+}
+
 const TOKEN_KEY = 'campusflow.token';
 /** Fallback for embedded browsers that refuse storage access entirely. */
 let memoryToken: string | null = null;
@@ -50,6 +65,16 @@ function base(): string {
   return typeof window === 'undefined' ? SERVER_ORIGIN : '';
 }
 
+/**
+ * True when a failure is just "you are no longer signed in".
+ *
+ * The session provider has already dealt with it by the time a screen sees the error,
+ * so the screen must stay quiet rather than blame the data it was fetching.
+ */
+export function isSignedOut(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+}
+
 export async function api<T>(
   path: string,
   options: { method?: 'GET' | 'POST'; body?: unknown; token?: string | null } = {},
@@ -73,6 +98,11 @@ export async function api<T>(
 
   const text = await response.text();
   const payload = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  if (response.status === 401 && token) {
+    // The token we sent is dead: drop it before anything retries with it.
+    setToken(null);
+    onUnauthorized?.();
+  }
   if (!response.ok) {
     throw new ApiError(
       response.status,

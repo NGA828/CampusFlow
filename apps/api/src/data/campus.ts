@@ -92,6 +92,7 @@ const BLOCKS: BlockSpec[] = [
   {
     buildingId: 'iai-b-ped',
     letter: 'P',
+    name: 'Bâtiment Pédagogique',
     slug: 'ped',
     // Corridor runs south → north up the middle of the 92 × 16 m teaching bar.
     origin: [17, -43],
@@ -141,6 +142,7 @@ const BLOCKS: BlockSpec[] = [
   {
     buildingId: 'iai-b-adm',
     letter: 'A',
+    name: 'Administration',
     slug: 'adm',
     // Corridor along the long axis of the OSM-mapped 26.2 × 23.5 m block.
     origin: [-93.2, 61],
@@ -187,6 +189,7 @@ const BLOCKS: BlockSpec[] = [
   {
     buildingId: 'iai-b-cet',
     letter: 'C',
+    name: 'Centre d’Excellence',
     slug: 'cet',
     // Corridor runs south → north behind the verandah of the 80 × 16 m low block.
     origin: [97, -66],

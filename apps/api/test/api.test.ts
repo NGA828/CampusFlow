@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { before, test } from 'node:test';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { router } from '../src/routes.ts';
@@ -344,4 +348,32 @@ test('a long corridor is one instruction, not one per door', async () => {
 
   // The drawn line still follows every node, so it turns where the corridor turns.
   assert.ok(payload.route.geometry.length > payload.route.steps.length);
+});
+
+test('a session survives a restart of the API', () => {
+  // The bug this pins: tokens used to live only in memory while everything else was
+  // written to disk, so any restart — a deploy, a crash, a file saved in watch mode —
+  // silently signed every student out in the middle of what they were doing.
+  const dataFile = join(mkdtempSync(join(tmpdir(), 'campusflow-')), 'store.json');
+  const run = (script: string) =>
+    execFileSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
+      cwd: new URL('..', import.meta.url).pathname,
+      env: { ...process.env, CAMPUSFLOW_DATA_FILE: dataFile },
+      encoding: 'utf8',
+    }).trim();
+
+  const token = run(`
+    const { initialise, createSession, users } = await import('./src/store.ts');
+    initialise();
+    const student = [...users.values()].find((user) => user.role === 'STUDENT');
+    process.stdout.write(createSession(student.id).token);
+  `);
+  assert.ok(token.length > 20, 'no token was issued');
+
+  const stillValid = run(`
+    const { initialise, sessionByToken } = await import('./src/store.ts');
+    initialise();
+    process.stdout.write(sessionByToken(${JSON.stringify(token)}) ? 'yes' : 'no');
+  `);
+  assert.equal(stillValid, 'yes', 'the token did not survive the restart');
 });

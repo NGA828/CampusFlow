@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, isSignedOut } from '@/lib/api';
 import { useRequireRole } from '@/lib/session';
 import type { SessionUser, University } from '@/lib/types';
 
@@ -26,7 +26,8 @@ export default function AdminPage() {
       try {
         const [directory] = await Promise.all([api<{ items: University[] }>('/universities'), refresh()]);
         setUniversities(directory.items);
-      } catch {
+      } catch (caught) {
+        if (isSignedOut(caught)) return;
         setError('Administration data could not be loaded.');
       }
     })();

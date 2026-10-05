@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, isSignedOut } from '@/lib/api';
 import { useRequireRole } from '@/lib/session';
 import type { Announcement } from '@/lib/types';
 
@@ -18,7 +18,9 @@ export default function StaffPublishPage() {
     if (!user) return;
     void api<{ items: Announcement[] }>(`/announcements?university=${user.universitySlug}`)
       .then((payload) => setPublished(payload.items))
-      .catch(() => setError('Published announcements could not be loaded.'));
+      .catch((caught: unknown) => {
+        if (!isSignedOut(caught)) setError('Published announcements could not be loaded.');
+      });
   }, [user]);
 
   if (loading || !user) {

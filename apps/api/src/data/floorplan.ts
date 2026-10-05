@@ -64,6 +64,8 @@ export interface BlockSpec {
   buildingId: string;
   /** Single letter used in room numbers. */
   letter: string;
+  /** How a person refers to the block — used in every node label a student reads. */
+  name: string;
   /** Short code used in node ids, e.g. `ped` → `n-ped1-c3`. */
   slug: string;
   /** Corridor start, in campus metres east/north of the perimeter centroid. */
@@ -212,20 +214,20 @@ export function generateBlock(
     // Vertical links and the outside door.
     if (floor.stairsAt !== null) {
       const stairs = `${prefix}-stairs`;
-      node(stairs, floor.id, `Escalier ${block.letter} — ${floor.name}`, floor.stairsAt, 0);
+      node(stairs, floor.id, `Escalier ${block.name} — ${floor.name}`, floor.stairsAt, 0);
       edges.push({ from: corridorNodeAt.get(Math.round(floor.stairsAt * 10) / 10) as string, to: stairs, kind: 'CORRIDOR', accessible: true });
     }
     if (floor.liftAt !== null) {
       const lift = `${prefix}-lift`;
-      node(lift, floor.id, `Ascenseur ${block.letter} — ${floor.name}`, floor.liftAt, 0);
+      node(lift, floor.id, `Ascenseur ${block.name} — ${floor.name}`, floor.liftAt, 0);
       edges.push({ from: corridorNodeAt.get(Math.round(floor.liftAt * 10) / 10) as string, to: lift, kind: 'CORRIDOR', accessible: true });
     }
     if (floor.entranceAt !== undefined) {
       const sign = floor.entranceSide === 'EVEN' ? -1 : 1;
       const entrance = `n-${block.slug}${floor.level}-entrance`;
       const hall = `n-${block.slug}${floor.level}-hall`;
-      node(entrance, floor.id, `Entrée ${block.letter}`, floor.entranceAt, sign * (half + 2));
-      node(hall, floor.id, `Hall ${block.letter}`, floor.entranceAt, 0);
+      node(entrance, floor.id, `Entrée ${block.name}`, floor.entranceAt, sign * (half + 2));
+      node(hall, floor.id, `Hall ${block.name}`, floor.entranceAt, 0);
       edges.push({ from: entrance, to: hall, kind: 'DOOR', accessible: true });
       edges.push({ from: hall, to: corridorNodeAt.get(Math.round(floor.entranceAt * 10) / 10) as string, kind: 'CORRIDOR', accessible: true });
     }

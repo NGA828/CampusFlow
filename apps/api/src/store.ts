@@ -11,8 +11,12 @@ import type { Announcement, Booking, CampusEvent, Notification, PublicUser, Sess
  * can be installed in this environment; a single file written atomically is the
  * honest substitute, and `/health` reports which file is in use.
  *
- * Sessions are deliberately *not* persisted: a restart should end everyone's session
- * rather than resurrect tokens from disk.
+ * Sessions are persisted too. They used to be deliberately in-memory, on the argument
+ * that a restart should end everyone's session — but in practice the API restarts for
+ * reasons that have nothing to do with the person using it (a deploy, a crash, an edit
+ * in watch mode), and signing a student out mid-task because a file was saved is not
+ * security, it is a bug. Sessions still expire 12 hours after they are issued, logging
+ * out still deletes them, and expired ones are dropped on restore.
  */
 
 export const users = new Map<string, User>();
@@ -27,8 +31,10 @@ export const announcements = new Map<string, Announcement>();
 export const DATA_FILE = resolve(process.env.CAMPUSFLOW_DATA_FILE ?? resolve(process.cwd(), '../../.data/campusflow.json'));
 
 interface Snapshot {
-  version: 1;
+  version: 1 | 2;
   users: User[];
+  /** Added in version 2; a version 1 file simply has no live sessions to restore. */
+  sessions?: Session[];
   bookings: Booking[];
   notifications: Notification[];
   events: CampusEvent[];
@@ -41,8 +47,9 @@ let persistenceEnabled = true;
 export function persist(): void {
   if (!persistenceEnabled) return;
   const snapshot: Snapshot = {
-    version: 1,
+    version: 2,
     users: [...users.values()],
+    sessions: [...sessions.values()],
     bookings: [...bookings.values()],
     notifications: [...notifications.values()],
     events: [...events.values()],
@@ -64,13 +71,20 @@ function restore(): boolean {
   if (!existsSync(DATA_FILE)) return false;
   try {
     const snapshot = JSON.parse(readFileSync(DATA_FILE, 'utf8')) as Snapshot;
-    if (snapshot.version !== 1 || !Array.isArray(snapshot.users) || snapshot.users.length === 0) return false;
+    if ((snapshot.version !== 1 && snapshot.version !== 2) || !Array.isArray(snapshot.users) || snapshot.users.length === 0) {
+      return false;
+    }
     users.clear();
+    sessions.clear();
     bookings.clear();
     notifications.clear();
     events.clear();
     announcements.clear();
     for (const user of snapshot.users) users.set(user.id, user);
+    for (const session of snapshot.sessions ?? []) {
+      // A token that expired while the process was down must not come back to life.
+      if (Date.parse(session.expiresAt) > Date.now() && users.has(session.userId)) sessions.set(session.token, session);
+    }
     for (const booking of snapshot.bookings ?? []) bookings.set(booking.id, booking);
     for (const notification of snapshot.notifications ?? []) notifications.set(notification.id, notification);
     for (const event of snapshot.events ?? []) events.set(event.id, event);
@@ -121,6 +135,7 @@ export function createSession(userId: string): Session {
     expiresAt: new Date(Date.now() + SESSION_HOURS * 3_600_000).toISOString(),
   };
   sessions.set(session.token, session);
+  persist();
   return session;
 }
 
@@ -129,6 +144,7 @@ export function sessionByToken(token: string): Session | undefined {
   if (!session) return undefined;
   if (Date.parse(session.expiresAt) < Date.now()) {
     sessions.delete(token);
+    persist();
     return undefined;
   }
   return session;

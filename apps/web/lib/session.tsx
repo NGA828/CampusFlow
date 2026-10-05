@@ -1,13 +1,15 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ApiError, api, getToken, setToken } from './api';
+import { ApiError, api, getToken, setToken, setUnauthorizedHandler } from './api';
 import type { Role, SessionUser } from './types';
 
 interface SessionValue {
   user: SessionUser | null;
   loading: boolean;
+  /** True when a signed-in session was rejected mid-use, so the sign-in screen can say so. */
+  expired: boolean;
   signIn: (email: string, password: string) => Promise<SessionUser>;
   signOut: () => Promise<void>;
   reload: () => Promise<void>;
@@ -24,6 +26,28 @@ export const HOME_FOR: Record<Role, string> = {
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expired, setExpired] = useState(false);
+  // Read inside the handler below, which is registered once and must not go stale.
+  const signedIn = useRef(false);
+
+  useEffect(() => {
+    signedIn.current = user !== null;
+  }, [user]);
+
+  /**
+   * The API restarting, or twelve hours passing, must not look like a broken page.
+   * Any 401 against a token we were actually using ends the session here, once, and
+   * the role guards then send the student to the sign-in screen with an explanation.
+   */
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (!signedIn.current) return;
+      signedIn.current = false;
+      setExpired(true);
+      setUser(null);
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   const reload = useCallback(async () => {
     if (!getToken()) {
@@ -55,6 +79,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
     setToken(session.token);
     setUser(session.user);
+    setExpired(false);
     return session.user;
   }, []);
 
@@ -66,9 +91,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
     setToken(null);
     setUser(null);
+    setExpired(false);
   }, []);
 
-  const value = useMemo<SessionValue>(() => ({ user, loading, signIn, signOut, reload }), [user, loading, signIn, signOut, reload]);
+  const value = useMemo<SessionValue>(
+    () => ({ user, loading, expired, signIn, signOut, reload }),
+    [user, loading, expired, signIn, signOut, reload],
+  );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

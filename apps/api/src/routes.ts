@@ -9,6 +9,7 @@ import {
   announcements,
   bookings,
   createSession,
+  persist,
   events,
   hashPassword,
   notifications,
@@ -29,7 +30,7 @@ export const router = new Router();
 
 router.get('/api/v1/health', () => ({
   status: 'ok',
-  storage: `json-file: ${DATA_FILE} (written after every mutation; sessions are not persisted)`,
+  storage: `json-file: ${DATA_FILE} (written after every mutation, sessions included)`,
   universities: UNIVERSITIES.length,
   indoorCampuses: UNIVERSITIES.filter((university) => university.indoorMappingPriority === 1).map((u) => u.slug),
   time: new Date().toISOString(),
@@ -157,6 +158,8 @@ router.post('/api/v1/auth/refresh', (ctx) => {
   const user = users.get(session.userId);
   if (!user) throw new HttpError(401, 'This account is no longer available.');
   sessions.delete(session.token);
+  // sessionPayload issues (and persists) the replacement; this only drops the old one.
+  persist();
   return sessionPayload(user);
 });
 
@@ -164,7 +167,10 @@ router.post('/api/v1/auth/logout', (ctx) => {
   const header = ctx.req.headers.authorization;
   if (header?.startsWith('Bearer ')) {
     const session = sessionByToken(header.slice(7).trim());
-    if (session) sessions.delete(session.token);
+    if (session) {
+      sessions.delete(session.token);
+      persist();
+    }
   }
   return { signedOut: true };
 });

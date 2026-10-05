@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, isSignedOut } from '@/lib/api';
 import { useRequireRole } from '@/lib/session';
 import type { Announcement, CampusEvent, NotificationItem } from '@/lib/types';
 
@@ -24,7 +24,8 @@ export default function CampusLifePage() {
         setEvents(eventPayload.items);
         setNotices(noticePayload.items);
         setNotifications(notificationPayload.items);
-      } catch {
+      } catch (caught) {
+        if (isSignedOut(caught)) return;
         setError('Campus life could not be loaded.');
       }
     })();

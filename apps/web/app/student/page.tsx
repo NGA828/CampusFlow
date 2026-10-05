@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, isSignedOut } from '@/lib/api';
 import { useRequireRole } from '@/lib/session';
 import type { Announcement, Booking, CampusEvent, NotificationItem } from '@/lib/types';
 
@@ -32,7 +32,8 @@ export default function StudentHome() {
         setNotifications(notificationPayload.items);
         setEvents(eventPayload.items);
         setNotices(noticePayload.items);
-      } catch {
+      } catch (caught) {
+        if (isSignedOut(caught)) return;
         setError('Your campus data could not be loaded. Refresh to try again.');
       }
     })();

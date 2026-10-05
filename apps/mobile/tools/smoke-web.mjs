@@ -113,7 +113,7 @@ expect('an anchor fixes the indoor position', text().includes('Position : Entré
 await press('Carte');
 await wait(1000);
 expect('a device without WebGL still gets the screen', text().includes('Carte indisponible'), text());
-await press('D11 — Salle du Conseil');
+await press('A101 — Salle du Conseil');
 await press('Calculer');
 await wait(1200);
 expect('the server returns walkable steps', /Entrez : Salle du Conseil/.test(text()), text());

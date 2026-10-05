@@ -16,7 +16,7 @@ interface DemoAccount {
 function LoginScreen() {
   const router = useRouter();
   const params = useSearchParams();
-  const { user, loading, signIn } = useSession();
+  const { user, loading, expired, signIn } = useSession();
   const [accounts, setAccounts] = useState<DemoAccount[]>([]);
   const [demoPassword, setDemoPassword] = useState('');
   const [email, setEmail] = useState('');
@@ -87,6 +87,13 @@ function LoginScreen() {
     <main className="shell" style={{ paddingBlock: 48, maxWidth: 560 }}>
       <p className="eyebrow">CampusFlow · IAI Cameroun</p>
       <h1 style={{ marginTop: 8 }}>Sign in</h1>
+
+      {expired ? (
+        <p className="notice noticeError" role="status" style={{ marginTop: 18 }}>
+          Your session ended — the server was restarted or twelve hours have passed. Sign in again and you will come
+          straight back.
+        </p>
+      ) : null}
 
       {autoState === 'running' && !manual ? (
         <p className="notice" role="status" style={{ marginTop: 18 }}>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, isSignedOut } from '@/lib/api';
 import { useRequireRole } from '@/lib/session';
 import { CampusMap } from '@/components/campus-map';
 import type { CampusModel, IndoorRoute } from '@/lib/types';
@@ -42,13 +42,14 @@ export default function StudentMapPage() {
         setDestination(payload.rooms[0]?.id ?? '');
         setActiveFloorId(payload.buildings[0]?.floors[0]?.id ?? null);
       })
-      .catch((caught: unknown) =>
+      .catch((caught: unknown) => {
+        if (isSignedOut(caught)) return;
         setError(
           caught instanceof ApiError && caught.status === 404
             ? 'Your institution is not mapped indoors yet. IAI Cameroun is the pilot campus.'
             : 'The campus model could not be loaded.',
-        ),
-      );
+        );
+      });
   }, [user]);
 
   if (loading || !user) {

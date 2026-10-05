@@ -18,7 +18,7 @@ interface DemoAccount {
  * is written to the keychain and outlives the launch.
  */
 export function LoginScreen() {
-  const { signIn } = useSession();
+  const { signIn, expired } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [accounts, setAccounts] = useState<DemoAccount[]>([]);
@@ -55,6 +55,12 @@ export function LoginScreen() {
         <Text style={styles.subtitle}>
           Scan the QR anchors on campus walls, follow indoor routes and keep your appointments in your pocket.
         </Text>
+
+        {expired && !error ? (
+          <Text style={[styles.notice, styles.noticeError]}>
+            Votre session a pris fin — reconnectez-vous pour reprendre où vous en étiez.
+          </Text>
+        ) : null}
 
         {error ? <Text style={[styles.notice, styles.noticeError]}>{error}</Text> : null}
 

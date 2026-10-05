@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, isSignedOut } from '@/lib/api';
 import { useRequireRole } from '@/lib/session';
 import type { Booking, RoomSummary } from '@/lib/types';
 
@@ -35,7 +35,8 @@ export default function StudentRoomsPage() {
         const [roomPayload] = await Promise.all([api<{ items: RoomSummary[] }>('/rooms'), refresh()]);
         setRooms(roomPayload.items);
         setForm((current) => ({ ...current, roomId: roomPayload.items.find((room) => room.bookable)?.id ?? '' }));
-      } catch {
+      } catch (caught) {
+        if (isSignedOut(caught)) return;
         setError('Rooms could not be loaded.');
       }
     })();

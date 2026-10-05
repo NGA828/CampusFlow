@@ -1,10 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ApiError, api, loadToken, saveToken } from './api';
+import { ApiError, api, loadToken, saveToken, setUnauthorizedHandler } from './api';
 import type { SessionUser } from './types';
 
 interface SessionValue {
   user: SessionUser | null;
   loading: boolean;
+  /** Set when a live session was rejected, so the sign-in screen can explain itself. */
+  expired: boolean;
   signIn: (email: string, password: string) => Promise<SessionUser>;
   signOut: () => Promise<void>;
 }
@@ -14,6 +16,16 @@ const SessionContext = createContext<SessionValue | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expired, setExpired] = useState(false);
+
+  // One place decides that a session is over, so no screen has to guess.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setExpired(true);
+      setUser(null);
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -41,6 +53,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
     await saveToken(session.token);
     setUser(session.user);
+    setExpired(false);
     return session.user;
   }, []);
 
@@ -52,9 +65,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
     await saveToken(null);
     setUser(null);
+    setExpired(false);
   }, []);
 
-  const value = useMemo(() => ({ user, loading, signIn, signOut }), [user, loading, signIn, signOut]);
+  const value = useMemo(() => ({ user, loading, expired, signIn, signOut }), [user, loading, expired, signIn, signOut]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
