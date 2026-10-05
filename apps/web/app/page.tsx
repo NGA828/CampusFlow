@@ -25,12 +25,23 @@ export default async function LandingPage() {
             CampusFlow maps the universities and grandes écoles of Yaoundé, guides students across the IAI Cameroun campus
             indoors and out, and turns an administrative visit into a booking instead of a queue.
           </p>
+          {/*
+            Three seats, three different products. The landing page used to offer only
+            "Sign in as a student", so staff and administrators had no way in from here.
+          */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 22 }}>
-            <Link href="/login" className="btn">Sign in as a student</Link>
-            <Link href="/register" className="btn btnGhost" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}>
-              Create a student account
+            <Link href="/login?role=STUDENT" className="btn">Sign in as a student</Link>
+            <Link href="/login?role=STAFF" className="btn btnGhost" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}>
+              Sign in as staff
+            </Link>
+            <Link href="/login?role=ADMIN" className="btn btnGhost" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}>
+              Sign in as an administrator
             </Link>
           </div>
+          <p style={{ marginTop: 12, fontSize: 13.5, color: 'rgba(255,255,255,0.6)' }}>
+            New student? <Link href="/register" style={{ color: 'var(--gold-500)' }}>Create an account</Link>. Or{' '}
+            <Link href="/login" style={{ color: 'var(--gold-500)' }}>sign in with your own credentials</Link>.
+          </p>
           <dl className="grid cols3" style={{ marginTop: 34, color: 'white' }}>
             {[
               { label: 'Institutions listed', value: directory ? String(directory.total) : '—' },
@@ -61,6 +72,46 @@ export default async function LandingPage() {
               The directory could not be loaded because the CampusFlow API is not reachable.
             </p>
           )}
+        </div>
+      </section>
+
+      <section className="shell" style={{ paddingBlock: '10px 10px' }}>
+        <p className="eyebrow">Three ways in</p>
+        <h2 style={{ marginTop: 6 }}>What each account sees</h2>
+        <div className="grid cols3" style={{ marginTop: 18 }}>
+          {[
+            {
+              role: 'STUDENT',
+              title: 'Student',
+              lead: 'Find a room, get there, book a meeting.',
+              does: ['Campus map, indoor routes and step-free mode', 'QR scan for an indoor position (mobile)', 'Request an administrative room', 'Events, announcements and notifications'],
+            },
+            {
+              role: 'STAFF',
+              title: 'Staff — Scolarité',
+              lead: 'Decide requests, publish what students must know.',
+              does: ['Approve or decline room requests with a note', 'Publish announcements to the whole institution', 'See every booking and its decision', 'The student is notified either way'],
+            },
+            {
+              role: 'ADMIN',
+              title: 'Administrator',
+              lead: 'Accounts, campuses and the directory behind it all.',
+              does: ['Create staff and administrator accounts', 'Review every account on the platform', 'See the institution directory and its sources', 'Everything the scolarité can do'],
+            },
+          ].map((seat) => (
+            <article key={seat.role} className="card">
+              <p className="eyebrow">{seat.title}</p>
+              <p style={{ marginTop: 6, fontWeight: 600 }}>{seat.lead}</p>
+              <ul className="list" style={{ marginTop: 10 }}>
+                {seat.does.map((line) => (
+                  <li key={line} className="muted" style={{ fontSize: 13.5 }}>{line}</li>
+                ))}
+              </ul>
+              <Link href={`/login?role=${seat.role}`} className="btn btnSmall" style={{ marginTop: 12 }}>
+                Enter as {seat.title.split(' —')[0].toLowerCase()}
+              </Link>
+            </article>
+          ))}
         </div>
       </section>
 

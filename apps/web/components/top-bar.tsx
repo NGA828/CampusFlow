@@ -22,10 +22,15 @@ export function TopBar() {
         ? [
             { href: '/staff', label: 'Requests' },
             { href: '/staff/publish', label: 'Publish' },
+            { href: '/', label: 'Directory' },
           ]
         : user?.role === 'ADMIN'
           ? [
+              // An administrator may also work the scolarité desk — the API allows it,
+              // so the navigation should not pretend those pages are out of reach.
               { href: '/admin', label: 'Administration' },
+              { href: '/staff', label: 'Requests' },
+              { href: '/staff/publish', label: 'Publish' },
               { href: '/', label: 'Public directory' },
             ]
           : [

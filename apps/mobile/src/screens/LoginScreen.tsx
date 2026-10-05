@@ -55,6 +55,9 @@ export function LoginScreen() {
         <Text style={styles.subtitle}>
           Scan the QR anchors on campus walls, follow indoor routes and keep your appointments in your pocket.
         </Text>
+        <Text style={styles.muted}>
+          Application étudiante. La scolarité et l’administration travaillent sur CampusFlow web.
+        </Text>
 
         {expired && !error ? (
           <Text style={[styles.notice, styles.noticeError]}>

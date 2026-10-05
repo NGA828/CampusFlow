@@ -24,10 +24,15 @@ function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<Role | 'form' | null>(null);
   /**
-   * The walkthrough signs the student in on arrival. `?manual=1` turns that off, which
-   * is how staff and administrators reach the form without racing the redirect.
+   * Which seat the visitor asked for on the landing page: `?role=STAFF` signs that
+   * walkthrough account straight in. Arriving at `/login` with no role asks instead of
+   * assuming — it used to sign everybody in as the student, which left staff and
+   * administrators with no way in from the home page at all.
    */
-  const manual = params.get('manual') === '1';
+  const requested = params.get('role')?.toUpperCase();
+  const wanted: Role | null =
+    requested === 'STUDENT' || requested === 'STAFF' || requested === 'ADMIN' ? requested : null;
+  const manual = params.get('manual') === '1' || !wanted;
   const [autoState, setAutoState] = useState<'idle' | 'running' | 'failed'>(manual ? 'idle' : 'running');
   const autoAttempted = useRef(false);
 
@@ -63,14 +68,14 @@ function LoginScreen() {
         setAccounts(payload.accounts);
         setDemoPassword(payload.password);
 
-        if (manual || autoAttempted.current) return;
+        if (manual || !wanted || autoAttempted.current) return;
         autoAttempted.current = true;
-        const student = payload.accounts.find((account) => account.role === 'STUDENT');
-        if (!student) {
+        const account = payload.accounts.find((candidate) => candidate.role === wanted);
+        if (!account) {
           setAutoState('failed');
           return;
         }
-        const ok = await enter(student.email, payload.password, 'STUDENT');
+        const ok = await enter(account.email, payload.password, wanted);
         if (!ok && !cancelled) setAutoState('failed');
       } catch {
         if (!cancelled) setAutoState('failed');
@@ -79,9 +84,11 @@ function LoginScreen() {
     return () => {
       cancelled = true;
     };
-  }, [enter, manual]);
+  }, [enter, manual, wanted]);
 
   const showForm = manual || autoState === 'failed';
+  const seat = (role: Role) =>
+    role === 'STUDENT' ? 'Student' : role === 'STAFF' ? 'Staff — Scolarité' : 'Administrator';
 
   return (
     <main className="shell" style={{ paddingBlock: 48, maxWidth: 560 }}>
@@ -95,15 +102,15 @@ function LoginScreen() {
         </p>
       ) : null}
 
-      {autoState === 'running' && !manual ? (
+      {autoState === 'running' && wanted ? (
         <p className="notice" role="status" style={{ marginTop: 18 }}>
-          Signing you in as the walkthrough student…
+          Signing you in as the walkthrough {seat(wanted).toLowerCase()}…
         </p>
       ) : null}
 
       {autoState === 'failed' ? (
         <p className="notice noticeError" role="status" style={{ marginTop: 18 }}>
-          The automatic student sign-in did not complete. Use an account below.
+          That automatic sign-in did not complete. Choose an account below.
         </p>
       ) : null}
 
@@ -115,10 +122,10 @@ function LoginScreen() {
 
       {accounts.length > 0 ? (
         <section className="card" style={{ marginTop: 18 }}>
-          <p className="eyebrow">One-click walkthrough accounts</p>
+          <p className="eyebrow">Choose a seat · one-click walkthrough accounts</p>
           <p className="muted" style={{ marginTop: 6 }}>
-            Seeded accounts for this preview. They are real sign-ins: the server issues a token and checks the role on every
-            request afterwards.
+            Student, scolarité and administration each see a different CampusFlow. These are real sign-ins: the server
+            issues a token and checks the role on every request afterwards.
           </p>
           <div className="grid" style={{ gap: 8, marginTop: 12 }}>
             {accounts.map((account) => (
@@ -131,7 +138,7 @@ function LoginScreen() {
                 style={{ justifyContent: 'space-between' }}
               >
                 <span>
-                  <strong>{account.role === 'STUDENT' ? 'Student' : account.role === 'STAFF' ? 'Staff — Scolarité' : 'Administrator'}</strong>
+                  <strong>{seat(account.role)}</strong>
                   <span className="muted" style={{ marginLeft: 8 }}>{account.name}</span>
                 </span>
                 <span aria-hidden="true">→</span>
